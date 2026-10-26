@@ -1,0 +1,58 @@
+schema: spec-driven
+githubCopilot:
+  cloudAgent: false
+
+context: |
+  Smart Device Platform demonstrator. Business requirements live in docs/prd, hard-to-reverse architecture decisions in docs/adr,
+  reversible cross-cutting conventions in docs/architecture/implementation-guidelines.md.
+  Specs and designs MUST stay consistent with ADRs (propose a new ADR instead of silently diverging) and follow the guidelines
+  (or update them explicitly).
+  Platform services: Java 25 + Spring Boot 4. AI agent: Python + Microsoft Agent Framework. Web UI: SPA on Azure Static Web Apps.
+  All backend workloads run on Azure Container Apps; all user-facing APIs are exposed through Azure API Management.
+  Fully passwordless: managed identities + Microsoft Entra ID for every Azure data/control plane; no secrets, keys or connection
+  strings in code, config or IaC outputs. Documented exceptions only (see ADR-0005).
+  Devices authenticate with X.509 certificates issued by a per-site CA (DPS enrollment group per site).
+  Telemetry/traces/logs/metrics go to Application Insights via OpenTelemetry.
+  Infrastructure is Terraform deployed via azd. Region francecentral for everything except Static Web Apps (westeurope).
+  Users authenticate with Entra ID; two app roles: DeviceData.Read (query) and DeviceData.Write (edit).
+  Milestone order: M1 ingestion, M2 device list, M3 telemetry history + chart, M4 site certificates, M5 threshold alerting, M6 AI agent.
+
+rules:
+  proposal:
+    - Reference the PRD of the milestone the change delivers
+  design:
+    - Reference the ADRs and implementation guidelines the design relies on instead of restating them
+    - Never add easily reversible choices to ADRs; put cross-cutting ones in the implementation guidelines
+  tasks:
+    - Infrastructure tasks MUST be Terraform under infra/ and deployable with azd up
+
+# Project context (optional)
+# Add only constraints that should guide OpenSpec artifacts and workflows.
+# Include constraints an agent cannot infer by reading the code.
+# Keep general project documentation and discoverable codebase facts out.
+# Example:
+#   context: |
+#     Designs and tasks must cover Windows, macOS, and Linux
+#     Write all artifacts in Spanish
+
+# Per-artifact rules (optional)
+# Add custom rules for specific artifacts.
+# Example:
+#   rules:
+#     proposal:
+#       - Keep proposals under 500 words
+#       - Always state what is out of scope
+#     tasks:
+#       - Break tasks into chunks of max 2 hours
+
+# Per-operation guidance (optional)
+# Add advisory guidance for how apply and archive work should be conducted.
+# This is separate from artifact rules above.
+# Example:
+#   operations:
+#     apply:
+#       guidance:
+#         - Keep test summaries concise
+#     archive:
+#       guidance:
+#         - Summarize the archive outcome before finishing
