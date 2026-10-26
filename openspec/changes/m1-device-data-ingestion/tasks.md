@@ -2,20 +2,20 @@
 
 ## 1. Repository and build foundation
 
-- [ ] 1.1 Create the Maven parent `pom.xml` (Java 25, Spring Boot 4 BOM, Spring Cloud Azure BOM, Azure SDK BOM) and module skeletons `libs/payload-codecs`, `libs/platform-common`, `services/telemetry-decoder`, `services/device-simulator`, `services/db-migrator`; verify `mvn -q verify` succeeds on the empty modules
+- [x] 1.1 Create the Maven parent `pom.xml` (Java 25, Spring Boot 4 BOM, Spring Cloud Azure BOM, Azure SDK BOM) and module skeletons `libs/payload-codecs`, `libs/platform-common`, `services/telemetry-decoder`, `services/device-simulator`, `services/db-migrator`; verify `mvn -q verify` succeeds on the empty modules
 - [ ] 1.2 Spike: start a Spring Boot 4 / Java 25 app with the Application Insights Java agent and a passwordless PostgreSQL datasource against a dev server; verify telemetry appears in Application Insights and the DB connection uses an Entra token (record outcome in design.md Risks)
-- [ ] 1.3 Add a shared multi-stage Dockerfile pattern (JRE 25 minimal base, non-root user, App Insights agent) and verify each service image builds with `docker build`
-- [ ] 1.4 Add `.gitignore`, `.editorconfig`, root `README.md` (layout, prerequisites, `azd up`) and verify the README commands are accurate
+- [x] 1.3 Add a shared multi-stage Dockerfile pattern (JDK 25 distroless base, non-root user, App Insights agent, no BuildKit-only features) and verify each service image builds and starts with `podman build`/`podman run` (OCI-compatible, also used by `az acr build`)
+- [x] 1.4 Add `.gitignore`, `.editorconfig`, root `README.md` (layout, prerequisites, `azd up`) and verify the README commands are accurate
 
 ## 2. Payload codecs library
 
-- [ ] 2.1 Implement the metric catalogue (names, units, descriptions) and `DecodeResult` types; verify unit tests cover catalogue completeness against the payload-decoding spec
-- [ ] 2.2 Implement leading-byte detection and rejection reasons (`EMPTY_PAYLOAD`, `UNKNOWN_FORMAT`, `UNSUPPORTED_FORMAT`); verify spec scenarios as tests
-- [ ] 2.3 Implement Ruuvi DF5 decoder/encoder incl. not-available sentinels; verify official valid/min/max vectors and round-trip property tests pass
-- [ ] 2.4 Implement Ruuvi DF3 decoder/encoder; verify official vectors and the negative-temperature scenario pass
-- [ ] 2.5 Implement BTHome v2 decoder/encoder (supported object ids, stop-on-unknown, `NO_SUPPORTED_DATA`); verify spec scenarios and round trips pass
-- [ ] 2.6 Implement Cayenne LPP decoder/encoder with `0xCA` marker and channel-suffix rule; verify spec scenarios (two channels, negative temperature, truncation, unknown type) pass
-- [ ] 2.7 Document the format registry and metric mapping in `libs/payload-codecs/README.md`; verify it matches ADR-0003 and the spec tables
+- [x] 2.1 Implement the metric catalogue (names, units, descriptions) and `DecodeResult` types; verify unit tests cover catalogue completeness against the payload-decoding spec
+- [x] 2.2 Implement leading-byte detection and rejection reasons (`EMPTY_PAYLOAD`, `UNKNOWN_FORMAT`, `UNSUPPORTED_FORMAT`); verify spec scenarios as tests
+- [x] 2.3 Implement Ruuvi DF5 decoder/encoder incl. not-available sentinels; verify official valid/min/max vectors and round-trip property tests pass
+- [x] 2.4 Implement Ruuvi DF3 decoder/encoder; verify official vectors and the negative-temperature scenario pass
+- [x] 2.5 Implement BTHome v2 decoder/encoder (supported object ids, stop-on-unknown, `NO_SUPPORTED_DATA`); verify spec scenarios and round trips pass
+- [x] 2.6 Implement Cayenne LPP decoder/encoder with `0xCA` marker and channel-suffix rule; verify spec scenarios (two channels, negative temperature, truncation, unknown type) pass
+- [x] 2.7 Document the format registry and metric mapping in `libs/payload-codecs/README.md`; verify it matches ADR-0003 and the spec tables
 
 ## 3. Database schema and migrator
 

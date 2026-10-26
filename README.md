@@ -2,7 +2,7 @@
 
 End-to-end Azure demonstrator of a sensor platform: devices of several real-world binary formats send measurements through IoT Hub and Event Hubs, a batch decoder stores them in PostgreSQL, users browse devices and charts in a web portal, editors manage site certificates and alert thresholds, email alerts are raised for monitored devices, and an AI agent answers questions about the data.
 
-> **Status:** specification phase — PRDs, ADRs and OpenSpec changes are ready for review; no service code yet.
+> **Status:** M1 (device data ingestion) in progress — see `openspec list` for task progress.
 
 ## Documentation
 
@@ -38,6 +38,41 @@ All workloads ──OpenTelemetry──► Application Insights      Identity: E
 ```
 
 Stack: Java 25 + Spring Boot 4 (platform services), Python + Microsoft Agent Framework (agent), React + TypeScript (portal), Terraform deployed with azd. Region `francecentral` (Static Web Apps: `westeurope`).
+
+## Repository layout
+
+```
+libs/payload-codecs/        Format detection, decoders and encoders (pure Java)
+libs/platform-common/       Shared Spring Boot auto-configuration
+services/telemetry-decoder/ Event Hubs → PostgreSQL batch decoder
+services/device-simulator/  Simulated multi-site device fleet
+services/db-migrator/       Flyway migrations (Container Apps job)
+services/Dockerfile         Shared image definition for Java services
+infra/                      Terraform (deployed with azd)            [coming in M1]
+docs/  openspec/            Requirements, decisions, specs
+```
+
+## Prerequisites
+
+- **JDK 25** (e.g. [Microsoft Build of OpenJDK](https://learn.microsoft.com/java/openjdk/download)) with `JAVA_HOME` set — the build refuses older JDKs. Maven is not needed: use the wrapper `./mvnw`.
+- **Podman** (or Docker) to build images and run Testcontainers-based tests. With Podman, expose its socket to Testcontainers:
+  ```bash
+  systemctl --user enable --now podman.socket
+  export DOCKER_HOST=unix:///run/user/$(id -u)/podman/podman.sock
+  export TESTCONTAINERS_RYUK_DISABLED=true
+  ```
+- **Azure CLI**, **Azure Developer CLI (azd)**, **Terraform** for deployment.
+- **OpenSpec CLI** (`npm i -g @fission-ai/openspec`) to work with specs.
+
+## Build and run locally
+
+```bash
+./mvnw verify                                            # build and test all modules
+podman build -f services/Dockerfile \
+  --build-arg SERVICE=telemetry-decoder -t sdp/telemetry-decoder:dev .   # build one service image
+```
+
+Deployment (`azd up`) is documented once the infrastructure lands (M1 tasks 6–7).
 
 ## Working with specs
 

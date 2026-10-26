@@ -1,0 +1,36 @@
+# Build outputs
+target/
+*.class
+
+# IDEs
+.idea/
+*.iml
+.vscode/*
+!.vscode/extensions.json
+
+# OS
+.DS_Store
+Thumbs.db
+
+# azd / Terraform
+.azure/
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+crash.log
+
+# Node / Python (later milestones)
+node_modules/
+dist/
+.venv/
+__pycache__/
+
+# Local secrets and generated certificates (never commit)
+*.pem
+*.key
+*.pfx
+.env
+
+# Test tool caches
+.jqwik-database

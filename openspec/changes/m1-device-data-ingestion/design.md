@@ -83,6 +83,7 @@ Java services ship `applicationinsights-agent-3.x.jar` in the image (`JAVA_TOOL_
 ## Risks / Trade-offs
 
 - [Spring Boot 4 / Java 25 compatibility of Spring Cloud Azure and the App Insights Java agent] → Verify in task 1.x with a spike; fallback: Azure Identity + plain JDBC token supplier instead of the Spring Cloud Azure starter.
+  - *Spike result (local, 2026-10-26)*: Spring Boot 4.1.2 + Spring Cloud Azure 7.4.0 (`spring-cloud-azure-starter-jdbc-postgresql`, passwordless enabled) start correctly on Microsoft OpenJDK 25.0.5 with virtual threads; Application Insights agent 3.7.10 attaches on Java 25 and attempts managed-identity (UAMI) authentication. The agent needs `--enable-native-access=ALL-UNNAMED` (Netty native access warning) and adds a few seconds of JVM start-up. Pending: token-authenticated PostgreSQL connection and ingestion against real Azure resources (completed with the first `azd provision`, tasks 6.2/6.5).
 - [IoT Hub identity-based endpoint requires its role assignment to exist first] → Separate endpoint/route resources with explicit `depends_on` and a `time_sleep` for RBAC propagation.
 - [KEDA Event Hubs scaler with managed identity support in azurerm] → Use `azapi_update_resource` on the container app if `azurerm` lacks identity-based scale rule auth.
 - [Simulator holds site CA private keys] → Acceptable for demo; documented; production uses customer PKI and pre-provisioned device certificates.

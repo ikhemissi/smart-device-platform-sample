@@ -1,0 +1,14 @@
+**/target/
+**/node_modules/
+.git/
+.azure/
+.terraform/
+docs/
+openspec/
+infra/
+web/
+agents/
+*.pem
+*.key
+*.pfx
+.env

@@ -11,7 +11,9 @@ Cross-cutting implementation choices and conventions that apply to all milestone
 | Java runtime | Virtual threads enabled for request handling and I/O-bound work. Azure access through Spring Cloud Azure passwordless starters or `azure-identity` (`DefaultAzureCredential`). |
 | Python | Python 3.13, dependencies and lock file managed with `uv`; FastAPI + Uvicorn; `ruff` and `pytest`. |
 | Web | React + TypeScript + Vite, Fluent UI React v9, MSAL React, TanStack Query, React Router; Vitest, React Testing Library, Playwright (+ axe-core). Runtime configuration served as `config.json` generated at deploy time, so one build works for every environment. |
-| Container images | Multi-stage builds, minimal JRE 25 / `python:3.13-slim` base images, non-root user, one image per service. |
+| Container images | One shared multi-stage `services/Dockerfile` (build arg `SERVICE`) for Java services: Microsoft OpenJDK `25-ubuntu` build stage, `25-distroless` runtime, Spring Boot layered extraction, non-root uid 101, Application Insights agent in `JAVA_TOOL_OPTIONS` (with `--enable-native-access=ALL-UNNAMED`). Python: `python:3.13-slim`, non-root. |
+| Container tooling | No Docker daemon is assumed. Dockerfiles avoid BuildKit-only features so they build with Podman locally and with ACR Tasks; azd builds images remotely in ACR (`docker.remoteBuild: true`). Testcontainers runs against the Podman socket (`DOCKER_HOST=unix:///run/user/$UID/podman/podman.sock`, Ryuk disabled). |
+| Toolchain | JDK 25 (Microsoft Build of OpenJDK) and the checked-in Maven wrapper (`./mvnw`, Maven 3.9.x); the build enforces Java ≥ 25. |
 | Hosting | One Container Apps environment (Consumption workload profile). Event-driven services scale with KEDA scalers authenticated by managed identity; user-facing APIs keep at least one replica for demo responsiveness. |
 
 ## 2. Ingestion
