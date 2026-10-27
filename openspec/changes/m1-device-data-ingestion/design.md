@@ -24,6 +24,8 @@ azure.yaml                     # azd project (infra.provider: terraform)
 pom.xml                        # Maven parent: Java 25, Spring Boot 4 BOM, Spring Cloud Azure BOM
 libs/payload-codecs/           # pure Java, no Spring: detection + codecs + encoders + metric catalogue
 libs/platform-common/          # Spring auto-config: OTel attributes, JSON logging, Azure credential wiring
+libs/db-schema/                # Flyway migrations (classpath:db/migration), reused by service integration tests
+libs/test-support/             # Testcontainers PostgreSQL 18 + pg_partman image, Podman adaptation (test scope)
 services/telemetry-decoder/
 services/device-simulator/
 services/db-migrator/          # Flyway migrations + runner (container app job)
@@ -45,16 +47,21 @@ Later milestones add `services/device-api`, `services/provisioning-api`, `servic
 - Health: Spring Boot actuator liveness/readiness on a management port (no ingress); readiness false while partitions cannot be claimed.
 *Alternative*: Spring Cloud Stream binder for Event Hubs — rejected; less control over batch-level transaction/checkpoint ordering.
 
-### D4. Database schema (Flyway `V1__…`)
-- `sites(site_id text pk, display_name, created_at)`; `devices(device_id text pk, site_id fk, display_name, description, location jsonb, last_payload_format, first_seen_at, last_seen_at, updated_at, updated_by)`.
-- `metric_definitions(name pk, unit, description)` seeded from the codec catalogue.
-- `measurements(device_id, site_id, measured_at timestamptz, received_at, message_key, payload_format, raw_payload bytea, metrics jsonb, attributes jsonb, PRIMARY KEY (device_id, measured_at, message_key)) PARTITION BY RANGE (measured_at)`; same pattern for `rejected_messages` (PK `(received_at, device_id, message_key)`).
-- `ingested_messages(device_id, message_key, ingested_at, PRIMARY KEY (device_id, message_key))` — non-partitioned deduplication ledger; `pg_cron` deletes rows older than 7 days daily (Event Hubs retention is 1 day, device resends happen within minutes).
-- `pg_partman.create_parent(... '1 day', premake 7)`, `retention = '30 days'`, `retention_keep_table = false`; `pg_cron` runs `partman.run_maintenance_proc()` hourly. Server parameters `azure.extensions = PG_PARTMAN,PG_CRON`, `shared_preload_libraries` includes `pg_cron,pg_partman_bgw`, `cron.database_name = sdp` (Terraform).
-- Roles: migrator MI is the server's Entra administrator and schema owner. Migration `R__principals.sql` (repeatable, placeholders) runs `pgaadauth_create_principal_with_oid` for each workload identity, then grants: decoder → `INSERT` on measurements/rejected_messages/ingested_messages, `INSERT, UPDATE(last_seen_at,last_payload_format)` + `SELECT` on devices, `SELECT` on sites. Application roles never own objects.
+### D4. Database schema (Flyway `V1__…`, PostgreSQL 18)
+- Schema `sdp` owned by the migrator; pg_partman 5 in schema `partman`.
+- `sites(site_id text pk, display_name, created_at)`; `devices(device_id text pk, site_id fk, display_name, description, location jsonb, last_payload_format, first_seen_at, last_seen_at, updated_at, updated_by)`. The decoder inserts an unknown site (display name = id) rather than failing a batch on the foreign key.
+- `metric_definitions(name pk, unit, description)` seeded by the repeatable Java migration `R__Metric_definitions` from the codec catalogue (checksum derived from the catalogue, so it re-runs when metrics change).
+- `measurements(device_id, site_id, measured_at timestamptz, received_at, message_key, payload_format, raw_payload bytea, metrics jsonb, attributes jsonb, PRIMARY KEY (device_id, measured_at, message_key)) PARTITION BY RANGE (measured_at)`; `rejected_messages(received_at, enqueued_at, device_id, site_id, message_key, reason, detail, raw_payload) PARTITION BY RANGE (received_at)` without primary key (deduplicated through the ledger), indexed on `received_at` and `(device_id, received_at)`.
+- `ingested_messages(device_id, message_key, ingested_at, PRIMARY KEY (device_id, message_key))` — non-partitioned deduplication ledger, purged after 7 days (Event Hubs retention is 1 day, device resends happen within minutes).
+- `partman.create_parent(... '1 day', premake 7)`, `infinite_time_partitions`, `retention = 30 days`, `retention_keep_table = false`. Server parameter `azure.extensions = PG_PARTMAN` (Terraform); no `shared_preload_libraries` change is needed because the background worker is not used.
+- Roles: migrator MI is the server's Entra administrator and schema owner. Privileges are granted to NOLOGIN **group roles** in versioned migrations (`sdp_ingest` for the decoder: `INSERT` measurements/rejected_messages/ingested_messages + `SELECT(device_id, message_key)` on the ledger for `RETURNING`, `SELECT, INSERT` sites/devices, `UPDATE(last_seen_at, last_payload_format)` devices). The Flyway callback `afterMigrate.sql` runs after every migration and idempotently creates each workload principal (`pgaadauth_create_principal_with_oid` on Azure, `CREATE ROLE … LOGIN` elsewhere) from placeholders and grants its group role. Application roles never own objects.
+- *Alternative*: `pg_cron` for maintenance — rejected: pg_cron jobs run as the scheduling role and need a local connection for it, which conflicts with Entra-only principals; maintenance in the migrator is identity-based, observable and testable locally.
 
-### D5. Migration execution
-`db-migrator` is a Spring Boot + Flyway non-web app packaged as an image and run as a **Container Apps job** (manual trigger) under the migrator identity. The azd `postprovision` hook builds/pushes its image with `az acr build` (Entra auth, no local Docker needed), updates the job image, starts it and waits for success — so the schema exists before `azd deploy` starts the services. Locally, `scripts/run-migrations.sh` runs the same app with the developer's Entra token (developer added as additional Entra admin in dev only).
+### D5. Migration and maintenance execution
+`db-migrator` is a Spring Boot + Flyway non-web app (tasks `migrate` and/or `maintain`, exit code = outcome) packaged as an image and run as **Container Apps jobs** under the migrator identity:
+- `migrate,maintain` (manual trigger): the azd `postprovision` hook builds/pushes its image with `az acr build` (Entra auth, no local Docker needed), updates the job image, starts it and waits for success — so the schema exists before `azd deploy` starts the services;
+- `maintain` (schedule `0 * * * *`): pre-creates partitions, drops expired ones, purges the ledger.
+Locally, `scripts/run-migrations.sh` runs the same app with the developer's Entra token (developer added as additional Entra admin in dev only), or `--local` against `scripts/local-postgres.sh`.
 *Alternative*: Flyway at decoder start-up — rejected (decoder would need DDL rights, violating least privilege).
 
 ### D6. Device simulator
@@ -87,7 +94,7 @@ Java services ship `applicationinsights-agent-3.x.jar` in the image (`JAVA_TOOL_
 - [IoT Hub identity-based endpoint requires its role assignment to exist first] → Separate endpoint/route resources with explicit `depends_on` and a `time_sleep` for RBAC propagation.
 - [KEDA Event Hubs scaler with managed identity support in azurerm] → Use `azapi_update_resource` on the container app if `azurerm` lacks identity-based scale rule auth.
 - [Simulator holds site CA private keys] → Acceptable for demo; documented; production uses customer PKI and pre-provisioned device certificates.
-- [`pg_cron` must run in the `sdp` database] → set `cron.database_name` server parameter; requires server restart, handled by Terraform ordering.
+- [A missed hourly maintenance run] → 7 future daily partitions are pre-created and a default partition catches out-of-range rows, so ingestion never fails; the next run catches up.
 - [Partition-key choice prevents scaling beyond 4 decoder replicas] → Sufficient for demo targets (100 msg/s).
 
 ## Migration Plan

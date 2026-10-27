@@ -12,7 +12,7 @@ Cross-cutting implementation choices and conventions that apply to all milestone
 | Python | Python 3.13, dependencies and lock file managed with `uv`; FastAPI + Uvicorn; `ruff` and `pytest`. |
 | Web | React + TypeScript + Vite, Fluent UI React v9, MSAL React, TanStack Query, React Router; Vitest, React Testing Library, Playwright (+ axe-core). Runtime configuration served as `config.json` generated at deploy time, so one build works for every environment. |
 | Container images | One shared multi-stage `services/Dockerfile` (build arg `SERVICE`) for Java services: Microsoft OpenJDK `25-ubuntu` build stage, `25-distroless` runtime, Spring Boot layered extraction, non-root uid 101, Application Insights agent in `JAVA_TOOL_OPTIONS` (with `--enable-native-access=ALL-UNNAMED`). Python: `python:3.13-slim`, non-root. |
-| Container tooling | No Docker daemon is assumed. Dockerfiles avoid BuildKit-only features so they build with Podman locally and with ACR Tasks; azd builds images remotely in ACR (`docker.remoteBuild: true`). Testcontainers runs against the Podman socket (`DOCKER_HOST=unix:///run/user/$UID/podman/podman.sock`, Ryuk disabled). |
+| Container tooling | No Docker daemon is assumed. Dockerfiles avoid BuildKit-only features so they build with Podman locally and with ACR Tasks; azd builds images remotely in ACR (`docker.remoteBuild: true`). Testcontainers runs against the Podman socket (`DOCKER_HOST=unix:///run/user/$UID/podman/podman.sock`, Ryuk disabled); on rootless Podman, `libs/test-support` starts containers in slirp4netns network mode so no CNI plugins are required. Integration tests are `*IT` classes run by Failsafe during `verify`; `test` needs no container engine. |
 | Toolchain | JDK 25 (Microsoft Build of OpenJDK) and the checked-in Maven wrapper (`./mvnw`, Maven 3.9.x); the build enforces Java ≥ 25. |
 | Hosting | One Container Apps environment (Consumption workload profile). Event-driven services scale with KEDA scalers authenticated by managed identity; user-facing APIs keep at least one replica for demo responsiveness. |
 
@@ -30,10 +30,10 @@ Cross-cutting implementation choices and conventions that apply to all milestone
 
 | Topic | Guideline |
 |---|---|
-| PostgreSQL | Flexible Server, latest GA major version (≥ 17), Entra-only authentication. |
-| Partitions | Daily partitions managed by `pg_partman` (7 days pre-created) with maintenance scheduled by `pg_cron`; default retention 30 days. |
+| PostgreSQL | Flexible Server, PostgreSQL 18, Entra-only authentication; schema `sdp`. Local/test image: `postgres:18` + `postgresql-18-partman` (`libs/test-support`). |
+| Partitions | Daily partitions managed by `pg_partman` 5 (7 days pre-created, default partition as safety net); maintenance (`run_maintenance_proc`, retention, ledger purge) executed hourly by the migrator's `maintain` task in a scheduled Container Apps job — not `pg_cron`, whose jobs cannot run as Entra principals. Default retention 30 days. |
 | Idempotency | Non-partitioned deduplication ledger `ingested_messages(device_id, message_key)` written in the same transaction as the measurement; rows older than 7 days purged daily. |
-| Schema migrations | Flyway, executed only by the migrator identity (schema owner, Entra administrator of the server). Application identities get least-privilege grants and never own objects. |
+| Schema migrations | Flyway migrations in `libs/db-schema`, executed only by the migrator identity (schema owner, Entra administrator of the server). Privileges are granted to NOLOGIN group roles; the `afterMigrate.sql` callback creates workload principals (`pgaadauth_create_principal_with_oid`) and grants them their group role. Application identities never own objects. |
 | Metric catalogue | `metric_definitions` table seeded from the codec library's catalogue (name, unit, description). |
 
 ## 4. Identity and access (RBAC matrix)

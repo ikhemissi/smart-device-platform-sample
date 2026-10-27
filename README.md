@@ -46,8 +46,11 @@ libs/payload-codecs/        Format detection, decoders and encoders (pure Java)
 libs/platform-common/       Shared Spring Boot auto-configuration
 services/telemetry-decoder/ Event Hubs → PostgreSQL batch decoder
 services/device-simulator/  Simulated multi-site device fleet
-services/db-migrator/       Flyway migrations (Container Apps job)
+libs/db-schema/             Flyway migrations (PostgreSQL schema)
+libs/test-support/          Testcontainers definitions for integration tests
+services/db-migrator/       Applies migrations and DB maintenance (Container Apps jobs)
 services/Dockerfile         Shared image definition for Java services
+scripts/                    Developer and deployment scripts
 infra/                      Terraform (deployed with azd)            [coming in M1]
 docs/  openspec/            Requirements, decisions, specs
 ```
@@ -67,7 +70,9 @@ docs/  openspec/            Requirements, decisions, specs
 ## Build and run locally
 
 ```bash
-./mvnw verify                                            # build and test all modules
+./mvnw test                                              # unit tests (no container engine needed)
+./mvnw verify                                            # + integration tests (*IT, Testcontainers)
+scripts/local-postgres.sh start && scripts/run-migrations.sh --local   # local database with the schema
 podman build -f services/Dockerfile \
   --build-arg SERVICE=telemetry-decoder -t sdp/telemetry-decoder:dev .   # build one service image
 ```

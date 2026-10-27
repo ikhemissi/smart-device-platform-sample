@@ -1,3 +1,28 @@
 spring:
   application:
     name: sdp-db-migrator
+  main:
+    web-application-type: none
+    banner-mode: off
+  datasource:
+    url: ${SDP_DB_URL:jdbc:postgresql://localhost:5432/sdp?sslmode=require}
+    username: ${SDP_DB_USERNAME:}
+    password: ${SDP_DB_PASSWORD:}
+    # Entra ID token authentication (managed identity in Azure, developer identity locally).
+    azure:
+      passwordless-enabled: ${SDP_DB_PASSWORDLESS:true}
+    hikari:
+      maximum-pool-size: 5
+  flyway:
+    schemas: sdp
+    default-schema: sdp
+    # Workload identities whose database principals are created after each migration (afterMigrate.sql).
+    placeholders:
+      "[decoder_principal_name]": ${SDP_DECODER_PRINCIPAL_NAME:}
+      "[decoder_principal_object_id]": ${SDP_DECODER_PRINCIPAL_OBJECT_ID:}
+
+sdp:
+  migrator:
+    tasks: ${SDP_MIGRATOR_TASKS:migrate,maintain}
+    retention: ${SDP_RETENTION:30d}
+    ledger-retention: ${SDP_LEDGER_RETENTION:7d}

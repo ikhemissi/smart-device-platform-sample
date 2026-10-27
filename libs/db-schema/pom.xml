@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>io.github.ikhemissi.sdp</groupId>
+        <artifactId>sdp-parent</artifactId>
+        <version>0.1.0-SNAPSHOT</version>
+        <relativePath>../../pom.xml</relativePath>
+    </parent>
+    <artifactId>db-schema</artifactId>
+    <name>SDP :: Database schema</name>
+    <description>Flyway migrations (classpath:db/migration) owned by the db-migrator and reused by service integration tests.</description>
+
+    <dependencies>
+        <dependency>
+            <groupId>io.github.ikhemissi.sdp</groupId>
+            <artifactId>payload-codecs</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.flywaydb</groupId>
+            <artifactId>flyway-core</artifactId>
+        </dependency>
+    </dependencies>
+</project>

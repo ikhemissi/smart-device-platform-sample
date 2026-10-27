@@ -19,9 +19,9 @@
 
 ## 3. Database schema and migrator
 
-- [ ] 3.1 Write Flyway `V1` (sites, devices, metric_definitions seed, partitioned measurements and rejected_messages, `ingested_messages` deduplication ledger, pg_partman parents, pg_cron maintenance and ledger clean-up jobs); verify migration applies on a local PostgreSQL 17 container with pg_partman/pg_cron (Testcontainers test)
-- [ ] 3.2 Write repeatable `R__principals.sql` creating Entra principals and least-privilege grants from placeholders; verify with a Testcontainers test that the decoder role cannot run DDL
-- [ ] 3.3 Implement the `db-migrator` runner (exit code reflects success) and `scripts/run-migrations.sh` for local use; verify the script migrates a dev database using the developer's Entra token
+- [x] 3.1 Write Flyway `V1` (sites, devices, metric_definitions seed, partitioned measurements and rejected_messages, `ingested_messages` deduplication ledger, pg_partman parents) and the migrator's maintenance task (partitions, retention, ledger clean-up); verify migration and maintenance on a PostgreSQL 18 + pg_partman container (Testcontainers `MigrationIT`)
+- [x] 3.2 Write the `afterMigrate.sql` callback creating workload principals (Entra on Azure) from placeholders, with least-privilege grants through group roles; verify with a Testcontainers test (`PrivilegesIT`) that the decoder role cannot run DDL
+- [ ] 3.3 Implement the `db-migrator` runner (tasks `migrate`/`maintain`, exit code reflects success), `scripts/run-migrations.sh` and `scripts/local-postgres.sh`; verify the script migrates a dev database using the developer's Entra token (local mode verified; Entra mode pending the first `azd provision`)
 
 ## 4. Telemetry decoder
 
@@ -47,7 +47,7 @@
 - [ ] 6.3 Implement module `identity` (per-workload UAMIs and role assignments); verify roles with `az role assignment list` match the RBAC matrix in `docs/architecture/implementation-guidelines.md`
 - [ ] 6.4 Implement module `ingestion` (Event Hubs, Storage, IoT Hub with identity-based endpoint, route and siteId enrichment, DPS link); verify a test message sent with `az iot device simulate` reaches the event hub with `siteId`
 - [ ] 6.5 Implement module `data` (PostgreSQL Entra-only, extensions/parameters, database, migrator as Entra admin); verify password login is refused and the migrator identity can connect
-- [ ] 6.6 Define container apps (decoder with identity-based KEDA scaler, simulator) and the migrator job; verify `azd deploy` updates images and apps become healthy
+- [ ] 6.6 Define container apps (decoder with identity-based KEDA scaler, simulator), the migrator job (manual, `migrate,maintain`) and the hourly maintenance job (`maintain`); verify `azd deploy` updates images, apps become healthy and a scheduled maintenance execution succeeds
 - [ ] 6.7 Verify no secret-bearing outputs/values exist (`azd env get-values`, `terraform output`) and document the DPS link exception in `docs/security.md`
 
 ## 7. azd wiring and demo bootstrap

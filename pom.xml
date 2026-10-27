@@ -20,6 +20,8 @@
     <modules>
         <module>libs/payload-codecs</module>
         <module>libs/platform-common</module>
+        <module>libs/db-schema</module>
+        <module>libs/test-support</module>
         <module>services/telemetry-decoder</module>
         <module>services/device-simulator</module>
         <module>services/db-migrator</module>
@@ -64,6 +66,16 @@
                 <version>${project.version}</version>
             </dependency>
             <dependency>
+                <groupId>io.github.ikhemissi.sdp</groupId>
+                <artifactId>db-schema</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.github.ikhemissi.sdp</groupId>
+                <artifactId>test-support</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
                 <groupId>net.jqwik</groupId>
                 <artifactId>jqwik</artifactId>
                 <version>${jqwik.version}</version>
@@ -89,6 +101,19 @@
             </plugins>
         </pluginManagement>
         <plugins>
+            <plugin>
+                <!-- Runs *IT integration tests (Testcontainers) during `verify`; `test` stays container-free. -->
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-failsafe-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>integration-test</goal>
+                            <goal>verify</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-enforcer-plugin</artifactId>
