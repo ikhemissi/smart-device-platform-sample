@@ -75,6 +75,46 @@ module "data" {
   tags         = local.tags
 }
 
+module "web" {
+  source              = "./modules/web"
+  resource_group_name = azurerm_resource_group.main.name
+  location            = var.web_location
+  environment_name    = var.environment_name
+  token               = local.token
+  tags                = local.tags
+}
+
+module "entra" {
+  source                  = "./modules/entra"
+  environment_name        = var.environment_name
+  web_origin              = module.web.origin
+  deployer_object_id      = var.deployer_is_user ? data.azurerm_client_config.current.object_id : null
+  reader_group_object_ids = var.reader_group_object_ids
+  editor_group_object_ids = var.editor_group_object_ids
+  preauthorize_azure_cli  = var.preauthorize_azure_cli
+}
+
+module "api" {
+  source              = "./modules/api"
+  resource_group_name = azurerm_resource_group.main.name
+  location            = var.location
+  environment_name    = var.environment_name
+  token               = local.token
+  sku_name            = var.apim_sku
+  tenant_id           = data.azurerm_client_config.current.tenant_id
+  publisher_email     = var.deployer_is_user ? data.azuread_user.deployer[0].user_principal_name : "noreply@example.com"
+  application_insights = {
+    id                = module.core.application_insights_id
+    connection_string = module.core.application_insights_connection_string
+  }
+  api_client_id      = module.entra.api_client_id
+  api_identifier_uri = module.entra.api_identifier_uri
+  allowed_origins    = [module.web.origin, "http://localhost:5173"]
+  device_api_url     = module.apps.device_api_url
+  openapi_file       = "${path.root}/../services/device-api/openapi.json"
+  tags               = local.tags
+}
+
 module "apps" {
   source                       = "./modules/apps"
   resource_group_name          = azurerm_resource_group.main.name
@@ -104,7 +144,13 @@ module "apps" {
   decoder_image      = var.decoder_image
   simulator_image    = var.simulator_image
   simulator_settings = merge({ SDP_SIM_SITES = join(",", var.demo_sites) }, var.simulator_settings)
-  tags               = local.tags
+  device_api_image   = var.device_api_image
+  entra = {
+    tenant_id          = data.azurerm_client_config.current.tenant_id
+    api_client_id      = module.entra.api_client_id
+    api_identifier_uri = module.entra.api_identifier_uri
+  }
+  tags = local.tags
 
   # Workload identities must hold their roles before the apps start.
   depends_on = [time_sleep.rbac_propagation]

@@ -83,3 +83,47 @@ output "SIMULATOR_APP_NAME" {
 output "DEMO_SITES" {
   value = join(",", var.demo_sites)
 }
+
+output "DEVICE_API_APP_NAME" {
+  value = module.apps.device_api_app_name
+}
+
+output "DEVICE_API_IDENTITY_NAME" {
+  value = module.identity.device_api.name
+}
+
+output "DEVICE_API_IDENTITY_PRINCIPAL_ID" {
+  value = module.identity.device_api.principal_id
+}
+
+output "APIM_NAME" {
+  value = module.api.name
+}
+
+output "API_BASE_URL" {
+  value = module.api.api_base_url
+}
+
+output "ENTRA_TENANT_ID" {
+  value = data.azurerm_client_config.current.tenant_id
+}
+
+output "API_CLIENT_ID" {
+  value = module.entra.api_client_id
+}
+
+output "API_SCOPE" {
+  value = module.entra.api_scope
+}
+
+output "WEB_CLIENT_ID" {
+  value = module.entra.web_client_id
+}
+
+output "WEB_URL" {
+  value = module.web.origin
+}
+
+output "STATIC_WEB_APP_NAME" {
+  value = module.web.name
+}

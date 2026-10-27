@@ -30,6 +30,17 @@ services:
       buildArgs:
         - SERVICE=device-simulator
 
+  device-api:
+    project: ./services/device-api
+    language: java
+    host: containerapp
+    docker:
+      path: ../Dockerfile
+      context: ../..
+      remoteBuild: true
+      buildArgs:
+        - SERVICE=device-api
+
 hooks:
   preprovision:
     posix:

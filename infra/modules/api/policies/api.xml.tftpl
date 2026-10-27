@@ -1,0 +1,71 @@
+<!-- API-level policy (ADR-0007, M2 design D3). CORS first so browser preflights need no token. -->
+<policies>
+  <inbound>
+    <base />
+    <cors allow-credentials="false" terminate-unmatched-request="true">
+      <allowed-origins>
+%{ for origin in allowed_origins ~}
+        <origin>${origin}</origin>
+%{ endfor ~}
+      </allowed-origins>
+      <allowed-methods preflight-result-max-age="600">
+        <method>GET</method>
+        <method>POST</method>
+        <method>PATCH</method>
+        <method>PUT</method>
+        <method>DELETE</method>
+      </allowed-methods>
+      <allowed-headers>
+        <header>Authorization</header>
+        <header>Content-Type</header>
+        <header>If-Match</header>
+        <header>traceparent</header>
+        <header>tracestate</header>
+      </allowed-headers>
+      <expose-headers>
+        <header>ETag</header>
+      </expose-headers>
+    </cors>
+    <validate-azure-ad-token tenant-id="${tenant_id}" header-name="Authorization" failed-validation-httpcode="401"
+                             failed-validation-error-message="A valid access token for the Smart Device Platform API is required."
+                             output-token-variable-name="jwt">
+      <audiences>
+        <audience>${api_client_id}</audience>
+        <audience>${api_identifier_uri}</audience>
+      </audiences>
+    </validate-azure-ad-token>
+    <rate-limit-by-key calls="${rate_limit_calls}" renewal-period="60"
+                       counter-key="@(((Jwt)context.Variables["jwt"]).Claims.ContainsKey("oid") ? ((Jwt)context.Variables["jwt"]).Claims["oid"][0] : context.Request.IpAddress)" />
+  </inbound>
+  <backend>
+    <base />
+  </backend>
+  <outbound>
+    <base />
+  </outbound>
+  <on-error>
+    <base />
+    <!-- Token validation failures as RFC 9457 problem details, like the backend's (RFC 6750 challenge kept). -->
+    <choose>
+      <when condition="@(context.LastError.Source == "validate-azure-ad-token")">
+        <return-response>
+          <set-status code="401" reason="Unauthorized" />
+          <set-header name="WWW-Authenticate" exists-action="override">
+            <value>Bearer error="invalid_token"</value>
+          </set-header>
+          <set-header name="Content-Type" exists-action="override">
+            <value>application/problem+json</value>
+          </set-header>
+          <set-body>@{
+            return new JObject(
+              new JProperty("type", "about:blank"),
+              new JProperty("title", "Unauthorized"),
+              new JProperty("status", 401),
+              new JProperty("detail", "A valid Microsoft Entra ID access token for the platform API is required."),
+              new JProperty("instance", context.Request.OriginalUrl.Path)).ToString();
+          }</set-body>
+        </return-response>
+      </when>
+    </choose>
+  </on-error>
+</policies>

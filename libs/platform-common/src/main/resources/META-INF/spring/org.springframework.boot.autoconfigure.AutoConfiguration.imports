@@ -1,1 +1,2 @@
 io.github.ikhemissi.sdp.platform.PlatformObservabilityAutoConfiguration
+io.github.ikhemissi.sdp.platform.security.SdpSecurityAutoConfiguration

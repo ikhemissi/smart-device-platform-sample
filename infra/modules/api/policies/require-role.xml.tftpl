@@ -1,0 +1,30 @@
+<!-- Operation-level role check generated from the operation's x-sdp-required-role (${required_role}). -->
+<policies>
+  <inbound>
+    <base />
+    <choose>
+      <when condition="@{
+          var jwt = (Jwt)context.Variables["jwt"];
+          var roles = jwt.Claims.ContainsKey("roles") ? jwt.Claims["roles"] : new string[0];
+          return !(roles.Contains("DeviceData.Write")%{ if required_role == "read" } || roles.Contains("DeviceData.Read")%{ endif });
+        }">
+        <return-response>
+          <set-status code="403" reason="Forbidden" />
+          <set-header name="Content-Type" exists-action="override">
+            <value>application/problem+json</value>
+          </set-header>
+          <set-body>{"type":"about:blank","title":"Forbidden","status":403,"detail":"${detail}","requiredRole":"${app_role}"}</set-body>
+        </return-response>
+      </when>
+    </choose>
+  </inbound>
+  <backend>
+    <base />
+  </backend>
+  <outbound>
+    <base />
+  </outbound>
+  <on-error>
+    <base />
+  </on-error>
+</policies>

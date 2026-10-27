@@ -54,3 +54,43 @@ variable "postgres_sku" {
   type    = string
   default = "B_Standard_B2s"
 }
+
+variable "device_api_image" {
+  description = "Device API image deployed by azd (SERVICE_DEVICE_API_IMAGE_NAME); empty on the first run."
+  type        = string
+  default     = ""
+}
+
+variable "web_location" {
+  description = "Static Web Apps region (westeurope, its only European region, is blocked by tenant policy)."
+  type        = string
+  default     = "eastus2"
+}
+
+variable "apim_sku" {
+  description = "API Management v2 tier. Basic v2 covers every feature the platform uses (Entra token validation, CORS, rate limiting, managed-identity logging, response streaming); Standard v2 is only needed for VNet integration with network-isolated backends or inbound private endpoints."
+  type        = string
+  default     = "BasicV2_1"
+  validation {
+    condition     = can(regex("^(BasicV2|StandardV2)_[1-9][0-9]?$", var.apim_sku))
+    error_message = "apim_sku must be BasicV2_<units> or StandardV2_<units>."
+  }
+}
+
+variable "reader_group_object_ids" {
+  description = "Entra groups granted DeviceData.Read."
+  type        = list(string)
+  default     = []
+}
+
+variable "editor_group_object_ids" {
+  description = "Entra groups granted DeviceData.Write."
+  type        = list(string)
+  default     = []
+}
+
+variable "preauthorize_azure_cli" {
+  description = "Pre-authorize the Azure CLI on the API scope (az account get-access-token for testing, dev only)."
+  type        = bool
+  default     = true
+}

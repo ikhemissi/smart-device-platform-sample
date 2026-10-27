@@ -72,7 +72,7 @@ Exact built-in role names are verified at implementation; a scoped custom role i
 | Topic | Guideline |
 |---|---|
 | Surface | All public operations under `/api/v1` on one APIM API; operations from several backends are merged and routed per operation (`set-backend-service`). |
-| Gateway | APIM v2 tier (BasicV2 by default); policies: Entra token validation (tenant + audience), role check from each operation's `x-sdp-required-role` OpenAPI extension, CORS for the portal origin, per-user rate limit, `traceparent` forwarding. Streaming operations are unbuffered. |
+| Gateway | APIM v2 tier, `apim_sku` = `BasicV2_1` by default (Basic v2 covers token validation, CORS, rate limiting, managed-identity logging and streaming; use Standard v2 only if backends must become network-isolated via VNet integration or the gateway needs a private endpoint); policies: Entra token validation (tenant + audience), role check from each operation's `x-sdp-required-role` OpenAPI extension, CORS for the portal origin, per-user rate limit, `traceparent` forwarding. Streaming operations are unbuffered. |
 | Backends | Re-validate token and role (Container Apps ingress is public); use `oid` / display name for audit fields. |
 | Contract | OpenAPI 3.1 generated from code and checked in; errors as RFC 9457 problem details; optimistic concurrency with ETag / `If-Match` on mutable resources; cursor or page/pageSize paging with documented maxima. |
 | Current user | `GET /api/v1/me` returns identity and `canRead`/`canWrite`; the portal never parses access tokens. |

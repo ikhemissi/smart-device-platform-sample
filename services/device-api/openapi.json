@@ -1,0 +1,432 @@
+{
+  "openapi" : "3.0.1",
+  "info" : {
+    "description" : "Device catalog of the Smart Device Platform. Requires a Microsoft Entra ID access token for the platform API; operations declare the app role they need in x-sdp-required-role.",
+    "title" : "Smart Device Platform API",
+    "version" : "v1"
+  },
+  "security" : [ {
+    "entra" : [ ]
+  } ],
+  "paths" : {
+    "/api/v1/devices" : {
+      "get" : {
+        "description" : "Filter by site and status, search id and display name (case-insensitive), sort and page.",
+        "operationId" : "listDevices",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "siteId",
+          "required" : false,
+          "schema" : {
+            "maxLength" : 40,
+            "minLength" : 1,
+            "type" : "string"
+          }
+        }, {
+          "in" : "query",
+          "name" : "status",
+          "required" : false,
+          "schema" : {
+            "pattern" : "reporting|silent",
+            "type" : "string",
+            "enum" : [ "reporting", "silent" ]
+          }
+        }, {
+          "in" : "query",
+          "name" : "search",
+          "required" : false,
+          "schema" : {
+            "maxLength" : 100,
+            "minLength" : 0,
+            "type" : "string"
+          }
+        }, {
+          "in" : "query",
+          "name" : "sort",
+          "required" : false,
+          "schema" : {
+            "pattern" : "displayName|siteId|firstSeen|lastSeen",
+            "type" : "string",
+            "enum" : [ "displayName", "siteId", "firstSeen", "lastSeen" ]
+          }
+        }, {
+          "in" : "query",
+          "name" : "order",
+          "required" : false,
+          "schema" : {
+            "pattern" : "asc|desc",
+            "type" : "string",
+            "enum" : [ "asc", "desc" ]
+          }
+        }, {
+          "in" : "query",
+          "name" : "page",
+          "required" : false,
+          "schema" : {
+            "minimum" : 1,
+            "type" : "integer",
+            "format" : "int32",
+            "default" : 1
+          }
+        }, {
+          "in" : "query",
+          "name" : "pageSize",
+          "required" : false,
+          "schema" : {
+            "maximum" : 100,
+            "minimum" : 1,
+            "type" : "integer",
+            "format" : "int32",
+            "default" : 25
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/DevicePage"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "List devices",
+        "tags" : [ "Devices" ],
+        "x-sdp-required-role" : "read"
+      }
+    },
+    "/api/v1/devices/{deviceId}" : {
+      "get" : {
+        "description" : "The ETag header is required to edit it.",
+        "operationId" : "getDevice",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "deviceId",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/DeviceDetails"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "Get a device",
+        "tags" : [ "Devices" ],
+        "x-sdp-required-role" : "read"
+      },
+      "patch" : {
+        "description" : "JSON Merge Patch of displayName, description and location; requires If-Match with the current ETag.",
+        "operationId" : "updateDevice",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "deviceId",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "in" : "header",
+          "name" : "If-Match",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/DeviceEdit"
+              }
+            },
+            "application/merge-patch+json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/DeviceEdit"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/DeviceDetails"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "Edit a device's information",
+        "tags" : [ "Devices" ],
+        "x-sdp-required-role" : "write"
+      }
+    },
+    "/api/v1/me" : {
+      "get" : {
+        "description" : "Available without any platform role so that clients can explain which permission to request.",
+        "operationId" : "getCurrentUser",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/SdpUser"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "Signed-in user and effective permissions",
+        "tags" : [ "Current user" ],
+        "x-sdp-required-role" : "authenticated"
+      }
+    },
+    "/api/v1/sites" : {
+      "get" : {
+        "operationId" : "listSites",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "type" : "array",
+                  "items" : {
+                    "$ref" : "#/components/schemas/Site"
+                  }
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "List sites with their number of devices",
+        "tags" : [ "Sites" ],
+        "x-sdp-required-role" : "read"
+      }
+    }
+  },
+  "components" : {
+    "schemas" : {
+      "DeviceDetails" : {
+        "type" : "object",
+        "properties" : {
+          "description" : {
+            "type" : "string"
+          },
+          "deviceId" : {
+            "type" : "string"
+          },
+          "displayName" : {
+            "type" : "string"
+          },
+          "firstSeenAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "lastPayloadFormat" : {
+            "type" : "string"
+          },
+          "lastSeenAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "location" : {
+            "$ref" : "#/components/schemas/Location"
+          },
+          "siteId" : {
+            "type" : "string"
+          },
+          "status" : {
+            "type" : "string",
+            "enum" : [ "reporting", "silent" ]
+          },
+          "updatedAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "updatedBy" : {
+            "$ref" : "#/components/schemas/Editor"
+          }
+        }
+      },
+      "DeviceEdit" : {
+        "type" : "object",
+        "properties" : {
+          "description" : {
+            "maxLength" : 1000,
+            "type" : "string",
+            "nullable" : true
+          },
+          "displayName" : {
+            "maxLength" : 100,
+            "type" : "string",
+            "nullable" : true
+          },
+          "location" : {
+            "$ref" : "#/components/schemas/LocationEdit"
+          }
+        },
+        "description" : "Fields to change; null clears a field, absent fields are unchanged."
+      },
+      "DevicePage" : {
+        "type" : "object",
+        "properties" : {
+          "items" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/DeviceSummary"
+            }
+          },
+          "page" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "pageSize" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "total" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        }
+      },
+      "DeviceSummary" : {
+        "type" : "object",
+        "properties" : {
+          "deviceId" : {
+            "type" : "string"
+          },
+          "displayName" : {
+            "type" : "string"
+          },
+          "firstSeenAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "lastPayloadFormat" : {
+            "type" : "string"
+          },
+          "lastSeenAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "siteId" : {
+            "type" : "string"
+          },
+          "status" : {
+            "type" : "string",
+            "enum" : [ "reporting", "silent" ]
+          }
+        }
+      },
+      "Editor" : {
+        "type" : "object",
+        "properties" : {
+          "displayName" : {
+            "type" : "string"
+          },
+          "objectId" : {
+            "type" : "string"
+          }
+        }
+      },
+      "Location" : {
+        "type" : "object",
+        "properties" : {
+          "label" : {
+            "type" : "string"
+          },
+          "latitude" : {
+            "type" : "number",
+            "format" : "double"
+          },
+          "longitude" : {
+            "type" : "number",
+            "format" : "double"
+          }
+        }
+      },
+      "LocationEdit" : {
+        "type" : "object",
+        "properties" : {
+          "label" : {
+            "maxLength" : 100,
+            "type" : "string",
+            "nullable" : true
+          },
+          "latitude" : {
+            "maximum" : 90,
+            "minimum" : -90,
+            "type" : "number",
+            "format" : "double"
+          },
+          "longitude" : {
+            "maximum" : 180,
+            "minimum" : -180,
+            "type" : "number",
+            "format" : "double"
+          }
+        },
+        "nullable" : true
+      },
+      "SdpUser" : {
+        "type" : "object",
+        "properties" : {
+          "canRead" : {
+            "type" : "boolean"
+          },
+          "canWrite" : {
+            "type" : "boolean"
+          },
+          "displayName" : {
+            "type" : "string"
+          },
+          "objectId" : {
+            "type" : "string"
+          },
+          "userPrincipalName" : {
+            "type" : "string"
+          }
+        }
+      },
+      "Site" : {
+        "type" : "object",
+        "properties" : {
+          "deviceCount" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "displayName" : {
+            "type" : "string"
+          },
+          "siteId" : {
+            "type" : "string"
+          }
+        }
+      }
+    },
+    "securitySchemes" : {
+      "entra" : {
+        "bearerFormat" : "JWT",
+        "scheme" : "bearer",
+        "type" : "http"
+      }
+    }
+  }
+}

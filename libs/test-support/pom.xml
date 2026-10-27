@@ -18,5 +18,10 @@
             <groupId>org.testcontainers</groupId>
             <artifactId>testcontainers-postgresql</artifactId>
         </dependency>
+        <!-- Signed Entra-like access tokens for API security tests (Nimbus JOSE, at the version Spring Security uses). -->
+        <dependency>
+            <groupId>org.springframework.security</groupId>
+            <artifactId>spring-security-oauth2-jose</artifactId>
+        </dependency>
     </dependencies>
 </project>

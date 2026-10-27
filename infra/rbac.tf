@@ -2,9 +2,10 @@
 
 locals {
   workload_principals = {
-    decoder   = module.identity.decoder.principal_id
-    simulator = module.identity.simulator.principal_id
-    migrator  = module.identity.migrator.principal_id
+    decoder    = module.identity.decoder.principal_id
+    simulator  = module.identity.simulator.principal_id
+    migrator   = module.identity.migrator.principal_id
+    device_api = module.identity.device_api.principal_id
   }
 }
 
