@@ -41,6 +41,20 @@ services:
       buildArgs:
         - SERVICE=device-api
 
+  web:
+    project: ./web/portal
+    language: js
+    host: staticwebapp
+    dist: dist
+    hooks:
+      # Environment-specific config.json and staticwebapp.config.json (sign-in settings, API URL, CSP).
+      prepackage:
+        posix:
+          shell: sh
+          run: node scripts/write-config.mjs
+          interactive: false
+          continueOnError: false
+
 hooks:
   preprovision:
     posix:

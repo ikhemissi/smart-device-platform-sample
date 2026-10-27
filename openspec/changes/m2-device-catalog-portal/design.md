@@ -40,9 +40,10 @@ M1 delivered ingestion, the `sites`/`devices`/`measurements` schema and the azd/
 ### D4. Web portal
 - `web/portal`: React 19 + TypeScript + Vite, **Fluent UI React v9** (Microsoft look & feel, accessible components), `@azure/msal-react` (auth code + PKCE, redirect flow), TanStack Query for data fetching/caching, React Router with URL search params as state for filters.
 - `GET /api/v1/me` drives role-aware UI (`canWrite`), never token parsing.
-- Runtime configuration (`clientId`, `tenantId`, `apiScope`, `apiBaseUrl`) generated into `public/config.json` by an azd `prepackage` hook from azd env values — the same build artefact works for all environments.
+- Runtime configuration (`clientId`, `tenantId`, `apiScope`, `apiBaseUrl`) generated into `config.json` (and `staticwebapp.config.json`, whose CSP lists the environment's API origin) by an azd `prepackage` hook from azd env values — the same build artefact works for all environments.
 - `staticwebapp.config.json`: SPA navigation fallback, security headers (CSP restricting `connect-src` to APIM and Entra endpoints).
-- Tests: Vitest + React Testing Library for components; Playwright smoke test against a deployed environment using a test user.
+- Tests: Vitest + React Testing Library + MSW for components (one per spec scenario); Playwright end-to-end tests of the production build served like Static Web Apps (same generated headers and CSP), with Entra ID and the API faked at the network level on their real URLs (sign-in redirect flow, smoke flow, keyboard-only operation, axe-core). Interactive sign-in against a real tenant cannot be automated without a test account exempt from MFA/Conditional Access, so the deployed environment is verified manually with the demo guide.
+- Linting with oxlint (the Vite template default) instead of ESLint.
 
 ### D5. Static Web App
 `azurerm_static_web_app` Free tier in `var.web_location` (`eastus2`; `westeurope` is blocked by tenant policy); azd service `web` with `host: staticwebapp`; no SWA built-in auth or linked backend (ADR-0007).

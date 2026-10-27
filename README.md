@@ -49,6 +49,8 @@ services/device-simulator/  Simulated multi-site device fleet (see its README)
 libs/db-schema/             Flyway migrations (PostgreSQL schema)
 libs/test-support/          Testcontainers definitions for integration tests
 services/db-migrator/       Applies migrations and DB maintenance (Container Apps jobs)
+services/device-api/        Device catalog API behind API Management (see its README)
+web/portal/                 Web portal: React, Fluent UI, MSAL (see its README)
 services/Dockerfile         Shared image definition for Java services
 scripts/                    Developer and deployment scripts
 infra/                      Terraform (deployed with azd)
@@ -64,6 +66,7 @@ docs/  openspec/            Requirements, decisions, specs
   export DOCKER_HOST=unix:///run/user/$(id -u)/podman/podman.sock
   export TESTCONTAINERS_RYUK_DISABLED=true
   ```
+- **Node.js 22+** for the web portal.
 - **Azure CLI**, **Azure Developer CLI (azd)**, **Terraform** for deployment.
 - **OpenSpec CLI** (`npm i -g @fission-ai/openspec`) to work with specs.
 
@@ -75,6 +78,7 @@ docs/  openspec/            Requirements, decisions, specs
 scripts/local-postgres.sh start && scripts/run-migrations.sh --local   # local database with the schema
 podman build -f services/Dockerfile \
   --build-arg SERVICE=telemetry-decoder -t sdp/telemetry-decoder:dev .   # build one service image
+cd web/portal && npm ci && npm test && npm run build     # portal (see web/portal/README.md)
 ```
 
 ## Deploy to Azure
@@ -87,7 +91,7 @@ azd env new sdp-dev --location francecentral --subscription <subscription-id>
 azd up                                  # state backend, infrastructure, database migration, demo sites, services
 ```
 
-`azd up` first makes sure the Terraform state store exists (`scripts/bootstrap-tfstate.sh`, Entra-only storage shared by all environments of the subscription), provisions everything with Terraform (`infra/`), then the post-provision hook builds the migrator image, migrates the database and prepares the demo sites (CA per site in Key Vault, verified in DPS, enrollment groups), and finally azd deploys the decoder and the simulator. The simulator starts sending immediately (3 sites × 10 devices every 30 s). Re-running `azd up` is idempotent. Remove everything with `azd down --purge` (deletes the resource group and purges the Key Vault). A guided demo is in [docs/demo/m1-ingestion.md](docs/demo/m1-ingestion.md); `scripts/psql.sh` and `scripts/trace-device.sh` help explore data and traces.
+`azd up` first makes sure the Terraform state store exists (`scripts/bootstrap-tfstate.sh`, Entra-only storage shared by all environments of the subscription), provisions everything with Terraform (`infra/`), then the post-provision hook builds the migrator image, migrates the database and prepares the demo sites (CA per site in Key Vault, verified in DPS, enrollment groups), and finally azd deploys the decoder and the simulator. The simulator starts sending immediately (3 sites × 10 devices every 30 s). Re-running `azd up` is idempotent. Remove everything with `azd down --purge` (deletes the resource group and purges the Key Vault). Guided demos: [M1 ingestion](docs/demo/m1-ingestion.md), [M2 device list](docs/demo/m2-device-list.md); `scripts/psql.sh` and `scripts/trace-device.sh` help explore data and traces.
 
 All resources carry the tenant governance tags `SecurityControl=Ignore` and `CostControl=Ignore` (see [docs/security.md](docs/security.md)).
 

@@ -24,19 +24,19 @@
 
 ## 4. Web portal
 
-- [ ] 4.1 Scaffold `web/portal` (Vite, React, TypeScript, Fluent UI v9, MSAL, TanStack Query, Router, ESLint, Vitest); verify `npm run build` and `npm test` pass
-- [ ] 4.2 Implement runtime config loading and the azd `prepackage` hook writing `config.json`; verify the deployed site loads the environment's configuration
-- [ ] 4.3 Implement the shell (sign-in redirect, header with user and sign-out, navigation) and the access-denied page driven by `GET /me`; verify component tests and a manual check with a user without role
-- [ ] 4.4 Implement the device list (columns, status badge, site filter, debounced search, sort, paging, URL state, empty state); verify component tests for each spec scenario
-- [ ] 4.5 Implement the Editor-only edit dialog with validation, `If-Match` and conflict handling; verify component tests for reader/no-action and 412 scenarios
-- [ ] 4.6 Add `staticwebapp.config.json` (fallback, security headers, CSP) and verify the deployed site passes a CSP check with no console violations
-- [ ] 4.7 Check keyboard-only operation and accessible names with axe (Playwright + axe-core); verify zero serious violations
+- [x] 4.1 Scaffold `web/portal` (Vite, React, TypeScript, Fluent UI v9, MSAL, TanStack Query, Router, oxlint, Vitest); verify `npm run build` and `npm test` pass
+- [x] 4.2 Implement runtime config loading and the azd `prepackage` hook writing `config.json`; verify the deployed site loads the environment's configuration
+- [x] 4.3 Implement the shell (sign-in redirect, header with user and sign-out, navigation) and the access-denied page driven by `GET /me`; verify component tests and a manual check with a user without role
+- [x] 4.4 Implement the device list (columns, status badge, site filter, debounced search, sort, paging, URL state, empty state); verify component tests for each spec scenario
+- [x] 4.5 Implement the Editor-only edit dialog with validation, `If-Match` and conflict handling; verify component tests for reader/no-action and 412 scenarios
+- [x] 4.6 Add `staticwebapp.config.json` (fallback, security headers, CSP) and verify the deployed site passes a CSP check with no console violations (headers verified on the deployed site; violations checked by the Playwright suite running the production build under the same CSP, as interactive sign-in cannot be automated here)
+- [x] 4.7 Check keyboard-only operation and accessible names with axe (Playwright + axe-core); verify zero serious violations
 
 ## 5. Deployment and integration
 
-- [ ] 5.1 Add `infra/modules/web` (Static Web App in `var.web_location`, default `eastus2`) and the `web` and `device-api` services to `azure.yaml`; verify `azd up` deploys the portal reachable at its default hostname
-- [ ] 5.2 Playwright smoke test against the environment: sign in as Editor, filter by site, edit a device name, verify it persists; verify the test passes
-- [ ] 5.3 Write the M2 demo guide `docs/demo/m2-device-list.md`; verify a dry run follows it as written
+- [x] 5.1 Add `infra/modules/web` (Static Web App in `var.web_location`, default `eastus2`) and the `web` and `device-api` services to `azure.yaml`; verify `azd up` deploys the portal reachable at its default hostname
+- [ ] 5.2 Smoke test against the environment (automated flow: `npm run e2e` with faked identity; real sign-in: manual run of the demo guide in a desktop browser): sign in as Editor, filter by site, edit a device name, verify it persists; verify the test passes
+- [x] 5.3 Write the M2 demo guide `docs/demo/m2-device-list.md`; verify a dry run follows it as written
 
 ## Workflow follow-up
 
