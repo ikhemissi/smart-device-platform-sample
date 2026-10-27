@@ -25,10 +25,12 @@ public class DbMigratorApplication {
     }
 
     @Bean
-    FlywayMigrationStrategy migrationStrategy(MigratorProperties properties) {
+    FlywayMigrationStrategy migrationStrategy(MigratorProperties properties, PrincipalsTask principals) {
         return flyway -> {
             if (properties.tasks().contains(Task.MIGRATE)) {
+                principals.ensurePrincipals();
                 var result = flyway.migrate();
+                principals.grantGroupRoles();
                 var current = flyway.info().current();
                 log.info("Flyway migration completed: {} migration(s) applied, schema version {}",
                         result.migrationsExecuted, current == null ? "none" : current.getVersion());

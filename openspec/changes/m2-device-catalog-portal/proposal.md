@@ -26,6 +26,6 @@ _None._
 ## Impact
 
 - **New code**: `services/device-api`, `web/portal`, `infra/modules/{api,web}` and Entra app registrations in `infra/modules/identity`; Flyway migration adding device-api grants.
-- **Azure resources**: APIM (BasicV2), Static Web App (Free, `westeurope`), device-api container app and identity, two Entra app registrations with role assignments for the deployer.
+- **Azure resources**: APIM (BasicV2), Static Web App (Free, `eastus2`), device-api container app and identity, two Entra app registrations with role assignments for the deployer.
 - **ADRs relied on**: ADR-0005, ADR-0007, ADR-0008; implementation guidelines (API conventions).
 - **Contracts introduced**: public API base path `/api/v1`, error format (RFC 9457), role names, device JSON representation.

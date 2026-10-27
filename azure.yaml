@@ -1,0 +1,39 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/Azure/azure-dev/main/schemas/v1.0/azure.yaml.json
+name: smart-device-platform
+metadata:
+  template: smart-device-platform-sample
+
+infra:
+  provider: terraform
+  path: infra
+
+services:
+  telemetry-decoder:
+    project: ./services/telemetry-decoder
+    language: java
+    host: containerapp
+    docker:
+      path: ../Dockerfile
+      context: ../..
+      remoteBuild: true
+      buildArgs:
+        - SERVICE=telemetry-decoder
+
+  device-simulator:
+    project: ./services/device-simulator
+    language: java
+    host: containerapp
+    docker:
+      path: ../Dockerfile
+      context: ../..
+      remoteBuild: true
+      buildArgs:
+        - SERVICE=device-simulator
+
+hooks:
+  postprovision:
+    posix:
+      shell: sh
+      run: bash ./scripts/hooks/postprovision.sh
+      interactive: false
+      continueOnError: false

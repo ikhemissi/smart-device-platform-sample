@@ -2,7 +2,7 @@
 
 ## Context
 
-M1 bootstrap creates demo site CAs (Key Vault) and DPS enrollment groups `site-<siteId>` with initial twin tag `siteId`. ADR-0006 defines one enrollment group per site with primary/secondary signing certificates. See [proposal.md](proposal.md) and `specs/`.
+M1 bootstrap creates demo site CAs (Key Vault), registers them in DPS as verified CA certificates `site-<siteId>` and creates enrollment groups `site-<siteId>` referencing them, with initial twin tag `siteId`. ADR-0006 defines one enrollment group per site with primary/secondary CA references. See [proposal.md](proposal.md) and `specs/`.
 
 ## Goals / Non-Goals
 
@@ -16,8 +16,8 @@ M1 bootstrap creates demo site CAs (Key Vault) and DPS enrollment groups `site-<
 `services/provisioning-api` (Spring Boot 4) with its own managed identity holding **Device Provisioning Service Data Contributor** on DPS and **IoT Hub Registry Contributor** on IoT Hub. Uses the Azure IoT `provisioning-service-client` and `iot-service-client` with `TokenCredential` (no SAS). Shares security/problem-details auto-configuration from `libs/platform-common`.
 
 ### D2. Mapping to DPS
-- Site ⇔ enrollment group `site-<siteId>`, X.509 attestation with signing certificates in `primary`/`secondary`, `initialTwin.tags.siteId`, reprovision policy "update hub assignment + migrate data".
-- Add: read group (ETag) → place cert in free slot (create group if absent; re-enable if disabled) → `createOrUpdate` with ETag → on success commit DB rows. Remove: clear slot (if removing primary while secondary exists, secondary is moved to primary) → if none left, set `provisioningStatus = disabled`.
+- Site ⇔ enrollment group `site-<siteId>`, X.509 attestation with CA references in `primary`/`secondary` (each a DPS certificate registered as verified on upload, named `site-<siteId>-<fingerprint prefix>`), `initialTwin.tags.siteId`, reprovision policy "update hub assignment + migrate data".
+- Add: register the certificate in DPS as verified → read group (ETag) → reference it in the free slot (create group if absent; re-enable if disabled) → `createOrUpdate` with ETag → on success commit DB rows. Remove: clear slot (if removing primary while secondary exists, secondary is moved to primary) → if none left, set `provisioningStatus = disabled`.
 - Consistency: DPS is authoritative. DPS call first with optimistic ETag (failure → 503, nothing changed); DB transaction second. If the DB write fails after DPS succeeded, the API returns 500 and the hourly/startup reconciliation (D5) repairs the records and writes a `RECONCILED_*` audit entry — no compensating DPS call (which could itself fail).
 - Device disable/re-enable (D3) is idempotent and tracked in an `site_operations` table (`PENDING/DONE/FAILED`); reconciliation retries pending operations.
 

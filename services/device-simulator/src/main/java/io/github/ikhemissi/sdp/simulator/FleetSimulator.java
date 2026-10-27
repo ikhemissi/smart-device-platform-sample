@@ -158,7 +158,7 @@ public class FleetSimulator implements SmartLifecycle {
                 Thread.currentThread().interrupt();
                 return null;
             } catch (Exception e) {
-                log.warn("Device {} cannot connect ({}), retrying in {}", device.deviceId(), e.toString(), backoff);
+                log.warn("Device {} cannot connect ({}), retrying in {}", device.deviceId(), causes(e), backoff);
                 try {
                     sleep(backoff);
                 } catch (InterruptedException ie) {
@@ -169,6 +169,18 @@ public class FleetSimulator implements SmartLifecycle {
             }
         }
         return null;
+    }
+
+    /** Exception messages along the cause chain: SDK exceptions often hide the service's reason in a cause. */
+    static String causes(Throwable e) {
+        StringBuilder sb = new StringBuilder();
+        for (Throwable t = e; t != null && sb.length() < 1000; t = t.getCause() == t ? null : t.getCause()) {
+            if (!sb.isEmpty()) {
+                sb.append(" <- ");
+            }
+            sb.append(t.getClass().getSimpleName()).append(": ").append(t.getMessage());
+        }
+        return sb.toString();
     }
 
     private void sleep(Duration duration) throws InterruptedException {

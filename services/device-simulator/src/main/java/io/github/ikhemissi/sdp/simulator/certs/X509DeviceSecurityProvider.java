@@ -30,7 +30,7 @@ public final class X509DeviceSecurityProvider extends SecurityProviderX509 {
         return credentials.privateKey();
     }
 
-    /** The site CA is uploaded to the site's enrollment group, so the device presents it in its chain. */
+    /** The device presents its site CA (registered in DPS as a verified CA) as the rest of its chain. */
     @Override
     public Collection<X509Certificate> getIntermediateCertificatesChain() {
         return credentials.chain();

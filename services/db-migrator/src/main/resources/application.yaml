@@ -16,13 +16,14 @@ spring:
   flyway:
     schemas: sdp
     default-schema: sdp
-    # Workload identities whose database principals are created after each migration (afterMigrate.sql).
-    placeholders:
-      "[decoder_principal_name]": ${SDP_DECODER_PRINCIPAL_NAME:}
-      "[decoder_principal_object_id]": ${SDP_DECODER_PRINCIPAL_OBJECT_ID:}
 
 sdp:
   migrator:
     tasks: ${SDP_MIGRATOR_TASKS:migrate,maintain}
     retention: ${SDP_RETENTION:30d}
     ledger-retention: ${SDP_LEDGER_RETENTION:7d}
+    # Workload identities created as database principals before each migration, then granted their group role.
+    principals:
+      - name: ${SDP_DECODER_PRINCIPAL_NAME:}
+        object-id: ${SDP_DECODER_PRINCIPAL_OBJECT_ID:}
+        group-role: sdp_ingest

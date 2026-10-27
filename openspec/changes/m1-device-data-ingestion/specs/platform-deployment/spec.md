@@ -29,11 +29,11 @@ Several environments SHALL coexist in the same subscription without name collisi
 - **THEN** both deploy successfully and neither affects the other
 
 ### Requirement: Regions
-All regional resources SHALL be deployed in the configured primary region (default `francecentral`) except Static Web Apps, deployed in the configured web region (default `westeurope`). Non-regional resources (Entra objects, global resources) are exempt; services with a data location (Communication Services) SHALL use Europe, and model deployments the EU data zone.
+All regional resources SHALL be deployed in the configured primary region (default `francecentral`) except Static Web Apps, deployed in the configured web region (default `eastus2`, as the only European region is blocked by tenant policy). Non-regional resources (Entra objects, global resources) are exempt; services with a data location (Communication Services) SHALL use Europe, and model deployments the EU data zone.
 
 #### Scenario: Default regions
 - **WHEN** an environment is deployed with default settings
-- **THEN** every regional resource is located in `francecentral` except the Static Web App located in `westeurope`, and every data location is in Europe
+- **THEN** every regional resource is located in `francecentral` except the Static Web App located in `eastus2`, and every data location is in Europe
 
 ### Requirement: Demo bootstrap
 Provisioning SHALL ensure that the database schema is at the latest version, that each configured demo site exists with a demo certificate authority, and that the corresponding device enrollment is enabled, so the simulator can send data immediately. Re-running SHALL NOT regenerate existing site authorities.

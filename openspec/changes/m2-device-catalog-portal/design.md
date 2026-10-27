@@ -42,7 +42,7 @@ M1 delivered ingestion, the `sites`/`devices`/`measurements` schema and the azd/
 - Tests: Vitest + React Testing Library for components; Playwright smoke test against a deployed environment using a test user.
 
 ### D5. Static Web App
-`azurerm_static_web_app` Free tier in `var.web_location` (`westeurope`); azd service `web` with `host: staticwebapp`; no SWA built-in auth or linked backend (ADR-0007).
+`azurerm_static_web_app` Free tier in `var.web_location` (`eastus2`; `westeurope` is blocked by tenant policy); azd service `web` with `host: staticwebapp`; no SWA built-in auth or linked backend (ADR-0007).
 
 ## Risks / Trade-offs
 

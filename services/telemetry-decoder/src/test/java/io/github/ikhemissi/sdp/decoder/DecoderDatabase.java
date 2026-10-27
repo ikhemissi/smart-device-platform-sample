@@ -1,7 +1,6 @@
 package io.github.ikhemissi.sdp.decoder;
 
 import io.github.ikhemissi.sdp.testsupport.SdpPostgres;
-import java.util.Map;
 import org.flywaydb.core.Flyway;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
@@ -10,7 +9,8 @@ import org.testcontainers.postgresql.PostgreSQLContainer;
 
 /**
  * Shared PostgreSQL for decoder integration tests: migrated with the real migrations (libs/db-schema); the decoder
- * connects as the least-privilege decoder principal created by afterMigrate.sql (given a password for tests only).
+ * connects as a least-privilege principal member of {@code sdp_ingest}, as the migrator sets it up (with a password,
+ * for tests only).
  */
 public final class DecoderDatabase {
 
@@ -27,10 +27,10 @@ public final class DecoderDatabase {
             Flyway.configure()
                     .dataSource(postgres.getJdbcUrl(), postgres.getUsername(), postgres.getPassword())
                     .schemas("sdp").defaultSchema("sdp")
-                    .placeholders(Map.of("decoder_principal_name", DECODER_PRINCIPAL, "decoder_principal_object_id", ""))
                     .load()
                     .migrate();
-            admin().execute("ALTER ROLE \"" + DECODER_PRINCIPAL + "\" PASSWORD '" + DECODER_PASSWORD + "'");
+            admin().execute("CREATE ROLE \"" + DECODER_PRINCIPAL + "\" LOGIN PASSWORD '" + DECODER_PASSWORD + "'");
+            admin().execute("GRANT sdp_ingest TO \"" + DECODER_PRINCIPAL + "\"");
             migrated = true;
         }
         return postgres;

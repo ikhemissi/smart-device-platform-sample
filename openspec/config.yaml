@@ -13,7 +13,8 @@ context: |
   strings in code, config or IaC outputs. Documented exceptions only (see ADR-0005).
   Devices authenticate with X.509 certificates issued by a per-site CA (DPS enrollment group per site).
   Telemetry/traces/logs/metrics go to Application Insights via OpenTelemetry.
-  Infrastructure is Terraform deployed via azd. Region francecentral for everything except Static Web Apps (westeurope).
+  Infrastructure is Terraform deployed via azd. Region francecentral for everything except Static Web Apps (eastus2; westeurope is blocked by tenant policy).
+  Every resource carries the tenant governance tags SecurityControl=Ignore and CostControl=Ignore.
   Users authenticate with Entra ID; two app roles: DeviceData.Read (query) and DeviceData.Write (edit).
   Milestone order: M1 ingestion, M2 device list, M3 telemetry history + chart, M4 site certificates, M5 threshold alerting, M6 AI agent.
 

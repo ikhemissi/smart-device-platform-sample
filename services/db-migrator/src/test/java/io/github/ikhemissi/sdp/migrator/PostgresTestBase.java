@@ -17,6 +17,7 @@ abstract class PostgresTestBase {
         registry.add("spring.datasource.username", POSTGRES::getUsername);
         registry.add("spring.datasource.password", POSTGRES::getPassword);
         registry.add("spring.datasource.azure.passwordless-enabled", () -> "false");
-        registry.add("spring.flyway.placeholders.[decoder_principal_name]", () -> DECODER_PRINCIPAL);
+        registry.add("sdp.migrator.principals[0].name", () -> DECODER_PRINCIPAL);
+        registry.add("sdp.migrator.principals[0].group-role", () -> "sdp_ingest");
     }
 }

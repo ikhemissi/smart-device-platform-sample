@@ -3,7 +3,7 @@
 ## 1. Repository and build foundation
 
 - [x] 1.1 Create the Maven parent `pom.xml` (Java 25, Spring Boot 4 BOM, Spring Cloud Azure BOM, Azure SDK BOM) and module skeletons `libs/payload-codecs`, `libs/platform-common`, `services/telemetry-decoder`, `services/device-simulator`, `services/db-migrator`; verify `mvn -q verify` succeeds on the empty modules
-- [ ] 1.2 Spike: start a Spring Boot 4 / Java 25 app with the Application Insights Java agent and a passwordless PostgreSQL datasource against a dev server; verify telemetry appears in Application Insights and the DB connection uses an Entra token (record outcome in design.md Risks)
+- [x] 1.2 Spike: start a Spring Boot 4 / Java 25 app with the Application Insights Java agent and a passwordless PostgreSQL datasource against a dev server; verify telemetry appears in Application Insights and the DB connection uses an Entra token (record outcome in design.md Risks)
 - [x] 1.3 Add a shared multi-stage Dockerfile pattern (JDK 25 distroless base, non-root user, App Insights agent, no BuildKit-only features) and verify each service image builds and starts with `podman build`/`podman run` (OCI-compatible, also used by `az acr build`)
 - [x] 1.4 Add `.gitignore`, `.editorconfig`, root `README.md` (layout, prerequisites, `azd up`) and verify the README commands are accurate
 
@@ -20,8 +20,8 @@
 ## 3. Database schema and migrator
 
 - [x] 3.1 Write Flyway `V1` (sites, devices, metric_definitions seed, partitioned measurements and rejected_messages, `ingested_messages` deduplication ledger, pg_partman parents) and the migrator's maintenance task (partitions, retention, ledger clean-up); verify migration and maintenance on a PostgreSQL 18 + pg_partman container (Testcontainers `MigrationIT`)
-- [x] 3.2 Write the `afterMigrate.sql` callback creating workload principals (Entra on Azure) from placeholders, with least-privilege grants through group roles; verify with a Testcontainers test (`PrivilegesIT`) that the decoder role cannot run DDL
-- [ ] 3.3 Implement the `db-migrator` runner (tasks `migrate`/`maintain`, exit code reflects success), `scripts/run-migrations.sh` and `scripts/local-postgres.sh`; verify the script migrates a dev database using the developer's Entra token (local mode verified; Entra mode pending the first `azd provision`)
+- [x] 3.2 Create workload principals (Entra on Azure, through the `postgres` database) from configuration, with least-privilege grants through group roles; verify with a Testcontainers test (`PrivilegesIT`) that the decoder role cannot run DDL
+- [x] 3.3 Implement the `db-migrator` runner (tasks `migrate`/`maintain`, exit code reflects success), `scripts/run-migrations.sh` and `scripts/local-postgres.sh`; verify the script migrates a dev database using the developer's Entra token (local and Entra modes verified)
 
 ## 4. Telemetry decoder
 
@@ -36,24 +36,24 @@
 
 - [x] 5.1 Implement fleet configuration, deterministic device ids and reading models; verify unit tests for defaults, custom fleet and value continuity
 - [x] 5.2 Implement site-CA loading from Key Vault and in-memory leaf certificate generation; verify a generated leaf chains to the CA and has CN = device id
-- [ ] 5.3 Implement DPS provisioning and IoT Hub MQTT sending with message id and `traceparent`; verify against the dev environment that a device provisions and messages arrive in Event Hubs (message mapping unit-tested; dev-environment verification pending the first `azd provision`)
+- [x] 5.3 Implement DPS provisioning and IoT Hub MQTT sending with message id and `traceparent`; verify against the dev environment that a device provisions and messages arrive in Event Hubs (30 devices provisioned through DPS, messages routed to Event Hubs with their site)
 - [x] 5.4 Implement corruption and anomaly injection and graceful shutdown; verify unit tests for injection rates/anomaly windows and a shutdown test within 10 seconds
 - [x] 5.5 Document local and cloud usage (incl. on-demand anomalies) in `services/device-simulator/README.md`; verify commands run as written (dry-run command verified; Azure commands are exercised by 5.3)
 
 ## 6. Infrastructure (Terraform)
 
-- [ ] 6.1 Create `scripts/bootstrap-tfstate.sh`, `infra/provider.tf`, `infra/provider.conf.json`, variables (regions, env name, demo sites) and naming/tagging conventions; verify `terraform init` with the Entra-authenticated backend
-- [ ] 6.2 Implement module `core` (RG, Log Analytics, App Insights with local auth disabled, ACR, ACA environment, Key Vault RBAC); verify `terraform plan` and `azd provision` succeed
-- [ ] 6.3 Implement module `identity` (per-workload UAMIs and role assignments); verify roles with `az role assignment list` match the RBAC matrix in `docs/architecture/implementation-guidelines.md`
-- [ ] 6.4 Implement module `ingestion` (Event Hubs, Storage, IoT Hub with identity-based endpoint, route and siteId enrichment, DPS link); verify a test message sent with `az iot device simulate` reaches the event hub with `siteId`
-- [ ] 6.5 Implement module `data` (PostgreSQL Entra-only, extensions/parameters, database, migrator as Entra admin); verify password login is refused and the migrator identity can connect
-- [ ] 6.6 Define container apps (decoder with identity-based KEDA scaler, simulator), the migrator job (manual, `migrate,maintain`) and the hourly maintenance job (`maintain`); verify `azd deploy` updates images, apps become healthy and a scheduled maintenance execution succeeds
-- [ ] 6.7 Verify no secret-bearing outputs/values exist (`azd env get-values`, `terraform output`) and document the DPS link exception in `docs/security.md`
+- [x] 6.1 Create `scripts/bootstrap-tfstate.sh`, `infra/provider.tf`, `infra/provider.conf.json`, variables (regions, env name, demo sites) and naming/tagging conventions; verify `terraform init` with the Entra-authenticated backend
+- [x] 6.2 Implement module `core` (RG, Log Analytics, App Insights with local auth disabled, ACR, ACA environment, Key Vault RBAC); verify `terraform plan` and `azd provision` succeed
+- [x] 6.3 Implement module `identity` (per-workload UAMIs and role assignments); verify roles with `az role assignment list` match the RBAC matrix in `docs/architecture/implementation-guidelines.md`
+- [x] 6.4 Implement module `ingestion` (Event Hubs, Storage, IoT Hub with identity-based endpoint, route and siteId enrichment, DPS link); verify a test message sent with `az iot device simulate` reaches the event hub with `siteId`
+- [x] 6.5 Implement module `data` (PostgreSQL Entra-only, extensions/parameters, database, migrator as Entra admin); verify password login is refused and the migrator identity can connect
+- [x] 6.6 Define container apps (decoder with identity-based KEDA scaler, simulator), the migrator job (manual, `migrate,maintain`) and the hourly maintenance job (`maintain`); verify `azd deploy` updates images, apps become healthy and a scheduled maintenance execution succeeds
+- [x] 6.7 Verify no secret-bearing outputs/values exist (`azd env get-values`, `terraform output`) and document the DPS link exception in `docs/security.md`
 
 ## 7. azd wiring and demo bootstrap
 
 - [ ] 7.1 Write `azure.yaml` (services, hooks) and the `postprovision` hook running migrations then `scripts/bootstrap-demo-sites.sh`; verify `azd up` on an empty environment completes without manual steps
-- [ ] 7.2 Implement `scripts/bootstrap-demo-sites.sh` (idempotent CA generation into Key Vault, `sites` rows, DPS enrollment groups with initial twin tag); verify a second run keeps existing CAs
+- [x] 7.2 Implement `scripts/bootstrap-demo-sites.sh` (idempotent CA generation into Key Vault, `sites` rows, DPS enrollment groups with initial twin tag); verify a second run keeps existing CAs
 - [ ] 7.3 Verify `azd down --purge` removes all resources including soft-deleted Key Vault
 
 ## 8. End-to-end verification

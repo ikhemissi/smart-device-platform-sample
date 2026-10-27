@@ -6,7 +6,7 @@ One-shot job that owns the database schema. It runs Flyway migrations from `libs
 
 | Task | What it does |
 |---|---|
-| `migrate` | Applies `db/migration` (versioned SQL, repeatable Java migration seeding `sdp.metric_definitions` from the codec catalogue), then `afterMigrate.sql`, which creates the workload principals and grants their group role |
+| `migrate` | Creates the workload principals (through the `postgres` database: on Azure with `pgaadauth`, as Entra principals), applies `db/migration` (versioned SQL, repeatable Java migration seeding `sdp.metric_definitions` from the codec catalogue), then grants each principal its group role |
 | `maintain` | Re-applies the retention to partitioned tables, runs `partman.run_maintenance_proc()` (pre-creates daily partitions for the next 7 days, drops expired ones), purges deduplication keys older than the ledger retention |
 
 The deployment runs `migrate,maintain` after every provisioning, and `maintain` hourly on a schedule.
@@ -27,7 +27,7 @@ The deployment runs `migrate,maintain` after every provisioning, and `maintain` 
 ## Database model and privileges
 
 - Schema `sdp` (owner: migrator). `measurements` and `rejected_messages` are range-partitioned by day with pg_partman (schema `partman`); `ingested_messages` is the non-partitioned deduplication ledger (ADR-0004, implementation guidelines §3).
-- Group roles (NOLOGIN) carry privileges; principals are members. On Azure, principals are created with `pgaadauth_create_principal_with_oid`; on plain PostgreSQL as `LOGIN` roles.
+- Group roles (NOLOGIN) carry privileges; principals are members. On Azure, principals are created with `pgaadauth_create_principal_with_oid` from the `postgres` database (the only one where `pgaadauth` exists); a same-named plain role is replaced. On plain PostgreSQL principals are `LOGIN` roles.
 
 | Group role | Members | Privileges |
 |---|---|---|

@@ -10,7 +10,7 @@ All resources must be deployed with Terraform, ideally via the Azure Developer C
 ## Decision
 
 1. **All Azure resources and Entra app registrations are defined in Terraform and deployed through azd** (`infra.provider: terraform`); azd also builds and deploys every service.
-2. **Primary region `francecentral`** for every regional resource; **Static Web Apps in `westeurope`** (the only European region it supports; content is globally distributed). Services with a data location use **Europe**; model deployments use the **EU data zone**. (`swedencentral` was preferred but does not offer IoT Hub/DPS.)
+2. **Primary region `francecentral`** for every regional resource. **Static Web Apps in `eastus2`**: its only European region (`westeurope`) is blocked by tenant policy; the Static Web Apps region only holds resource metadata and the static UI assets (no customer data), content being served globally. Services with a data location use **Europe**; model deployments use the **EU data zone**. (`swedencentral` was preferred but does not offer IoT Hub/DPS.)
 3. **Public network endpoints** protected by Entra authentication and disabled local auth; no VNet integration or private endpoints.
 
 ## Why hard to reverse
@@ -31,4 +31,6 @@ Switching IaC tooling means rewriting all infrastructure code and migrating stat
 | Bicep with azd | Requirement states Terraform. |
 | Terraform without azd | Loses one-command provisioning + deployment. |
 | `swedencentral` | IoT Hub and DPS unavailable. |
+| Static Web Apps in `westeurope` | Blocked by tenant policy (region access restriction). |
+| Private networking to satisfy the tenant's public-network policies | Kept out of scope; resources carry the tenant's opt-out tags instead (implementation guidelines §7). |
 | Private networking | Significant cost/complexity for a demonstrator. |

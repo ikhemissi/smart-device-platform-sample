@@ -34,7 +34,7 @@
 
 ## 5. Deployment and integration
 
-- [ ] 5.1 Add `infra/modules/web` (Static Web App in `var.web_location`) and the `web` and `device-api` services to `azure.yaml`; verify `azd up` deploys the portal reachable at its default hostname
+- [ ] 5.1 Add `infra/modules/web` (Static Web App in `var.web_location`, default `eastus2`) and the `web` and `device-api` services to `azure.yaml`; verify `azd up` deploys the portal reachable at its default hostname
 - [ ] 5.2 Playwright smoke test against the environment: sign in as Editor, filter by site, edit a device name, verify it persists; verify the test passes
 - [ ] 5.3 Write the M2 demo guide `docs/demo/m2-device-list.md`; verify a dry run follows it as written
 

@@ -1,13 +1,17 @@
-**/target/
-**/node_modules/
-.git/
-.azure/
-.terraform/
-docs/
-openspec/
-infra/
-web/
-agents/
+# No trailing slashes: `az acr build` (ACR remote builds) only matches rules written this way.
+**/target
+**/node_modules
+**/.jqwik-database
+.git
+.azure
+.terraform
+infra
+docs
+openspec
+scripts
+web
+agents
+.github
 *.pem
 *.key
 *.pfx

@@ -37,7 +37,7 @@ SPA (Static Web Apps) ──► API Management ──► device-api (ACA) ──
 All workloads ──OpenTelemetry──► Application Insights      Identity: Entra ID + managed identities (passwordless)
 ```
 
-Stack: Java 25 + Spring Boot 4 (platform services), Python + Microsoft Agent Framework (agent), React + TypeScript (portal), Terraform deployed with azd. Region `francecentral` (Static Web Apps: `westeurope`).
+Stack: Java 25 + Spring Boot 4 (platform services), Python + Microsoft Agent Framework (agent), React + TypeScript (portal), Terraform deployed with azd. Region `francecentral` (Static Web Apps: `eastus2`, as `westeurope` is blocked by tenant policy).
 
 ## Repository layout
 
@@ -51,7 +51,7 @@ libs/test-support/          Testcontainers definitions for integration tests
 services/db-migrator/       Applies migrations and DB maintenance (Container Apps jobs)
 services/Dockerfile         Shared image definition for Java services
 scripts/                    Developer and deployment scripts
-infra/                      Terraform (deployed with azd)            [coming in M1]
+infra/                      Terraform (deployed with azd)
 docs/  openspec/            Requirements, decisions, specs
 ```
 
@@ -77,7 +77,20 @@ podman build -f services/Dockerfile \
   --build-arg SERVICE=telemetry-decoder -t sdp/telemetry-decoder:dev .   # build one service image
 ```
 
-Deployment (`azd up`) is documented once the infrastructure lands (M1 tasks 6–7).
+## Deploy to Azure
+
+Prerequisites: Owner (or Contributor + User Access Administrator) on the subscription, `az` with the `azure-iot` extension (`az extension add -n azure-iot`), `azd`, Terraform, OpenSSL. No Docker needed: images are built in Azure Container Registry.
+
+```bash
+az login && azd auth login
+azd env new sdp-dev --location francecentral --subscription <subscription-id>
+scripts/bootstrap-tfstate.sh            # once per subscription: Terraform state storage (Entra-only)
+azd up                                  # infrastructure, database migration, demo sites, services
+```
+
+`azd up` provisions everything with Terraform (`infra/`), then the post-provision hook builds the migrator image, migrates the database and prepares the demo sites (CA per site in Key Vault, verified in DPS, enrollment groups), and finally azd deploys the decoder and the simulator. The simulator starts sending immediately (3 sites × 10 devices every 30 s). Re-running `azd up` is idempotent. Remove everything with `azd down --purge`.
+
+All resources carry the tenant governance tags `SecurityControl=Ignore` and `CostControl=Ignore` (see [docs/security.md](docs/security.md)).
 
 ## Working with specs
 

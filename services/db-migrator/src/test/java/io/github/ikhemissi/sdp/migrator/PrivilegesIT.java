@@ -15,7 +15,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 /**
- * Task 3.2 — workload principals are created by afterMigrate.sql with least-privilege grants
+ * Task 3.2 — workload principals are created by the migrator with least-privilege grants
  * (spec platform-security: "Least privilege per workload" / "Decoder cannot change schema").
  */
 @SpringBootTest
@@ -29,12 +29,19 @@ class PrivilegesIT extends PostgresTestBase {
     @Autowired
     Flyway flyway;
 
+    @Autowired
+    PrincipalsTask principals;
+
     @Test
     void decoderPrincipalIsCreatedAndMemberOfTheIngestionRole() {
         assertThat(jdbc.queryForObject("SELECT pg_has_role(?, 'sdp_ingest', 'MEMBER')", Boolean.class, DECODER_PRINCIPAL)).isTrue();
         assertThat(jdbc.queryForObject("SELECT rolcreaterole OR rolcreatedb OR rolsuper FROM pg_roles WHERE rolname = ?",
                 Boolean.class, DECODER_PRINCIPAL)).isFalse();
-        assertThatCode(() -> flyway.migrate()).as("afterMigrate is idempotent").doesNotThrowAnyException();
+        assertThatCode(() -> {
+            principals.ensurePrincipals();
+            flyway.migrate();
+            principals.grantGroupRoles();
+        }).as("principal creation and grants are idempotent").doesNotThrowAnyException();
     }
 
     @Test
