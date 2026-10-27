@@ -31,9 +31,27 @@ services:
         - SERVICE=device-simulator
 
 hooks:
+  preprovision:
+    posix:
+      shell: sh
+      run: bash ./scripts/hooks/preprovision.sh
+      interactive: false
+      continueOnError: false
   postprovision:
     posix:
       shell: sh
       run: bash ./scripts/hooks/postprovision.sh
+      interactive: false
+      continueOnError: false
+  postdeploy:
+    posix:
+      shell: sh
+      run: bash ./scripts/hooks/postdeploy.sh
+      interactive: false
+      continueOnError: false
+  predown:
+    posix:
+      shell: sh
+      run: bash ./scripts/hooks/predown.sh
       interactive: false
       continueOnError: false

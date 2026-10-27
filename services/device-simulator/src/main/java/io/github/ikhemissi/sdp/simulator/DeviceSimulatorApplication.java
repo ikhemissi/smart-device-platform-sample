@@ -33,7 +33,9 @@ public class DeviceSimulatorApplication {
         ConfigurableApplicationContext context = SpringApplication.run(DeviceSimulatorApplication.class, args);
         // Device loops run on (daemon) virtual threads: keep the JVM alive until the simulation stops.
         context.getBean(FleetSimulator.class).awaitTermination();
-        context.close();
+        // Exit explicitly: the IoT provisioning SDK can leave non-daemon executor threads behind (e.g. after a
+        // refused registration), which would otherwise keep the JVM running after the simulation ended.
+        System.exit(SpringApplication.exit(context));
     }
 
     @Bean

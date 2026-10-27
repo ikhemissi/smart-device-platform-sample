@@ -32,7 +32,7 @@ All `sdp.decoder.*` properties are defined in [application.yaml](src/main/resour
 
 - **Health** (port `8080`): `/actuator/health/liveness`, `/actuator/health/readiness`. Readiness includes the `ingestion` indicator, `DOWN` (with `failingSince` and `lastError`) while batches cannot be persisted.
 - **Scaling**: one replica per Event Hubs partition at most (KEDA Event Hubs scaler); partitions are balanced automatically between replicas.
-- **Telemetry** (OpenTelemetry → Application Insights): span `sdp.ingest.batch` per batch with one child span `sdp.ingest.message` per message (attributes `sdp.device.id`, `sdp.site.id`, `sdp.payload.format`, `sdp.ingestion.outcome`, `sdp.rejection.reason`), linked to the device's send span. Metrics: `sdp.ingestion.messages{sdp.payload.format, sdp.ingestion.outcome, sdp.rejection.reason}`, `sdp.ingestion.batch.size`, `sdp.ingestion.latency` (IoT Hub enqueue → persisted).
+- **Telemetry** (OpenTelemetry → Application Insights): span `sdp.ingest.batch` per batch with one child span `sdp.ingest.message` per message (attributes `sdp.device.id`, `sdp.site.id`, `sdp.payload.format`, `sdp.ingestion.outcome`, `sdp.rejection.reason`), children of the Event Hubs SDK's `process device-telemetry` request, which links to each message's send span (`_MS.links`). `scripts/trace-device.sh <deviceId>` shows the whole journey. Metrics: `sdp.ingestion.messages{sdp.payload.format, sdp.ingestion.outcome, sdp.rejection.reason}`, `sdp.ingestion.batch.size`, `sdp.ingestion.latency` (IoT Hub enqueue → persisted).
 - **Investigating rejections**: `SELECT received_at, device_id, reason, detail, encode(raw_payload, 'hex') FROM sdp.rejected_messages ORDER BY received_at DESC LIMIT 50;`
 
 ## Tests

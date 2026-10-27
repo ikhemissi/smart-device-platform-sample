@@ -4,7 +4,8 @@
 #
 #   scripts/bootstrap-tfstate.sh [location]
 #
-# If an azd environment is selected, its RS_* variables are set so `azd provision` uses this backend.
+# If an azd environment is selected, its RS_* variables are set so `azd provision` uses this backend. Also run by
+# the azd preprovision hook, so a new environment needs no manual step.
 set -euo pipefail
 
 LOCATION="${1:-${AZURE_LOCATION:-francecentral}}"
@@ -34,10 +35,13 @@ if [[ -z "$(az role assignment list --assignee "$ME" --scope "$ACCOUNT_ID" --rol
 fi
 az storage container create -n "$CONTAINER" --account-name "$ACCOUNT" --auth-mode login -o none
 
-if azd env get-values >/dev/null 2>&1; then
-  azd env set RS_RESOURCE_GROUP "$RG" >/dev/null
-  azd env set RS_STORAGE_ACCOUNT "$ACCOUNT" >/dev/null
-  azd env set RS_CONTAINER_NAME "$CONTAINER" >/dev/null
+# Inside azd hooks AZURE_ENV_NAME designates the environment being provisioned.
+ENV_ARGS=()
+[[ -n "${AZURE_ENV_NAME:-}" ]] && ENV_ARGS=(-e "$AZURE_ENV_NAME")
+if azd env get-values "${ENV_ARGS[@]}" >/dev/null 2>&1; then
+  azd env set "${ENV_ARGS[@]}" RS_RESOURCE_GROUP "$RG" >/dev/null
+  azd env set "${ENV_ARGS[@]}" RS_STORAGE_ACCOUNT "$ACCOUNT" >/dev/null
+  azd env set "${ENV_ARGS[@]}" RS_CONTAINER_NAME "$CONTAINER" >/dev/null
   echo "azd environment configured to use the remote state backend."
 fi
 echo "Terraform state: $ACCOUNT/$CONTAINER (resource group $RG)"

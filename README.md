@@ -84,11 +84,10 @@ Prerequisites: Owner (or Contributor + User Access Administrator) on the subscri
 ```bash
 az login && azd auth login
 azd env new sdp-dev --location francecentral --subscription <subscription-id>
-scripts/bootstrap-tfstate.sh            # once per subscription: Terraform state storage (Entra-only)
-azd up                                  # infrastructure, database migration, demo sites, services
+azd up                                  # state backend, infrastructure, database migration, demo sites, services
 ```
 
-`azd up` provisions everything with Terraform (`infra/`), then the post-provision hook builds the migrator image, migrates the database and prepares the demo sites (CA per site in Key Vault, verified in DPS, enrollment groups), and finally azd deploys the decoder and the simulator. The simulator starts sending immediately (3 sites × 10 devices every 30 s). Re-running `azd up` is idempotent. Remove everything with `azd down --purge`.
+`azd up` first makes sure the Terraform state store exists (`scripts/bootstrap-tfstate.sh`, Entra-only storage shared by all environments of the subscription), provisions everything with Terraform (`infra/`), then the post-provision hook builds the migrator image, migrates the database and prepares the demo sites (CA per site in Key Vault, verified in DPS, enrollment groups), and finally azd deploys the decoder and the simulator. The simulator starts sending immediately (3 sites × 10 devices every 30 s). Re-running `azd up` is idempotent. Remove everything with `azd down --purge` (deletes the resource group and purges the Key Vault). A guided demo is in [docs/demo/m1-ingestion.md](docs/demo/m1-ingestion.md); `scripts/psql.sh` and `scripts/trace-device.sh` help explore data and traces.
 
 All resources carry the tenant governance tags `SecurityControl=Ignore` and `CostControl=Ignore` (see [docs/security.md](docs/security.md)).
 

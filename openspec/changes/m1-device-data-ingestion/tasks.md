@@ -52,17 +52,17 @@
 
 ## 7. azd wiring and demo bootstrap
 
-- [ ] 7.1 Write `azure.yaml` (services, hooks) and the `postprovision` hook running migrations then `scripts/bootstrap-demo-sites.sh`; verify `azd up` on an empty environment completes without manual steps
+- [ ] 7.1 Write `azure.yaml` (services, hooks) and the `postprovision` hook running migrations then `scripts/bootstrap-demo-sites.sh`; verify `azd up` on an empty environment completes without manual steps (implemented and used for `sdp-dev`; two fresh-environment runs found and fixed `ServerIsBusy` and an orphaned diagnostic setting — re-check when a new environment is next created)
 - [x] 7.2 Implement `scripts/bootstrap-demo-sites.sh` (idempotent CA generation into Key Vault, `sites` rows, DPS enrollment groups with initial twin tag); verify a second run keeps existing CAs
-- [ ] 7.3 Verify `azd down --purge` removes all resources including soft-deleted Key Vault
+- [x] 7.3 Verify `azd down --purge` removes all resources including soft-deleted Key Vault (`predown` hook: diagnostic settings, resource group, Key Vault purge)
 
 ## 8. End-to-end verification
 
-- [ ] 8.1 Run the default simulator fleet for 15 minutes; verify measurements for all 30 devices and 4 formats are in PostgreSQL and devices are auto-registered with correct sites
-- [ ] 8.2 Run 100 msg/s for 10 minutes with 1% corruption; verify p99 ingestion latency < 60 s, rejected messages stored with reasons and no duplicates
-- [ ] 8.3 Follow one simulated message end to end in Application Insights (send span → decoder batch span → DB write); verify span attributes `sdp.device.id`, `sdp.site.id`, `sdp.payload.format`
-- [ ] 8.4 Attempt provisioning with a certificate from an unknown CA; verify it is refused
-- [ ] 8.5 Write the M1 demo guide `docs/demo/m1-ingestion.md` following PRD-001 §6; verify a dry run follows it as written
+- [x] 8.1 Run the default simulator fleet for 15 minutes; verify measurements for all 30 devices and 4 formats are in PostgreSQL and devices are auto-registered with correct sites (886 measurements in 15 min, 0 wrong sites, 0 duplicates)
+- [x] 8.2 Run 100 msg/s for 10 minutes with 1% corruption; verify p99 ingestion latency < 60 s, rejected messages stored with reasons and no duplicates (112 msg/s: p99 5.1 s, 0.96% rejected with reasons, 0 duplicates, no throttling)
+- [x] 8.3 Follow one simulated message end to end in Application Insights (send span → decoder batch span → DB write); verify span attributes `sdp.device.id`, `sdp.site.id`, `sdp.payload.format` (`scripts/trace-device.sh`)
+- [x] 8.4 Attempt provisioning with a certificate from an unknown CA; verify it is refused (DPS `401002 CA certificate not found`, nothing reaches IoT Hub)
+- [x] 8.5 Write the M1 demo guide `docs/demo/m1-ingestion.md` following PRD-001 §6; verify a dry run follows it as written
 
 ## Workflow follow-up
 

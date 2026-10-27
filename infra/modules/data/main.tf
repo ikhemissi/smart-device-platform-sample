@@ -44,17 +44,21 @@ resource "azurerm_postgresql_flexible_server" "main" {
   }
 }
 
-resource "azurerm_postgresql_flexible_server_database" "sdp" {
-  name      = "sdp"
-  server_id = azurerm_postgresql_flexible_server.main.id
-  charset   = "UTF8"
-  collation = "en_US.utf8"
-}
+# PostgreSQL rejects concurrent server-level operations ("ServerIsBusy"): the resources below are chained with
+# depends_on so they are applied one at a time.
 
 resource "azurerm_postgresql_flexible_server_configuration" "extensions" {
   name      = "azure.extensions"
   server_id = azurerm_postgresql_flexible_server.main.id
   value     = "PG_PARTMAN"
+}
+
+resource "azurerm_postgresql_flexible_server_database" "sdp" {
+  name       = "sdp"
+  server_id  = azurerm_postgresql_flexible_server.main.id
+  charset    = "UTF8"
+  collation  = "en_US.utf8"
+  depends_on = [azurerm_postgresql_flexible_server_configuration.extensions]
 }
 
 resource "azurerm_postgresql_flexible_server_active_directory_administrator" "migrator" {
@@ -64,6 +68,7 @@ resource "azurerm_postgresql_flexible_server_active_directory_administrator" "mi
   object_id           = var.migrator_identity.principal_id
   principal_name      = var.migrator_identity.name
   principal_type      = "ServicePrincipal"
+  depends_on          = [azurerm_postgresql_flexible_server_firewall_rule.developer, azurerm_postgresql_flexible_server_firewall_rule.azure_services]
 }
 
 resource "azurerm_postgresql_flexible_server_active_directory_administrator" "developer" {
@@ -74,8 +79,7 @@ resource "azurerm_postgresql_flexible_server_active_directory_administrator" "de
   object_id           = var.developer_admin.object_id
   principal_name      = var.developer_admin.user_principal_name
   principal_type      = "User"
-  # Entra administrators cannot be added concurrently.
-  depends_on = [azurerm_postgresql_flexible_server_active_directory_administrator.migrator]
+  depends_on          = [azurerm_postgresql_flexible_server_active_directory_administrator.migrator]
 }
 
 resource "azurerm_postgresql_flexible_server_firewall_rule" "azure_services" {
@@ -83,6 +87,7 @@ resource "azurerm_postgresql_flexible_server_firewall_rule" "azure_services" {
   server_id        = azurerm_postgresql_flexible_server.main.id
   start_ip_address = "0.0.0.0"
   end_ip_address   = "0.0.0.0"
+  depends_on       = [azurerm_postgresql_flexible_server_database.sdp]
 }
 
 resource "azurerm_postgresql_flexible_server_firewall_rule" "developer" {
@@ -91,6 +96,7 @@ resource "azurerm_postgresql_flexible_server_firewall_rule" "developer" {
   server_id        = azurerm_postgresql_flexible_server.main.id
   start_ip_address = var.developer_ip
   end_ip_address   = var.developer_ip
+  depends_on       = [azurerm_postgresql_flexible_server_firewall_rule.azure_services]
 }
 
 output "postgres_fqdn" { value = azurerm_postgresql_flexible_server.main.fqdn }

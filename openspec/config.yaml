@@ -15,6 +15,8 @@ context: |
   Telemetry/traces/logs/metrics go to Application Insights via OpenTelemetry.
   Infrastructure is Terraform deployed via azd. Region francecentral for everything except Static Web Apps (eastus2; westeurope is blocked by tenant policy).
   Every resource carries the tenant governance tags SecurityControl=Ignore and CostControl=Ignore.
+  A single long-lived Azure environment (azd env sdp-dev) is updated incrementally; tasks verify against it and do
+  not create or tear down environments unless explicitly requested.
   Users authenticate with Entra ID; two app roles: DeviceData.Read (query) and DeviceData.Write (edit).
   Milestone order: M1 ingestion, M2 device list, M3 telemetry history + chart, M4 site certificates, M5 threshold alerting, M6 AI agent.
 
