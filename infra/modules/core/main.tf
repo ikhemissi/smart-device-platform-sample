@@ -13,8 +13,13 @@ resource "azurerm_log_analytics_workspace" "main" {
   resource_group_name = var.resource_group_name
   location            = var.location
   sku                 = "PerGB2018"
-  retention_in_days   = 30
+  retention_in_days   = 90
   tags                = var.tags
+
+  lifecycle {
+    # Holds the demonstrator's history (shown to customers): a change forcing replacement must fail, not wipe it.
+    prevent_destroy = true
+  }
 }
 
 resource "azurerm_application_insights" "main" {
@@ -25,6 +30,11 @@ resource "azurerm_application_insights" "main" {
   application_type             = "java"
   local_authentication_enabled = false
   tags                         = var.tags
+
+  lifecycle {
+    # Holds the demonstrator's history (shown to customers): a change forcing replacement must fail, not wipe it.
+    prevent_destroy = true
+  }
 }
 
 resource "azurerm_container_registry" "main" {
@@ -48,6 +58,11 @@ resource "azurerm_key_vault" "main" {
   soft_delete_retention_days    = 7
   public_network_access_enabled = true
   tags                          = var.tags
+
+  lifecycle {
+    # Holds the site CAs trusted by devices: recreating it would regenerate them and lock devices out.
+    prevent_destroy = true
+  }
 }
 
 resource "azurerm_container_app_environment" "main" {

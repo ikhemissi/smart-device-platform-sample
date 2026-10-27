@@ -40,7 +40,9 @@ resource "azurerm_postgresql_flexible_server" "main" {
   }
 
   lifecycle {
-    ignore_changes = [zone]
+    # Holds the demonstrator's history (shown to customers): a change forcing replacement must fail, not wipe it.
+    prevent_destroy = true
+    ignore_changes  = [zone]
   }
 }
 
@@ -59,6 +61,11 @@ resource "azurerm_postgresql_flexible_server_database" "sdp" {
   charset    = "UTF8"
   collation  = "en_US.utf8"
   depends_on = [azurerm_postgresql_flexible_server_configuration.extensions]
+
+  lifecycle {
+    # Holds the demonstrator's history (shown to customers): a change forcing replacement must fail, not wipe it.
+    prevent_destroy = true
+  }
 }
 
 resource "azurerm_postgresql_flexible_server_active_directory_administrator" "migrator" {
