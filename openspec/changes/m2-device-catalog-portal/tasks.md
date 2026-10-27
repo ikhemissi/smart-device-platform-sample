@@ -35,7 +35,7 @@
 ## 5. Deployment and integration
 
 - [x] 5.1 Add `infra/modules/web` (Static Web App in `var.web_location`, default `eastus2`) and the `web` and `device-api` services to `azure.yaml`; verify `azd up` deploys the portal reachable at its default hostname
-- [ ] 5.2 Smoke test against the environment (automated flow: `npm run e2e` with faked identity; real sign-in: manual run of the demo guide in a desktop browser): sign in as Editor, filter by site, edit a device name, verify it persists; verify the test passes
+- [x] 5.2 Smoke test against the environment: automated flow with faked identity (`npm run e2e`: sign in, filter by site, edit a device name, verify it persists after reload); real sign-in verified manually on `sdp-dev` with the demo guide (redirect back to the filtered list, no CSP violations, edit of `lyon-01-cayenne-001` persisted and attributed to the editor)
 - [x] 5.3 Write the M2 demo guide `docs/demo/m2-device-list.md`; verify a dry run follows it as written
 
 ## Workflow follow-up
