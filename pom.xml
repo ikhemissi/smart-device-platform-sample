@@ -36,6 +36,9 @@
         <azure-sdk-bom.version>1.3.9</azure-sdk-bom.version>
         <applicationinsights-agent.version>3.7.10</applicationinsights-agent.version>
         <jqwik.version>1.10.2</jqwik.version>
+        <iot-device-client.version>2.5.1</iot-device-client.version>
+        <provisioning-device-client.version>2.1.3</provisioning-device-client.version>
+        <bouncycastle.version>1.86</bouncycastle.version>
     </properties>
 
     <dependencyManagement>
@@ -79,6 +82,21 @@
                 <groupId>net.jqwik</groupId>
                 <artifactId>jqwik</artifactId>
                 <version>${jqwik.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.microsoft.azure.sdk.iot</groupId>
+                <artifactId>iot-device-client</artifactId>
+                <version>${iot-device-client.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.microsoft.azure.sdk.iot.provisioning</groupId>
+                <artifactId>provisioning-device-client</artifactId>
+                <version>${provisioning-device-client.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.bouncycastle</groupId>
+                <artifactId>bcpkix-jdk18on</artifactId>
+                <version>${bouncycastle.version}</version>
             </dependency>
         </dependencies>
     </dependencyManagement>

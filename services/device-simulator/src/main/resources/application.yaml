@@ -1,3 +1,29 @@
 spring:
   application:
     name: sdp-device-simulator
+  main:
+    web-application-type: none
+    banner-mode: off
+
+sdp:
+  simulator:
+    sites: ${SDP_SIM_SITES:paris-01,lyon-01,marseille-01}
+    devices-per-site: ${SDP_SIM_DEVICES_PER_SITE:10}
+    formats: ${SDP_SIM_FORMAT_MIX:ruuvi-df5,ruuvi-df3,bthome-v2,cayenne-lpp}
+    interval: ${SDP_SIM_INTERVAL:30s}
+    jitter: ${SDP_SIM_JITTER:5s}
+    duration: ${SDP_SIM_DURATION:}
+    corruption-rate: ${SDP_SIM_CORRUPTION_RATE:0}
+    anomalies: ${SDP_SIM_ANOMALIES:}
+    transport: ${SDP_SIM_TRANSPORT:iothub}
+    dps:
+      global-endpoint: ${SDP_DPS_GLOBAL_ENDPOINT:global.azure-devices-provisioning.net}
+      id-scope: ${SDP_DPS_ID_SCOPE:}
+    ca:
+      key-vault-uri: ${SDP_KEYVAULT_URI:}
+      directory: ${SDP_SIM_CA_DIRECTORY:}
+
+logging:
+  level:
+    # The IoT SDKs are verbose at INFO (connection state per device).
+    com.microsoft.azure.sdk.iot: WARN

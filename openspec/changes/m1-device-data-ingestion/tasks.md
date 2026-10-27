@@ -34,11 +34,11 @@
 
 ## 5. Device simulator
 
-- [ ] 5.1 Implement fleet configuration, deterministic device ids and reading models; verify unit tests for defaults, custom fleet and value continuity
-- [ ] 5.2 Implement site-CA loading from Key Vault and in-memory leaf certificate generation; verify a generated leaf chains to the CA and has CN = device id
-- [ ] 5.3 Implement DPS provisioning and IoT Hub MQTT sending with message id and `traceparent`; verify against the dev environment that a device provisions and messages arrive in Event Hubs
-- [ ] 5.4 Implement corruption and anomaly injection and graceful shutdown; verify unit tests for injection rates/anomaly windows and a shutdown test within 10 seconds
-- [ ] 5.5 Document local and cloud usage (incl. on-demand anomalies) in `services/device-simulator/README.md`; verify commands run as written
+- [x] 5.1 Implement fleet configuration, deterministic device ids and reading models; verify unit tests for defaults, custom fleet and value continuity
+- [x] 5.2 Implement site-CA loading from Key Vault and in-memory leaf certificate generation; verify a generated leaf chains to the CA and has CN = device id
+- [ ] 5.3 Implement DPS provisioning and IoT Hub MQTT sending with message id and `traceparent`; verify against the dev environment that a device provisions and messages arrive in Event Hubs (message mapping unit-tested; dev-environment verification pending the first `azd provision`)
+- [x] 5.4 Implement corruption and anomaly injection and graceful shutdown; verify unit tests for injection rates/anomaly windows and a shutdown test within 10 seconds
+- [x] 5.5 Document local and cloud usage (incl. on-demand anomalies) in `services/device-simulator/README.md`; verify commands run as written (dry-run command verified; Azure commands are exercised by 5.3)
 
 ## 6. Infrastructure (Terraform)
 

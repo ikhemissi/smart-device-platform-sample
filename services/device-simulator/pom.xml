@@ -11,17 +11,59 @@
     </parent>
     <artifactId>device-simulator</artifactId>
     <name>SDP :: Device simulator</name>
-
     <description>Simulates a multi-site fleet of devices sending real-format payloads through DPS and IoT Hub.</description>
 
     <dependencies>
+        <dependency>
+            <groupId>io.github.ikhemissi.sdp</groupId>
+            <artifactId>payload-codecs</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.github.ikhemissi.sdp</groupId>
+            <artifactId>platform-common</artifactId>
+        </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter</artifactId>
         </dependency>
         <dependency>
+            <groupId>com.azure</groupId>
+            <artifactId>azure-security-keyvault-secrets</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.azure</groupId>
+            <artifactId>azure-identity</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.microsoft.azure.sdk.iot</groupId>
+            <artifactId>iot-device-client</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.microsoft.azure.sdk.iot.provisioning</groupId>
+            <artifactId>provisioning-device-client</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.bouncycastle</groupId>
+            <artifactId>bcpkix-jdk18on</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.opentelemetry</groupId>
+            <artifactId>opentelemetry-api</artifactId>
+        </dependency>
+
+        <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>io.opentelemetry</groupId>
+            <artifactId>opentelemetry-sdk-testing</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.awaitility</groupId>
+            <artifactId>awaitility</artifactId>
             <scope>test</scope>
         </dependency>
     </dependencies>
