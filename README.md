@@ -2,7 +2,7 @@
 
 End-to-end Azure demonstrator of a sensor platform: devices of several real-world binary formats send measurements through IoT Hub and Event Hubs, a batch decoder stores them in PostgreSQL, users browse devices and charts in a web portal, editors manage site certificates and alert thresholds, email alerts are raised for monitored devices, and an AI agent answers questions about the data.
 
-> **Status:** M1 (device data ingestion) in progress — see `openspec list` for task progress.
+> **Status:** M1 (device data ingestion) delivered and archived (baseline specs in `openspec/specs/`); M2 next — see `openspec list`.
 
 ## Documentation
 
