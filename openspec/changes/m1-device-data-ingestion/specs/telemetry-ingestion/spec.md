@@ -47,15 +47,19 @@ The system SHALL register a device the first time a message from it is persisted
 - **THEN** its last-seen time is updated and its first-seen time is unchanged
 
 ### Requirement: Quarantine of undecodable messages
-A message that cannot be decoded, or that lacks the site of its device, SHALL be stored as a rejected message with device id (when known), receipt time, original payload, reason code and detail, and SHALL NOT prevent the other messages of the batch from being persisted or the batch from being acknowledged.
+A message that cannot be decoded, or that lacks its device identity or the site of its device, SHALL be stored as a rejected message with device id (when known), receipt time, original payload, reason code and detail, and SHALL NOT prevent the other messages of the batch from being persisted or the batch from being acknowledged.
 
 #### Scenario: Corrupted message in a batch
 - **WHEN** a batch contains 99 valid messages and 1 message with leading byte `0x7F`
 - **THEN** 99 measurements are stored, 1 rejected message with reason `UNKNOWN_FORMAT` is stored, and the batch is acknowledged
 
 #### Scenario: Message without site
-- **WHEN** a decodable message arrives without a site identifier
+- **WHEN** a decodable message arrives without a site identifier, or with an invalid one
 - **THEN** it is stored as rejected with reason `MISSING_SITE`
+
+#### Scenario: Message without device identity
+- **WHEN** a message arrives without a device identifier
+- **THEN** it is stored as rejected with reason `MISSING_DEVICE`
 
 ### Requirement: Ingestion latency and throughput
 The system SHALL make a measurement queryable in the database within 60 seconds of the platform receiving it, at a sustained rate of at least 100 messages per second.

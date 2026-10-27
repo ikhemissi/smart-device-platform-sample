@@ -25,12 +25,12 @@
 
 ## 4. Telemetry decoder
 
-- [ ] 4.1 Implement Event Hubs batch processing with Blob checkpoint store and configuration properties; verify with an integration test (Event Hubs emulator + Azurite) that checkpoints advance only after persistence
-- [ ] 4.2 Implement message mapping (device id, enqueued time, siteId, message key) and batch persistence (measurements, rejected messages, aggregated device upsert) in one transaction; verify idempotency (incl. the 'device resends a message later' scenario) and auto-registration scenarios with Testcontainers
-- [ ] 4.3 Implement quarantine rules incl. `MISSING_SITE`; verify the "corrupted message in a batch" scenario
-- [ ] 4.4 Implement retry with back-off on database failures and readiness reporting; verify the "storage unavailable" scenario by stopping the DB container mid-test
-- [ ] 4.5 Add custom metrics, span attributes and JSON logs with trace ids; verify via an OTel in-memory exporter test
-- [ ] 4.6 Document decoder configuration and operations in `services/telemetry-decoder/README.md`; verify documented properties match `application.yaml`
+- [x] 4.1 Implement Event Hubs batch processing with Blob checkpoint store and configuration properties; verify with an integration test (Event Hubs emulator + Azurite, `DecoderPipelineIT`) that checkpoints advance only after persistence
+- [x] 4.2 Implement message mapping (device id, enqueued time, siteId, message key) and batch persistence (measurements, rejected messages, aggregated device upsert) in one transaction; verify idempotency (incl. the 'device resends a message later' scenario) and auto-registration scenarios with Testcontainers
+- [x] 4.3 Implement quarantine rules incl. `MISSING_SITE`; verify the "corrupted message in a batch" scenario
+- [x] 4.4 Implement retry with back-off on database failures and readiness reporting; verify the "storage unavailable" scenario by making the database unavailable to the decoder mid-test (`DecoderPipelineIT`)
+- [x] 4.5 Add custom metrics, span attributes and JSON logs with trace ids; verify via an OTel in-memory exporter test
+- [x] 4.6 Document decoder configuration and operations in `services/telemetry-decoder/README.md`; verify documented properties match `application.yaml`
 
 ## 5. Device simulator
 

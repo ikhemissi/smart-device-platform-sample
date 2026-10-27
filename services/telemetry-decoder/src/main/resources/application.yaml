@@ -1,3 +1,55 @@
 spring:
   application:
     name: sdp-telemetry-decoder
+  main:
+    banner-mode: off
+  threads:
+    virtual:
+      enabled: true
+  datasource:
+    url: ${SDP_DB_URL:jdbc:postgresql://localhost:5432/sdp?sslmode=require}
+    username: ${SDP_DB_USERNAME:}
+    password: ${SDP_DB_PASSWORD:}
+    # Entra ID token authentication with the decoder's managed identity (AZURE_CLIENT_ID).
+    azure:
+      passwordless-enabled: ${SDP_DB_PASSWORDLESS:true}
+    hikari:
+      maximum-pool-size: ${SDP_DB_POOL_SIZE:6}
+      data-source-properties:
+        reWriteBatchedInserts: true
+
+server:
+  port: ${PORT:8080}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      group:
+        readiness:
+          include: readinessState,ingestion
+
+sdp:
+  decoder:
+    eventhubs:
+      fully-qualified-namespace: ${SDP_EVENTHUBS_NAMESPACE:}
+      event-hub-name: ${SDP_EVENTHUB_NAME:device-telemetry}
+      consumer-group: ${SDP_EVENTHUBS_CONSUMER_GROUP:telemetry-decoder}
+      # Event Hubs emulator only (local development); never used in Azure.
+      connection-string: ${SDP_EVENTHUBS_EMULATOR_CONNECTION_STRING:}
+    checkpoint:
+      container-url: ${SDP_CHECKPOINT_CONTAINER_URL:}
+      # Azurite only (local development); never used in Azure.
+      connection-string: ${SDP_CHECKPOINT_AZURITE_CONNECTION_STRING:}
+      container-name: ${SDP_CHECKPOINT_CONTAINER:checkpoints}
+    batch:
+      max-size: ${SDP_BATCH_MAX_SIZE:500}
+      max-wait: ${SDP_BATCH_MAX_WAIT:5s}
+    retry:
+      initial-backoff: 1s
+      max-backoff: 30s

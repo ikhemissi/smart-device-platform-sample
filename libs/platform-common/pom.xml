@@ -11,13 +11,16 @@
     </parent>
     <artifactId>platform-common</artifactId>
     <name>SDP :: Platform common</name>
-
-    <description>Shared Spring Boot auto-configuration: security, problem details, observability attributes, Azure credential wiring.</description>
+    <description>Shared Spring Boot auto-configuration: observability (OpenTelemetry API), conventions shared by platform services.</description>
 
     <dependencies>
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-autoconfigure</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.opentelemetry</groupId>
+            <artifactId>opentelemetry-api</artifactId>
         </dependency>
     </dependencies>
 </project>

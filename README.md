@@ -44,7 +44,7 @@ Stack: Java 25 + Spring Boot 4 (platform services), Python + Microsoft Agent Fra
 ```
 libs/payload-codecs/        Format detection, decoders and encoders (pure Java)
 libs/platform-common/       Shared Spring Boot auto-configuration
-services/telemetry-decoder/ Event Hubs → PostgreSQL batch decoder
+services/telemetry-decoder/ Event Hubs → PostgreSQL batch decoder (see its README)
 services/device-simulator/  Simulated multi-site device fleet
 libs/db-schema/             Flyway migrations (PostgreSQL schema)
 libs/test-support/          Testcontainers definitions for integration tests

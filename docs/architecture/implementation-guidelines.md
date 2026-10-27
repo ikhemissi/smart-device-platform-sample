@@ -23,7 +23,7 @@ Cross-cutting implementation choices and conventions that apply to all milestone
 | Device transport | MQTT; payload sent as the binary message body (`application/octet-stream`); devices set a message id and a W3C `traceparent` application property. |
 | IoT Hub | Standard tier; system-assigned identity; identity-based Event Hubs custom endpoint; route `DeviceMessages → device-telemetry`; message enrichment `siteId = $twin.tags.siteId`; fallback route disabled. |
 | Event Hubs | Standard namespace; hub `device-telemetry` with 4 partitions (sized for the demo targets; fixed at creation) and 1-day retention; one consumer group per consumer. |
-| Decoder | Event processor in batch mode (default max 500 events / 5 s), checkpoints in Blob Storage written only after the batch is persisted (and published, from M5). Message key = IoT Hub message id, else `partition:sequenceNumber`. Undecodable messages go to `rejected_messages` with a reason code. |
+| Decoder | Event processor in batch mode (default max 500 events / 5 s), checkpoints in Blob Storage written only after the batch is persisted (and published, from M5). Message key = IoT Hub message id, else `partition:sequenceNumber`. Persistence retried with exponential back-off (1 s → 30 s) without checkpointing; readiness `DOWN` while failing. Undecodable messages go to `rejected_messages` with a reason code. |
 | Codecs | Implemented once in `libs/payload-codecs` with symmetric encoders used by the simulator; validated with the format maintainers' official test vectors and round-trip property tests. |
 
 ## 3. Data
@@ -61,7 +61,7 @@ Exact built-in role names are verified at implementation; a scoped custom role i
 | Exporters | Java: Azure Monitor OpenTelemetry Java agent (Application Insights 3.x, attached via `JAVA_TOOL_OPTIONS`) with managed-identity authentication. Python: Azure Monitor OpenTelemetry distro with `ManagedIdentityCredential`. Code uses the vendor-neutral OpenTelemetry API only. |
 | Destination | One workspace-based Application Insights per environment with local authentication disabled. Its connection string carries no usable secret in that mode and is injected as an environment variable. |
 | Browser | The SPA propagates `traceparent` on API calls; it does not send telemetry directly (impossible with Entra-only ingestion). |
-| Context propagation | W3C Trace Context everywhere: device message property → decoder batch span **links** to each message context (fan-in) → Service Bus messages → APIM forwards `traceparent` → backends. |
+| Context propagation | W3C Trace Context everywhere: device message property → decoder per-message spans (children of the batch span) **linked** to each message context (fan-in) → Service Bus messages → APIM forwards `traceparent` → backends. |
 | Naming | `service.name = sdp-<service>`, `deployment.environment = <azd env>`, domain attributes prefixed `sdp.` (`sdp.device.id`, `sdp.site.id`, `sdp.payload.format`). |
 | Domain metrics | `sdp.ingestion.messages{format,outcome,reason}`, `sdp.ingestion.batch.size`, `sdp.ingestion.latency`, `sdp.cache.hits/misses/errors`, `sdp.alerts.*`, agent token usage (GenAI semantic conventions). |
 | Logs | Structured JSON with trace and span ids. |
