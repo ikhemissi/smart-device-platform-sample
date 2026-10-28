@@ -103,21 +103,32 @@ public class FleetSimulator implements SmartLifecycle {
 
     private void runDevice(SimulatedDevice device, Instant start) {
         ReadingModel model = new ReadingModel(device, anomalies, start);
-        DeviceConnection connection = connectWithRetry(device);
-        if (connection == null) {
-            return;
-        }
-        try (connection) {
-            // Spread the first messages over one interval so the fleet does not send in bursts.
-            sleep(Duration.ofMillis(ThreadLocalRandom.current().nextLong(properties.interval().toMillis())));
-            while (running.get()) {
-                send(device, model, connection);
-                long jitter = properties.jitter().toMillis();
-                long delay = properties.interval().toMillis() + (jitter == 0 ? 0 : ThreadLocalRandom.current().nextLong(-jitter, jitter + 1));
-                sleep(Duration.ofMillis(delay));
+        boolean first = true;
+        while (running.get()) {
+            DeviceConnection connection = connectWithRetry(device);
+            if (connection == null) {
+                return;
             }
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
+            try (connection) {
+                if (first) {
+                    // Spread the first messages over one interval so the fleet does not send in bursts.
+                    sleep(Duration.ofMillis(ThreadLocalRandom.current().nextLong(properties.interval().toMillis())));
+                    first = false;
+                }
+                while (running.get() && !connection.lost()) {
+                    send(device, model, connection);
+                    long jitter = properties.jitter().toMillis();
+                    long delay = properties.interval().toMillis() + (jitter == 0 ? 0 : ThreadLocalRandom.current().nextLong(-jitter, jitter + 1));
+                    sleep(Duration.ofMillis(delay));
+                }
+                if (connection.lost()) {
+                    // As a real device: join again through DPS (fails while the site's trust or the device is disabled).
+                    log.warn("Device {} lost its connection, joining again", device.deviceId());
+                }
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                return;
+            }
         }
     }
 

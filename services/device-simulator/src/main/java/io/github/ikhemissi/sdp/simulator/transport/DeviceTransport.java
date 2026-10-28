@@ -17,6 +17,11 @@ public interface DeviceTransport {
         /** Sends a message and waits for the acknowledgement. */
         void send(OutgoingMessage message) throws Exception;
 
+        /** True once the connection is gone for good (the client stopped retrying): the device must connect again. */
+        default boolean lost() {
+            return false;
+        }
+
         @Override
         void close();
     }

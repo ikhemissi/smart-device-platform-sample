@@ -40,6 +40,9 @@ class FleetSimulatorTest {
         final List<Sent> sent = new CopyOnWriteArrayList<>();
         final Set<String> open = ConcurrentHashMap.newKeySet();
         final Map<String, AtomicInteger> connectFailures = new ConcurrentHashMap<>();
+        final Map<String, AtomicInteger> connections = new ConcurrentHashMap<>();
+        /** Device whose first connection is lost (client gave up) after this many messages. */
+        final Map<String, Integer> lostAfter = new ConcurrentHashMap<>();
         volatile Duration sendLatency = Duration.ZERO;
 
         @Override
@@ -49,11 +52,20 @@ class FleetSimulatorTest {
                 throw new IllegalStateException("DPS unavailable");
             }
             open.add(device.deviceId());
+            int connection = connections.computeIfAbsent(device.deviceId(), id -> new AtomicInteger()).incrementAndGet();
+            AtomicInteger sentOnConnection = new AtomicInteger();
             return new DeviceConnection() {
                 @Override
                 public void send(OutgoingMessage message) throws InterruptedException {
                     Thread.sleep(sendLatency);
                     sent.add(new Sent(device.deviceId(), message));
+                    sentOnConnection.incrementAndGet();
+                }
+
+                @Override
+                public boolean lost() {
+                    Integer limit = lostAfter.get(device.deviceId());
+                    return connection == 1 && limit != null && sentOnConnection.get() >= limit;
                 }
 
                 @Override
@@ -140,5 +152,17 @@ class FleetSimulatorTest {
 
         await().atMost(Duration.ofSeconds(15)).until(() ->
                 transport.sent.stream().anyMatch(s -> s.deviceId().equals("paris-01-ruuvi5-001")));
+    }
+
+    @Test
+    void aLostConnectionIsReplacedByANewOne() {
+        transport.lostAfter.put("paris-01-ruuvi5-001", 2);
+        simulator(Duration.ofMillis(100), null).start();
+
+        await().atMost(Duration.ofSeconds(15)).until(() ->
+                transport.sent.stream().filter(s -> s.deviceId().equals("paris-01-ruuvi5-001")).count() >= 4);
+
+        assertThat(transport.connections.get("paris-01-ruuvi5-001")).hasValue(2);
+        assertThat(transport.connections.get("lyon-01-ruuvi5-001")).hasValue(1);
     }
 }
