@@ -5,7 +5,7 @@
 set -euo pipefail
 : "${AZURE_RESOURCE_GROUP:?}" "${DECODER_APP_NAME:?}"
 pending=()
-for app in "$DECODER_APP_NAME" "${DEVICE_API_APP_NAME:-}" "${PROVISIONING_API_APP_NAME:-}"; do
+for app in "$DECODER_APP_NAME" "${DEVICE_API_APP_NAME:-}" "${PROVISIONING_API_APP_NAME:-}" "${ALERT_SERVICE_APP_NAME:-}"; do
   [[ -n "$app" ]] || continue
   image="$(az containerapp show -n "$app" -g "$AZURE_RESOURCE_GROUP" --query 'properties.template.containers[0].image' -o tsv)"
   probes="$(az containerapp show -n "$app" -g "$AZURE_RESOURCE_GROUP" \

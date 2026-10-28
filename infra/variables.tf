@@ -112,3 +112,21 @@ variable "provisioning_api_image" {
   type        = string
   default     = ""
 }
+
+variable "alert_service_image" {
+  description = "Alert service image deployed by azd (SERVICE_ALERT_SERVICE_IMAGE_NAME); empty on the first run."
+  type        = string
+  default     = ""
+}
+
+variable "alerting_subscription_filter" {
+  description = "Service Bus SQL filter selecting the devices monitored for alerts (properties siteId, deviceId, payloadFormat), e.g. \"siteId IN ('paris-01','lyon-01')\"; set with `azd env set ALERTING_SUBSCRIPTION_FILTER`. Empty: siteId = 'paris-01'."
+  type        = string
+  default     = ""
+}
+
+variable "alerting_publish_enabled" {
+  description = "Whether the decoder publishes persisted measurements to the Service Bus topic (ALERTING_PUBLISH_ENABLED)."
+  type        = bool
+  default     = true
+}

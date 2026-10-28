@@ -15,6 +15,7 @@ variable "identities" {
     acr_pull         = object({ id = string, client_id = string, principal_id = string, name = string })
     device_api       = object({ id = string, client_id = string, principal_id = string, name = string })
     provisioning_api = object({ id = string, client_id = string, principal_id = string, name = string })
+    alert_service    = object({ id = string, client_id = string, principal_id = string, name = string })
   })
 }
 variable "application_insights" {
@@ -46,6 +47,20 @@ variable "provisioning" {
   type        = object({ dps_resource_id = string, dps_service_host = string, iothub_hostname = string })
 }
 variable "redis" { type = object({ host = string, port = number }) }
+variable "alerting" {
+  description = "Service Bus topic/subscription of decoded measurements and the email service (ADR-0009)."
+  type = object({
+    publish_enabled        = bool
+    namespace_name         = string
+    namespace_fqdn         = string
+    topic_name             = string
+    subscription_name      = string
+    communication_endpoint = string
+    sender_address         = string
+  })
+}
+variable "alert_service_image" { type = string }
+variable "portal_base_url" { type = string }
 variable "entra" {
   description = "Token validation settings of the platform API (ADR-0007)."
   type        = object({ tenant_id = string, api_client_id = string, api_identifier_uri = string })
@@ -72,6 +87,9 @@ locals {
     SDP_CHECKPOINT_CONTAINER_URL              = var.eventhubs.checkpoint_container_url
     SDP_DB_URL                                = var.postgres.jdbc_url
     SDP_DB_USERNAME                           = var.identities.decoder.name
+    ALERTING_PUBLISH_ENABLED                  = tostring(var.alerting.publish_enabled)
+    SDP_SERVICEBUS_NAMESPACE                  = var.alerting.namespace_fqdn
+    SDP_SERVICEBUS_TOPIC                      = var.alerting.topic_name
   })
 
   simulator_env = merge(local.observability_env, {
@@ -94,6 +112,8 @@ locals {
     SDP_DEVICE_API_PRINCIPAL_OBJECT_ID        = var.identities.device_api.principal_id
     SDP_PROVISIONING_API_PRINCIPAL_NAME       = var.identities.provisioning_api.name
     SDP_PROVISIONING_API_PRINCIPAL_OBJECT_ID  = var.identities.provisioning_api.principal_id
+    SDP_ALERT_SERVICE_PRINCIPAL_NAME          = var.identities.alert_service.name
+    SDP_ALERT_SERVICE_PRINCIPAL_OBJECT_ID     = var.identities.alert_service.principal_id
   })
 
   device_api_env = merge(local.observability_env, {
@@ -120,6 +140,20 @@ locals {
     SDP_DPS_RESOURCE_ID                       = var.provisioning.dps_resource_id
     SDP_DPS_HOST                              = var.provisioning.dps_service_host
     SDP_IOTHUB_HOST                           = var.provisioning.iothub_hostname
+  })
+
+  alert_service_env = merge(local.observability_env, {
+    AZURE_CLIENT_ID                           = var.identities.alert_service.client_id
+    APPLICATIONINSIGHTS_AUTHENTICATION_STRING = "Authorization=AAD;ClientId=${var.identities.alert_service.client_id}"
+    APPLICATIONINSIGHTS_ROLE_NAME             = "sdp-alert-service"
+    SDP_DB_URL                                = var.postgres.jdbc_url
+    SDP_DB_USERNAME                           = var.identities.alert_service.name
+    SDP_SERVICEBUS_NAMESPACE                  = var.alerting.namespace_fqdn
+    SDP_SERVICEBUS_TOPIC                      = var.alerting.topic_name
+    SDP_SERVICEBUS_SUBSCRIPTION               = var.alerting.subscription_name
+    SDP_EMAIL_ENDPOINT                        = var.alerting.communication_endpoint
+    SDP_EMAIL_SENDER                          = var.alerting.sender_address
+    SDP_PORTAL_BASE_URL                       = var.portal_base_url
   })
 }
 
@@ -424,6 +458,89 @@ resource "azurerm_container_app" "provisioning_api" {
   }
 }
 
+# --- Alert service ---------------------------------------------------------------------------------------------
+
+resource "azurerm_container_app" "alert_service" {
+  name                         = "ca-alerts-${var.token}"
+  resource_group_name          = var.resource_group_name
+  container_app_environment_id = var.container_app_environment_id
+  revision_mode                = "Single"
+  workload_profile_name        = "Consumption"
+  tags                         = merge(var.tags, { "azd-service-name" = "alert-service" })
+
+  identity {
+    type         = "UserAssigned"
+    identity_ids = [var.identities.alert_service.id, var.identities.acr_pull.id]
+  }
+
+  registry {
+    server   = var.registry_server
+    identity = var.identities.acr_pull.id
+  }
+
+  template {
+    # One replica always runs: besides consuming measurements, it sends pending notifications and reminders.
+    min_replicas = 1
+    max_replicas = 3
+
+    container {
+      name   = "alert-service"
+      image  = var.alert_service_image != "" ? var.alert_service_image : local.placeholder_image
+      cpu    = 0.5
+      memory = "1Gi"
+
+      dynamic "env" {
+        for_each = local.alert_service_env
+        content {
+          name  = env.key
+          value = env.value
+        }
+      }
+
+      dynamic "liveness_probe" {
+        for_each = var.alert_service_image != "" ? [1] : []
+        content {
+          transport               = "HTTP"
+          port                    = 8080
+          path                    = "/actuator/health/liveness"
+          initial_delay           = 30
+          interval_seconds        = 10
+          failure_count_threshold = 5
+        }
+      }
+
+      dynamic "readiness_probe" {
+        for_each = var.alert_service_image != "" ? [1] : []
+        content {
+          transport               = "HTTP"
+          port                    = 8080
+          path                    = "/actuator/health/readiness"
+          initial_delay           = 15
+          interval_seconds        = 10
+          failure_count_threshold = 6
+        }
+      }
+    }
+
+    # Scale on the subscription's backlog with the service's managed identity (KEDA azure-servicebus scaler).
+    custom_scale_rule {
+      name             = "servicebus-backlog"
+      custom_rule_type = "azure-servicebus"
+      identity_id      = var.identities.alert_service.id
+      metadata = {
+        namespace        = var.alerting.namespace_name
+        topicName        = var.alerting.topic_name
+        subscriptionName = var.alerting.subscription_name
+        messageCount     = "200"
+      }
+    }
+  }
+
+  lifecycle {
+    ignore_changes = [template[0].container[0].image]
+  }
+}
+
 # --- Database migrator jobs -------------------------------------------------------------------------------------
 
 resource "azurerm_container_app_job" "migrate" {
@@ -530,3 +647,4 @@ output "device_api_url" { value = "https://${azurerm_container_app.device_api.in
 output "provisioning_api_app_name" { value = azurerm_container_app.provisioning_api.name }
 output "provisioning_api_url" { value = "https://${azurerm_container_app.provisioning_api.ingress[0].fqdn}" }
 output "maintenance_job_name" { value = azurerm_container_app_job.maintain.name }
+output "alert_service_app_name" { value = azurerm_container_app.alert_service.name }

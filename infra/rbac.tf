@@ -7,6 +7,7 @@ locals {
     migrator         = module.identity.migrator.principal_id
     device_api       = module.identity.device_api.principal_id
     provisioning_api = module.identity.provisioning_api.principal_id
+    alert_service    = module.identity.alert_service.principal_id
   }
 }
 
@@ -84,6 +85,43 @@ resource "azurerm_role_assignment" "provisioning_iothub_registry" {
   principal_type       = "ServicePrincipal"
 }
 
+# Alerting (M5): the decoder publishes to the topic; the alert service receives from its subscription only and sends
+# emails through Communication Services with a custom role limited to email sending (no access keys).
+resource "azurerm_role_assignment" "decoder_servicebus_sender" {
+  scope                = module.alerting.topic_id
+  role_definition_name = "Azure Service Bus Data Sender"
+  principal_id         = module.identity.decoder.principal_id
+  principal_type       = "ServicePrincipal"
+}
+
+resource "azurerm_role_assignment" "alert_service_servicebus_receiver" {
+  scope                = module.alerting.subscription_id
+  role_definition_name = "Azure Service Bus Data Receiver"
+  principal_id         = module.identity.alert_service.principal_id
+  principal_type       = "ServicePrincipal"
+}
+
+resource "azurerm_role_definition" "email_sender" {
+  name        = "SDP email sender (${var.environment_name})"
+  scope       = module.alerting.communication_service_id
+  description = "Send emails through the platform's Communication Services resource with Microsoft Entra authentication."
+  permissions {
+    actions = [
+      "Microsoft.Communication/CommunicationServices/Read",
+      "Microsoft.Communication/CommunicationServices/Write",
+      "Microsoft.Communication/EmailServices/write",
+    ]
+  }
+  assignable_scopes = [module.alerting.communication_service_id]
+}
+
+resource "azurerm_role_assignment" "alert_service_email" {
+  scope              = module.alerting.communication_service_id
+  role_definition_id = azurerm_role_definition.email_sender.role_definition_resource_id
+  principal_id       = module.identity.alert_service.principal_id
+  principal_type     = "ServicePrincipal"
+}
+
 # Deployer: needed by the post-provision bootstrap (site CAs, enrollment groups) and for troubleshooting.
 resource "azurerm_role_assignment" "deployer_key_vault" {
   scope                = module.core.key_vault_id
@@ -103,6 +141,25 @@ resource "azurerm_role_assignment" "deployer_iothub" {
   principal_id         = data.azurerm_client_config.current.object_id
 }
 
+# Deployer: runs the alerting services locally, sends test messages and test emails.
+resource "azurerm_role_assignment" "deployer_servicebus_sender" {
+  scope                = module.alerting.topic_id
+  role_definition_name = "Azure Service Bus Data Sender"
+  principal_id         = data.azurerm_client_config.current.object_id
+}
+
+resource "azurerm_role_assignment" "deployer_servicebus_receiver" {
+  scope                = module.alerting.subscription_id
+  role_definition_name = "Azure Service Bus Data Receiver"
+  principal_id         = data.azurerm_client_config.current.object_id
+}
+
+resource "azurerm_role_assignment" "deployer_email" {
+  scope              = module.alerting.communication_service_id
+  role_definition_id = azurerm_role_definition.email_sender.role_definition_resource_id
+  principal_id       = data.azurerm_client_config.current.object_id
+}
+
 resource "time_sleep" "rbac_propagation" {
   create_duration = "60s"
   depends_on = [
@@ -117,5 +174,8 @@ resource "time_sleep" "rbac_propagation" {
     azurerm_role_assignment.provisioning_dps_data,
     azurerm_role_assignment.provisioning_dps_certificates,
     azurerm_role_assignment.provisioning_iothub_registry,
+    azurerm_role_assignment.decoder_servicebus_sender,
+    azurerm_role_assignment.alert_service_servicebus_receiver,
+    azurerm_role_assignment.alert_service_email,
   ]
 }

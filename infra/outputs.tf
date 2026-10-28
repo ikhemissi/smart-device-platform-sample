@@ -151,3 +151,27 @@ output "DPS_SERVICE_HOST" {
 output "IOTHUB_HOSTNAME" {
   value = module.ingestion.iothub_hostname
 }
+
+output "ALERT_SERVICE_APP_NAME" {
+  value = module.apps.alert_service_app_name
+}
+
+output "ALERT_SERVICE_IDENTITY_NAME" {
+  value = module.identity.alert_service.name
+}
+
+output "SERVICEBUS_NAMESPACE" {
+  value = module.alerting.servicebus_namespace_name
+}
+
+output "SERVICEBUS_NAMESPACE_FQDN" {
+  value = module.alerting.servicebus_namespace_fqdn
+}
+
+output "COMMUNICATION_SERVICE_ENDPOINT" {
+  value = module.alerting.communication_service_endpoint
+}
+
+output "EMAIL_SENDER_ADDRESS" {
+  value = module.alerting.sender_address
+}

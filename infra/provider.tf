@@ -44,6 +44,8 @@ provider "azurerm" {
   }
   subscription_id     = var.subscription_id
   storage_use_azuread = true
+  # Not in the provider's default registration set (Azure Communication Services Email, M5).
+  resource_providers_to_register = ["Microsoft.Communication"]
 }
 
 provider "azuread" {}

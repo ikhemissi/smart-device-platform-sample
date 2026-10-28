@@ -58,6 +58,16 @@ module "ingestion" {
   tags                = local.tags
 }
 
+module "alerting" {
+  source              = "./modules/alerting"
+  resource_group_name = azurerm_resource_group.main.name
+  location            = var.location
+  environment_name    = var.environment_name
+  token               = local.token
+  subscription_filter = coalesce(var.alerting_subscription_filter, "siteId = 'paris-01'")
+  tags                = local.tags
+}
+
 module "data" {
   source              = "./modules/data"
   resource_group_name = azurerm_resource_group.main.name
@@ -173,6 +183,17 @@ module "apps" {
     host = module.cache.hostname
     port = module.cache.port
   }
+  alerting = {
+    publish_enabled        = var.alerting_publish_enabled
+    namespace_name         = module.alerting.servicebus_namespace_name
+    namespace_fqdn         = module.alerting.servicebus_namespace_fqdn
+    topic_name             = module.alerting.topic_name
+    subscription_name      = module.alerting.subscription_name
+    communication_endpoint = module.alerting.communication_service_endpoint
+    sender_address         = module.alerting.sender_address
+  }
+  alert_service_image = var.alert_service_image
+  portal_base_url     = module.web.origin
   entra = {
     tenant_id          = data.azurerm_client_config.current.tenant_id
     api_client_id      = module.entra.api_client_id

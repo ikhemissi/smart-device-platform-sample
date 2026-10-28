@@ -52,6 +52,17 @@ services:
       buildArgs:
         - SERVICE=provisioning-api
 
+  alert-service:
+    project: ./services/alert-service
+    language: java
+    host: containerapp
+    docker:
+      path: ../Dockerfile
+      context: ../..
+      remoteBuild: true
+      buildArgs:
+        - SERVICE=alert-service
+
   web:
     project: ./web/portal
     language: js
