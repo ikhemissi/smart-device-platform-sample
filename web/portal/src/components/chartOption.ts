@@ -6,6 +6,11 @@ export function metricLabel(metric: string, unit: string | null | undefined, des
   return unit ? `${base} (${unit})` : base
 }
 
+/** Identifies the data drawn by a chart. */
+export function seriesKey(series: Series): string {
+  return `${series.resolution}|${series.from}|${series.to}|${series.series.map((s) => `${s.metric}:${s.points.length}`).join(',')}`
+}
+
 const BUCKET_NAMES: Record<string, string> = {
   '1m': '1-minute',
   '5m': '5-minute',

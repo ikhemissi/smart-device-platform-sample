@@ -1,8 +1,13 @@
 # Web portal
 
-Browser front end of the Smart Device Platform: Microsoft Entra ID sign-in, the device list (site and status filters, search, sorting, paging) and, for Editors, editing device information. It implements the `web-portal` spec of OpenSpec change `m2-device-catalog-portal` and calls the platform API through API Management (ADR-0007).
+Browser front end of the Smart Device Platform:
+- Microsoft Entra ID sign-in;
+- the device list (site and status filters, search, sorting, paging) and, for Editors, editing device information;
+- the device page, with a chart of up to four metrics over 1 h, 24 h, 7 d, 30 d or a custom range, and the latest 20 measurements, refreshed every 30 s.
 
-Stack: React 19, TypeScript, Vite, Fluent UI React v9, MSAL React (authorization code flow with PKCE, redirect), TanStack Query, React Router. It is hosted on Azure Static Web Apps (Free) without SWA authentication or linked backends.
+It implements the `web-portal` and `telemetry-visualization` specs and calls the platform API through API Management (ADR-0007).
+
+Stack: React 19, TypeScript, Vite, Fluent UI React v9, MSAL React (authorization code flow with PKCE, redirect), TanStack Query, React Router, Apache ECharts (tree-shaken). It is hosted on Azure Static Web Apps (Free) without SWA authentication or linked backends.
 
 ## How it works
 
@@ -33,6 +38,12 @@ npm run build       # type check and production build into dist/
 - **What runs:** a sign-in → filter → edit → reload smoke flow, the Reader and no-role views, keyboard-only operation, and axe-core checks (WCAG 2.1 A/AA; no serious or critical violations).
 
 Where the browsers' system libraries can't be installed, `npm run e2e:podman` runs the same tests in the official Playwright image, without network access.
+
+`npm run e2e:env` runs [e2e-env/](e2e-env/) against the current azd environment, with network access and your Azure CLI token:
+- the production build runs in Chromium, and only sign-in is faked;
+- every API call is forwarded to the environment's API Management.
+
+It measures the 30-day chart render time (history cache flushed first, then again warm) and follows a live simulated device until its next measurement appears in the table (M3 tasks 4.6 and 4.7).
 
 Interactive Entra sign-in is outside these tests; the demo guide [docs/demo/m2-device-list.md](../../docs/demo/m2-device-list.md) covers it against a deployed environment.
 

@@ -29,8 +29,8 @@
 - [x] 4.3 Implement the ECharts chart (raw lines, aggregated avg + min–max band, multi-axis, tooltips); verify visual test snapshots for raw and aggregated modes
 - [x] 4.4 Implement the latest-20 table with unit headers and new-row highlight; verify component tests for ordering and highlight
 - [x] 4.5 Implement auto-refresh (30 s, paused when hidden), empty and error states; verify component tests using fake timers and visibility events
-- [ ] 4.6 Measure in a deployed browser the 30-day chart render time for a device reporting every 30 s (cold and warm cache); verify < 3 s cold
-- [ ] 4.7 Playwright smoke test: open a simulated device, switch periods, see a new row within 60 s; verify it passes against the environment
+- [x] 4.6 Measure in a deployed browser the 30-day chart render time for a device reporting every 30 s (cold and warm cache); verify < 3 s cold
+- [x] 4.7 Playwright smoke test: open a simulated device, switch periods, see a new row within 60 s; verify it passes against the environment
 
 ## 5. Integration
 

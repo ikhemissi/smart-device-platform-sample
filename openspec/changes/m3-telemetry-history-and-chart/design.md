@@ -56,6 +56,10 @@ Dataset: 30 devices reporting every 30 s, 30 days of history (2.52 M backfilled 
 | Same 30-day series twice within a minute (5 devices), APIM request duration | 264–333 ms → 24–37 ms: 7.5× to 12.7× faster in steady state; the first pair after deployment 2.7× (connection warm-up) | ≥ 3× |
 | Redis unreachable (host pointed at a non-existent name) | every request 200 from the database; `sdp.cache.errors{operation=connect}` emitted | succeeds, metric emitted |
 | Key-based access | ListKeys refused (access keys disabled), anonymous `PING` → `NOAUTH` | refused |
+| 30-day chart in Chromium (production build, data from the environment through APIM, cache flushed first), time from selecting "30 d" to ECharts finishing (721 one-hour buckets) | 999–1,005 ms first selection, 188–269 ms when selected again | < 3 s, < 1 s |
+| Live device page (`paris-01-ruuvi5-001`): period switches, then the next measurement in the table | appeared 25 s after it was measured | < 60 s |
+
+Browser checks run with `npm run e2e:env` (`web/portal/e2e-env`): the production build in Chromium where only sign-in is faked; every API call goes to the environment's API Management with the operator's token, so gateway, device API, cache, database and chart rendering are the deployed ones.
 
 No expression index was needed: partition pruning plus the primary key `(device_id, measured_at, …)` meet the targets.
 
