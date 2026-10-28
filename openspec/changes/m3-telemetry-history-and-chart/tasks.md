@@ -34,7 +34,7 @@
 
 ## 5. Integration
 
-- [ ] 5.1 Write the M3 demo guide `docs/demo/m3-device-data-and-chart.md` (incl. showing cache hits in Application Insights); verify a dry run follows it as written
+- [x] 5.1 Write the M3 demo guide `docs/demo/m3-device-data-and-chart.md` (incl. showing cache hits in Application Insights); verify a dry run follows it as written
 
 ## Workflow follow-up
 
