@@ -122,12 +122,14 @@ module "api" {
     id                = module.core.application_insights_id
     connection_string = module.core.application_insights_connection_string
   }
-  api_client_id      = module.entra.api_client_id
-  api_identifier_uri = module.entra.api_identifier_uri
-  allowed_origins    = [module.web.origin, "http://localhost:5173"]
-  device_api_url     = module.apps.device_api_url
-  openapi_file       = "${path.root}/../services/device-api/openapi.json"
-  tags               = local.tags
+  api_client_id             = module.entra.api_client_id
+  api_identifier_uri        = module.entra.api_identifier_uri
+  allowed_origins           = [module.web.origin, "http://localhost:5173"]
+  device_api_url            = module.apps.device_api_url
+  openapi_file              = "${path.root}/../services/device-api/openapi.json"
+  provisioning_api_url      = module.apps.provisioning_api_url
+  provisioning_openapi_file = "${path.root}/../services/provisioning-api/openapi.json"
+  tags                      = local.tags
 }
 
 module "apps" {
@@ -155,12 +157,18 @@ module "apps" {
     checkpoint_container_url = module.ingestion.checkpoint_container_url
     partition_count          = module.ingestion.event_hub_partition_count
   }
-  dps_id_scope       = module.ingestion.dps_id_scope
-  key_vault_uri      = module.core.key_vault_uri
-  decoder_image      = var.decoder_image
-  simulator_image    = var.simulator_image
-  simulator_settings = merge({ SDP_SIM_SITES = join(",", var.demo_sites) }, var.simulator_settings)
-  device_api_image   = var.device_api_image
+  dps_id_scope           = module.ingestion.dps_id_scope
+  key_vault_uri          = module.core.key_vault_uri
+  decoder_image          = var.decoder_image
+  simulator_image        = var.simulator_image
+  simulator_settings     = merge({ SDP_SIM_SITES = join(",", var.demo_sites) }, var.simulator_settings)
+  device_api_image       = var.device_api_image
+  provisioning_api_image = var.provisioning_api_image
+  provisioning = {
+    dps_resource_id  = module.ingestion.dps_id
+    dps_service_host = module.ingestion.dps_service_host
+    iothub_hostname  = module.ingestion.iothub_hostname
+  }
   redis = {
     host = module.cache.hostname
     port = module.cache.port

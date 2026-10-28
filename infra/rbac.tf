@@ -2,10 +2,11 @@
 
 locals {
   workload_principals = {
-    decoder    = module.identity.decoder.principal_id
-    simulator  = module.identity.simulator.principal_id
-    migrator   = module.identity.migrator.principal_id
-    device_api = module.identity.device_api.principal_id
+    decoder          = module.identity.decoder.principal_id
+    simulator        = module.identity.simulator.principal_id
+    migrator         = module.identity.migrator.principal_id
+    device_api       = module.identity.device_api.principal_id
+    provisioning_api = module.identity.provisioning_api.principal_id
   }
 }
 
@@ -45,6 +46,44 @@ resource "azurerm_role_assignment" "simulator_site_cas" {
   principal_type       = "ServicePrincipal"
 }
 
+# Provisioning API (M4): enrollment groups (DPS data plane), CA certificates (DPS control plane, custom role limited to
+# certificates) and device enable/disable (IoT Hub registry).
+resource "azurerm_role_assignment" "provisioning_dps_data" {
+  scope                = module.ingestion.dps_id
+  role_definition_name = "Device Provisioning Service Data Contributor"
+  principal_id         = module.identity.provisioning_api.principal_id
+  principal_type       = "ServicePrincipal"
+}
+
+resource "azurerm_role_definition" "dps_certificates" {
+  name        = "SDP DPS certificate manager (${var.environment_name})"
+  scope       = module.ingestion.dps_id
+  description = "Register, read and remove CA certificates of the platform's Device Provisioning Service."
+  permissions {
+    actions = [
+      "Microsoft.Devices/provisioningServices/read",
+      "Microsoft.Devices/provisioningServices/certificates/Read",
+      "Microsoft.Devices/provisioningServices/certificates/Write",
+      "Microsoft.Devices/provisioningServices/certificates/Delete",
+    ]
+  }
+  assignable_scopes = [module.ingestion.dps_id]
+}
+
+resource "azurerm_role_assignment" "provisioning_dps_certificates" {
+  scope              = module.ingestion.dps_id
+  role_definition_id = azurerm_role_definition.dps_certificates.role_definition_resource_id
+  principal_id       = module.identity.provisioning_api.principal_id
+  principal_type     = "ServicePrincipal"
+}
+
+resource "azurerm_role_assignment" "provisioning_iothub_registry" {
+  scope                = module.ingestion.iothub_id
+  role_definition_name = "IoT Hub Registry Contributor"
+  principal_id         = module.identity.provisioning_api.principal_id
+  principal_type       = "ServicePrincipal"
+}
+
 # Deployer: needed by the post-provision bootstrap (site CAs, enrollment groups) and for troubleshooting.
 resource "azurerm_role_assignment" "deployer_key_vault" {
   scope                = module.core.key_vault_id
@@ -75,5 +114,8 @@ resource "time_sleep" "rbac_propagation" {
     azurerm_role_assignment.deployer_key_vault,
     azurerm_role_assignment.deployer_dps,
     azurerm_role_assignment.deployer_iothub,
+    azurerm_role_assignment.provisioning_dps_data,
+    azurerm_role_assignment.provisioning_dps_certificates,
+    azurerm_role_assignment.provisioning_iothub_registry,
   ]
 }

@@ -9,11 +9,12 @@ variable "container_app_environment_id" { type = string }
 variable "registry_server" { type = string }
 variable "identities" {
   type = object({
-    decoder    = object({ id = string, client_id = string, principal_id = string, name = string })
-    simulator  = object({ id = string, client_id = string, principal_id = string, name = string })
-    migrator   = object({ id = string, client_id = string, principal_id = string, name = string })
-    acr_pull   = object({ id = string, client_id = string, principal_id = string, name = string })
-    device_api = object({ id = string, client_id = string, principal_id = string, name = string })
+    decoder          = object({ id = string, client_id = string, principal_id = string, name = string })
+    simulator        = object({ id = string, client_id = string, principal_id = string, name = string })
+    migrator         = object({ id = string, client_id = string, principal_id = string, name = string })
+    acr_pull         = object({ id = string, client_id = string, principal_id = string, name = string })
+    device_api       = object({ id = string, client_id = string, principal_id = string, name = string })
+    provisioning_api = object({ id = string, client_id = string, principal_id = string, name = string })
   })
 }
 variable "application_insights" {
@@ -39,6 +40,11 @@ variable "decoder_image" { type = string }
 variable "simulator_image" { type = string }
 variable "simulator_settings" { type = map(string) }
 variable "device_api_image" { type = string }
+variable "provisioning_api_image" { type = string }
+variable "provisioning" {
+  description = "DPS and IoT Hub endpoints managed by the provisioning API."
+  type        = object({ dps_resource_id = string, dps_service_host = string, iothub_hostname = string })
+}
 variable "redis" { type = object({ host = string, port = number }) }
 variable "entra" {
   description = "Token validation settings of the platform API (ADR-0007)."
@@ -86,6 +92,8 @@ locals {
     SDP_DECODER_PRINCIPAL_OBJECT_ID           = var.identities.decoder.principal_id
     SDP_DEVICE_API_PRINCIPAL_NAME             = var.identities.device_api.name
     SDP_DEVICE_API_PRINCIPAL_OBJECT_ID        = var.identities.device_api.principal_id
+    SDP_PROVISIONING_API_PRINCIPAL_NAME       = var.identities.provisioning_api.name
+    SDP_PROVISIONING_API_PRINCIPAL_OBJECT_ID  = var.identities.provisioning_api.principal_id
   })
 
   device_api_env = merge(local.observability_env, {
@@ -99,6 +107,19 @@ locals {
     SDP_EVENTHUB_PARTITIONS                   = tostring(var.eventhubs.partition_count)
     SDP_REDIS_HOST                            = var.redis.host
     SDP_REDIS_PORT                            = tostring(var.redis.port)
+  })
+
+  provisioning_api_env = merge(local.observability_env, {
+    AZURE_CLIENT_ID                           = var.identities.provisioning_api.client_id
+    APPLICATIONINSIGHTS_AUTHENTICATION_STRING = "Authorization=AAD;ClientId=${var.identities.provisioning_api.client_id}"
+    APPLICATIONINSIGHTS_ROLE_NAME             = "sdp-provisioning-api"
+    SDP_DB_URL                                = var.postgres.jdbc_url
+    SDP_DB_USERNAME                           = var.identities.provisioning_api.name
+    SDP_ENTRA_TENANT_ID                       = var.entra.tenant_id
+    SDP_API_AUDIENCES                         = "${var.entra.api_client_id},${var.entra.api_identifier_uri}"
+    SDP_DPS_RESOURCE_ID                       = var.provisioning.dps_resource_id
+    SDP_DPS_HOST                              = var.provisioning.dps_service_host
+    SDP_IOTHUB_HOST                           = var.provisioning.iothub_hostname
   })
 }
 
@@ -317,6 +338,92 @@ resource "azurerm_container_app" "device_api" {
   }
 }
 
+# --- Provisioning API (site certificates, M4) --------------------------------------------------------------------
+
+resource "azurerm_container_app" "provisioning_api" {
+  name                         = "ca-prov-api-${var.token}"
+  resource_group_name          = var.resource_group_name
+  container_app_environment_id = var.container_app_environment_id
+  revision_mode                = "Single"
+  workload_profile_name        = "Consumption"
+  tags                         = merge(var.tags, { "azd-service-name" = "provisioning-api" })
+
+  identity {
+    type         = "UserAssigned"
+    identity_ids = [var.identities.provisioning_api.id, var.identities.acr_pull.id]
+  }
+
+  registry {
+    server   = var.registry_server
+    identity = var.identities.acr_pull.id
+  }
+
+  # External ingress: APIM v2 reaches it without a VNet (ADR-0008); the service validates tokens itself (ADR-0007).
+  ingress {
+    external_enabled = true
+    target_port      = var.provisioning_api_image != "" ? 8080 : 80
+    transport        = "auto"
+    traffic_weight {
+      latest_revision = true
+      percentage      = 100
+    }
+  }
+
+  template {
+    # One replica: reconciliation and device operations are serialised by an advisory lock anyway; editing trust is rare.
+    min_replicas = 1
+    max_replicas = 2
+
+    container {
+      name   = "provisioning-api"
+      image  = var.provisioning_api_image != "" ? var.provisioning_api_image : local.placeholder_image
+      cpu    = 0.5
+      memory = "1Gi"
+
+      dynamic "env" {
+        for_each = local.provisioning_api_env
+        content {
+          name  = env.key
+          value = env.value
+        }
+      }
+
+      dynamic "liveness_probe" {
+        for_each = var.provisioning_api_image != "" ? [1] : []
+        content {
+          transport               = "HTTP"
+          port                    = 8080
+          path                    = "/actuator/health/liveness"
+          initial_delay           = 30
+          interval_seconds        = 10
+          failure_count_threshold = 5
+        }
+      }
+
+      dynamic "readiness_probe" {
+        for_each = var.provisioning_api_image != "" ? [1] : []
+        content {
+          transport               = "HTTP"
+          port                    = 8080
+          path                    = "/actuator/health/readiness"
+          initial_delay           = 15
+          interval_seconds        = 10
+          failure_count_threshold = 6
+        }
+      }
+    }
+
+    http_scale_rule {
+      name                = "http"
+      concurrent_requests = "50"
+    }
+  }
+
+  lifecycle {
+    ignore_changes = [template[0].container[0].image]
+  }
+}
+
 # --- Database migrator jobs -------------------------------------------------------------------------------------
 
 resource "azurerm_container_app_job" "migrate" {
@@ -420,4 +527,6 @@ output "simulator_app_name" { value = azurerm_container_app.simulator.name }
 output "migrator_job_name" { value = azurerm_container_app_job.migrate.name }
 output "device_api_app_name" { value = azurerm_container_app.device_api.name }
 output "device_api_url" { value = "https://${azurerm_container_app.device_api.ingress[0].fqdn}" }
+output "provisioning_api_app_name" { value = azurerm_container_app.provisioning_api.name }
+output "provisioning_api_url" { value = "https://${azurerm_container_app.provisioning_api.ingress[0].fqdn}" }
 output "maintenance_job_name" { value = azurerm_container_app_job.maintain.name }

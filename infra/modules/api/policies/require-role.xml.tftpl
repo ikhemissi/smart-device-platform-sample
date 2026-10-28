@@ -1,7 +1,12 @@
-<!-- Operation-level role check generated from the operation's x-sdp-required-role (${required_role}). -->
+<!-- Operation-level role check generated from the operation's x-sdp-required-role (${required_role}), and routing
+     to the operation's service when it is not the default backend (M4 design D6). -->
 <policies>
   <inbound>
     <base />
+%{ if backend_id != "" ~}
+    <set-backend-service backend-id="${backend_id}" />
+%{ endif ~}
+%{ if required_role != "authenticated" ~}
     <choose>
       <when condition="@{
           var jwt = (Jwt)context.Variables["jwt"];
@@ -17,6 +22,7 @@
         </return-response>
       </when>
     </choose>
+%{ endif ~}
   </inbound>
   <backend>
     <base />

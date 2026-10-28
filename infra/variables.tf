@@ -106,3 +106,9 @@ variable "redis_high_availability" {
   type        = bool
   default     = false
 }
+
+variable "provisioning_api_image" {
+  description = "Provisioning API image deployed by azd (SERVICE_PROVISIONING_API_IMAGE_NAME); empty on the first run."
+  type        = string
+  default     = ""
+}

@@ -135,3 +135,19 @@ output "REDIS_NAME" {
 output "REDIS_HOST" {
   value = module.cache.hostname
 }
+
+output "PROVISIONING_API_APP_NAME" {
+  value = module.apps.provisioning_api_app_name
+}
+
+output "PROVISIONING_API_IDENTITY_NAME" {
+  value = module.identity.provisioning_api.name
+}
+
+output "DPS_SERVICE_HOST" {
+  value = module.ingestion.dps_service_host
+}
+
+output "IOTHUB_HOSTNAME" {
+  value = module.ingestion.iothub_hostname
+}

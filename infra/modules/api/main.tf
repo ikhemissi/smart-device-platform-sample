@@ -22,6 +22,14 @@ variable "openapi_file" {
   description = "OpenAPI document exported by the device API; the API is imported once it exists."
   type        = string
 }
+variable "provisioning_api_url" {
+  description = "Base URL of the provisioning API container app (https://<fqdn>)."
+  type        = string
+}
+variable "provisioning_openapi_file" {
+  description = "OpenAPI document exported by the provisioning API; its operations are routed to that backend."
+  type        = string
+}
 variable "rate_limit_calls_per_minute" {
   type    = number
   default = 600
@@ -29,9 +37,25 @@ variable "rate_limit_calls_per_minute" {
 variable "tags" { type = map(string) }
 
 locals {
-  base_path = "/api/v1"
-  openapi   = fileexists(var.openapi_file) ? jsondecode(file(var.openapi_file)) : null
-  # Operations are imported relative to the API path (api/v1); the backend keeps the full path.
+  base_path    = "/api/v1"
+  methods      = ["get", "post", "put", "patch", "delete"]
+  device_api   = fileexists(var.openapi_file) ? jsondecode(file(var.openapi_file)) : null
+  provisioning = fileexists(var.provisioning_openapi_file) ? jsondecode(file(var.provisioning_openapi_file)) : null
+  # One API (M4 design D6): both services' documents merged per path and method. The device API is the default
+  # backend; provisioning operations are routed to their service by an operation-level policy.
+  paths = {
+    for path in distinct(concat(keys(try(local.device_api.paths, {})), keys(try(local.provisioning.paths, {})))) :
+    path => merge(lookup(try(local.device_api.paths, {}), path, {}), lookup(try(local.provisioning.paths, {}), path, {}))
+  }
+  api_description = "Devices, telemetry history and site trust of the Smart Device Platform. Requires a Microsoft Entra ID access token for the platform API; operations declare the app role they need in x-sdp-required-role."
+  openapi = local.device_api == null ? null : merge(local.device_api, {
+    info  = merge(local.device_api.info, { title = "Smart Device Platform API", description = local.api_description })
+    paths = local.paths
+    components = merge(local.device_api.components, {
+      schemas = merge(lookup(local.device_api.components, "schemas", {}), try(local.provisioning.components.schemas, {}))
+    })
+  })
+  # Operations are imported relative to the API path (api/v1); the backends keep the full path.
   openapi_relative = local.openapi == null ? null : merge(local.openapi, {
     servers = [{ url = "${var.device_api_url}${local.base_path}" }]
     paths   = { for path, item in local.openapi.paths : trimprefix(path, local.base_path) => item }
@@ -39,9 +63,12 @@ locals {
   operation_roles = local.openapi == null ? {} : merge([
     for path, item in local.openapi.paths : {
       for method, op in item : op.operationId => lookup(op, "x-sdp-required-role", "read")
-      if contains(["get", "post", "put", "patch", "delete"], method)
+      if contains(local.methods, method)
     }
   ]...)
+  provisioning_operations = flatten([
+    for path, item in try(local.provisioning.paths, {}) : [for method, op in item : op.operationId if contains(local.methods, method)]
+  ])
 }
 
 resource "azurerm_api_management" "main" {
@@ -98,6 +125,7 @@ resource "azurerm_api_management_api" "platform" {
   api_management_name   = azurerm_api_management.main.name
   resource_group_name   = var.resource_group_name
   display_name          = "Smart Device Platform API"
+  description           = local.api_description
   revision              = "1"
   path                  = trimprefix(local.base_path, "/")
   protocols             = ["https"]
@@ -124,18 +152,31 @@ resource "azurerm_api_management_api_policy" "platform" {
   })
 }
 
+resource "azurerm_api_management_backend" "provisioning_api" {
+  name                = "provisioning-api"
+  api_management_name = azurerm_api_management.main.name
+  resource_group_name = var.resource_group_name
+  protocol            = "http"
+  url                 = "${var.provisioning_api_url}${local.base_path}"
+  description         = "Site trust: sites, site certificates, audit (M4)"
+}
+
 resource "azurerm_api_management_api_operation_policy" "role" {
-  for_each            = { for id, role in local.operation_roles : id => role if role != "authenticated" }
+  for_each = {
+    for id, role in local.operation_roles : id => role
+    if role != "authenticated" || contains(local.provisioning_operations, id)
+  }
   api_name            = azurerm_api_management_api.platform[0].name
   api_management_name = azurerm_api_management.main.name
   resource_group_name = var.resource_group_name
   operation_id        = each.key
   xml_content = templatefile("${path.module}/policies/require-role.xml.tftpl", {
+    backend_id    = contains(local.provisioning_operations, each.key) ? azurerm_api_management_backend.provisioning_api.name : ""
     required_role = each.value
     app_role      = each.value == "write" ? "DeviceData.Write" : "DeviceData.Read"
     detail        = each.value == "write" ? "The Edit device data permission (DeviceData.Write) is required." : "The Query device data permission (DeviceData.Read) is required."
   })
-  depends_on = [azurerm_api_management_api_policy.platform]
+  depends_on = [azurerm_api_management_api_policy.platform, azurerm_api_management_backend.provisioning_api]
 }
 
 output "name" { value = azurerm_api_management.main.name }

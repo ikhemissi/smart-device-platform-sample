@@ -24,6 +24,7 @@
       </allowed-headers>
       <expose-headers>
         <header>ETag</header>
+        <header>Location</header>
       </expose-headers>
     </cors>
     <validate-azure-ad-token tenant-id="${tenant_id}" header-name="Authorization" failed-validation-httpcode="401"

@@ -41,6 +41,17 @@ services:
       buildArgs:
         - SERVICE=device-api
 
+  provisioning-api:
+    project: ./services/provisioning-api
+    language: java
+    host: containerapp
+    docker:
+      path: ../Dockerfile
+      context: ../..
+      remoteBuild: true
+      buildArgs:
+        - SERVICE=provisioning-api
+
   web:
     project: ./web/portal
     language: js

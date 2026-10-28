@@ -6,7 +6,7 @@ variable "token" { type = string }
 variable "tags" { type = map(string) }
 
 locals {
-  workloads = ["decoder", "simulator", "migrator", "acr-pull", "device-api"]
+  workloads = ["decoder", "simulator", "migrator", "acr-pull", "device-api", "provisioning-api"]
 }
 
 resource "azurerm_user_assigned_identity" "workload" {
@@ -22,3 +22,4 @@ output "simulator" { value = azurerm_user_assigned_identity.workload["simulator"
 output "migrator" { value = azurerm_user_assigned_identity.workload["migrator"] }
 output "acr_pull" { value = azurerm_user_assigned_identity.workload["acr-pull"] }
 output "device_api" { value = azurerm_user_assigned_identity.workload["device-api"] }
+output "provisioning_api" { value = azurerm_user_assigned_identity.workload["provisioning-api"] }
