@@ -114,6 +114,14 @@ export function apiHandlers(me: CurrentUser, log: Request[] = requests, token?: 
       record(request)
       return HttpResponse.json(METRICS)
     }),
+    http.get(`${API}/devices/:id/thresholds`, ({ request }) => {
+      record(request)
+      return HttpResponse.json([])
+    }),
+    http.get(`${API}/devices/:id/alerts`, ({ request }) => {
+      record(request)
+      return HttpResponse.json([])
+    }),
     http.get(`${API}/devices/:id/series`, ({ request }) => {
       record(request)
       return HttpResponse.json(seriesResponse(new URL(request.url)))

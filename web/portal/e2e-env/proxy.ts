@@ -12,7 +12,10 @@ export const DEVICE = process.env.SDP_DEVICE ?? 'paris-01-ruuvi5-001'
 export async function proxyToEnvironment(page: Page) {
   await page.route(`${FAKE_ENV.API_BASE_URL}/**`, async (route) => {
     if (route.request().method() === 'OPTIONS') {
-      return route.fulfill({ status: 204, headers: { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': '*' } })
+      return route.fulfill({
+        status: 204,
+        headers: { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': '*', 'Access-Control-Allow-Methods': 'GET, POST, PUT, PATCH, DELETE' },
+      })
     }
     const target = route.request().url().replace(FAKE_ENV.API_BASE_URL, API)
     // Server-to-server hop: no browser origin (the gateway only accepts the portal's origins).

@@ -1,5 +1,6 @@
 import type { Session } from '../auth/session'
 import type {
+  Alert,
   AuditEvent,
   CertificateChange,
   CurrentUser,
@@ -13,6 +14,8 @@ import type {
   Series,
   Site,
   SiteCertificate,
+  Threshold,
+  ThresholdInput,
 } from './types'
 
 export class ApiError extends Error {
@@ -121,6 +124,39 @@ export class ApiClient {
   async removeSiteCertificate(siteId: string, fingerprint: string): Promise<CertificateChange> {
     const response = await this.request(`/sites/${encodeURIComponent(siteId)}/certificates/${fingerprint}`, { method: 'DELETE' })
     return (await response.json()) as CertificateChange
+  }
+
+  thresholds(deviceId: string): Promise<Threshold[]> {
+    return this.json(`/devices/${encodeURIComponent(deviceId)}/thresholds`)
+  }
+
+  async createThreshold(deviceId: string, input: ThresholdInput): Promise<Threshold> {
+    const response = await this.request(`/devices/${encodeURIComponent(deviceId)}/thresholds`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(input),
+    })
+    return (await response.json()) as Threshold
+  }
+
+  async updateThreshold(deviceId: string, threshold: Threshold, input: ThresholdInput): Promise<Threshold> {
+    const response = await this.request(`/devices/${encodeURIComponent(deviceId)}/thresholds/${threshold.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', 'If-Match': threshold.etag },
+      body: JSON.stringify(input),
+    })
+    return (await response.json()) as Threshold
+  }
+
+  async deleteThreshold(deviceId: string, threshold: Threshold): Promise<void> {
+    await this.request(`/devices/${encodeURIComponent(deviceId)}/thresholds/${threshold.id}`, {
+      method: 'DELETE',
+      headers: { 'If-Match': threshold.etag },
+    })
+  }
+
+  deviceAlerts(deviceId: string): Promise<Alert[]> {
+    return this.json(`/devices/${encodeURIComponent(deviceId)}/alerts?limit=50`)
   }
 
   private async json<T>(path: string): Promise<T> {

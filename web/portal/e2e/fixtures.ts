@@ -111,6 +111,8 @@ export class FakePlatform {
   readonly sites = new Map<string, string>()
   readonly certificates: FakeCertificate[] = []
   readonly audit: { siteId: string; action: string; fingerprint: string | null }[] = []
+  /** Thresholds created through the portal (M5); no alert is ever raised by the fake. */
+  readonly thresholds: { id: string; deviceId: string; metric: string; min: number | null; max: number | null; recipients: string[]; enabled: boolean }[] = []
   private readonly latest = new Map<string, { measuredAt: string; payloadFormat: string; metrics: Record<string, number>; attributes: Record<string, string> }[]>()
   /** Access tokens presented to the API. */
   readonly tokens: string[] = []
@@ -189,7 +191,7 @@ export class FakePlatform {
     const cors = {
       'Access-Control-Allow-Origin': new URL(request.headers()['origin'] ?? 'http://localhost:4280').origin,
       'Access-Control-Allow-Headers': 'Authorization, Content-Type, If-Match',
-      'Access-Control-Allow-Methods': 'GET, POST, PATCH, DELETE',
+      'Access-Control-Allow-Methods': 'GET, POST, PUT, PATCH, DELETE',
       'Access-Control-Expose-Headers': 'ETag',
     }
     if (request.method() === 'OPTIONS') {
@@ -274,6 +276,22 @@ export class FakePlatform {
       const page = Number(q.get('page') ?? 1)
       const pageSize = Number(q.get('pageSize') ?? 25)
       return route.fulfill({ headers: cors, json: { items: items.slice((page - 1) * pageSize, page * pageSize), page, pageSize, total: items.length } })
+    }
+    const alerting = path.match(/^\/devices\/([^/]+)\/(thresholds|alerts)$/)
+    if (alerting) {
+      const deviceId = decodeURIComponent(alerting[1])
+      if (alerting[2] === 'alerts') return route.fulfill({ headers: cors, json: [] })
+      const view = (t: (typeof this.thresholds)[number]) => ({
+        ...t, unit: '°C', etag: `"${t.id}.1"`, updatedAt: new Date().toISOString(), updatedByName: this.user.name, openAlertId: null,
+      })
+      if (request.method() === 'POST') {
+        if (!canWrite) return problem(403, 'Forbidden')
+        const body = request.postDataJSON() as { metric: string; min: number | null; max: number | null; recipients: string[]; enabled?: boolean }
+        const threshold = { id: crypto.randomUUID(), deviceId, ...body, enabled: body.enabled ?? true }
+        this.thresholds.push(threshold)
+        return route.fulfill({ status: 201, headers: cors, json: view(threshold) })
+      }
+      return route.fulfill({ headers: cors, json: this.thresholds.filter((t) => t.deviceId === deviceId).map(view) })
     }
     const history = path.match(/^\/devices\/([^/]+)\/(metrics|measurements\/latest|series)$/)
     if (history) {

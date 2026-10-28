@@ -1,6 +1,6 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useApi } from './context'
-import type { DeviceEdit, DeviceQuery } from './types'
+import type { DeviceEdit, DeviceQuery, Threshold, ThresholdInput } from './types'
 
 export const queryKeys = {
   me: ['me'] as const,
@@ -14,6 +14,8 @@ export const queryKeys = {
   metrics: (deviceId: string) => ['devices', 'metrics', deviceId] as const,
   series: (deviceId: string, metrics: string[], period: string, from?: string, to?: string) =>
     ['devices', 'series', deviceId, metrics, period, from, to] as const,
+  thresholds: (deviceId: string) => ['devices', 'thresholds', deviceId] as const,
+  deviceAlerts: (deviceId: string) => ['devices', 'alerts', deviceId] as const,
 }
 
 export function useCurrentUser() {
@@ -154,4 +156,50 @@ export function useRemoveSiteCertificate(siteId: string) {
     mutationFn: (fingerprint: string) => api.removeSiteCertificate(siteId, fingerprint),
     onSuccess: () => invalidate(siteId),
   })
+}
+
+// --- Alerting (M5) ---------------------------------------------------------------------------------------------
+
+/** Alerts open and close as measurements arrive: refreshed like the latest measurements. */
+const ALERTS_REFRESH_MS = 30_000
+
+export function useThresholds(deviceId: string) {
+  const api = useApi()
+  return useQuery({ queryKey: queryKeys.thresholds(deviceId), queryFn: () => api.thresholds(deviceId), refetchInterval: ALERTS_REFRESH_MS })
+}
+
+export function useDeviceAlerts(deviceId: string) {
+  const api = useApi()
+  return useQuery({
+    queryKey: queryKeys.deviceAlerts(deviceId),
+    queryFn: () => api.deviceAlerts(deviceId),
+    refetchInterval: ALERTS_REFRESH_MS,
+    refetchIntervalInBackground: false,
+  })
+}
+
+function useInvalidateAlerting(deviceId: string) {
+  const client = useQueryClient()
+  return () =>
+    Promise.all([
+      client.invalidateQueries({ queryKey: queryKeys.thresholds(deviceId) }),
+      client.invalidateQueries({ queryKey: queryKeys.deviceAlerts(deviceId) }),
+    ])
+}
+
+/** Creates a threshold, or replaces `existing` (with its entity tag). */
+export function useSaveThreshold(deviceId: string) {
+  const api = useApi()
+  const invalidate = useInvalidateAlerting(deviceId)
+  return useMutation({
+    mutationFn: ({ existing, input }: { existing?: Threshold; input: ThresholdInput }) =>
+      existing ? api.updateThreshold(deviceId, existing, input) : api.createThreshold(deviceId, input),
+    onSettled: invalidate,
+  })
+}
+
+export function useDeleteThreshold(deviceId: string) {
+  const api = useApi()
+  const invalidate = useInvalidateAlerting(deviceId)
+  return useMutation({ mutationFn: (threshold: Threshold) => api.deleteThreshold(deviceId, threshold), onSettled: invalidate })
 }

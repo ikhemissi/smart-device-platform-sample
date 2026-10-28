@@ -147,3 +147,60 @@ export interface AuditEvent {
   fingerprint: string | null
   details: Record<string, unknown>
 }
+
+/** Expected range of a metric of a device (M5). `etag` goes in If-Match when changing it. */
+export interface Threshold {
+  id: string
+  deviceId: string
+  metric: string
+  unit: string | null
+  min: number | null
+  max: number | null
+  recipients: string[]
+  enabled: boolean
+  etag: string
+  updatedAt: string
+  updatedByName: string | null
+  openAlertId: number | null
+}
+
+export interface ThresholdInput {
+  metric: string
+  min: number | null
+  max: number | null
+  recipients: string[]
+  enabled: boolean
+}
+
+export type AlertStatus = 'OPEN' | 'CLOSED' | 'CANCELLED'
+
+export interface AlertNotification {
+  kind: 'ALERT' | 'REMINDER' | 'RESOLVED'
+  status: 'PENDING' | 'SENT' | 'FAILED'
+  recipients: number
+  attempts: number
+  createdAt: string
+  sentAt: string | null
+  lastError: string | null
+}
+
+export interface Alert {
+  id: number
+  thresholdId: string | null
+  deviceId: string
+  deviceName: string | null
+  siteId: string
+  metric: string
+  unit: string | null
+  thresholdMin: number | null
+  thresholdMax: number | null
+  direction: 'ABOVE' | 'BELOW'
+  status: AlertStatus
+  openedAt: string
+  closedAt: string | null
+  firstValue: number
+  worstValue: number
+  lastValue: number
+  lastBreachAt: string
+  notifications: AlertNotification[]
+}
