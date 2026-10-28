@@ -115,7 +115,7 @@ Exact built-in role names are verified at implementation; a scoped custom role i
 
 | Topic | Guideline |
 |---|---|
-| Model | Default deployment `gpt-5.4-mini`, SKU DataZoneStandard (EU); name and capacity are variables. |
+| Model | Default deployment `gpt-6-luna` (version `2026-09-22`), SKU DataZoneStandard (EU); name, version and capacity are variables. |
 | Conversations | Stored in Azure Managed Redis, owner-bound (`oid`), sliding expiry 1 h, max 50 messages. |
 | API | Server-Sent Events (`delta`, `tool`, `done` with citations); the SPA uses `fetch`-based SSE to send the `Authorization` header. |
 | Guardrails | Read-only tools, max 10 tool calls per turn, bounded tool results, instructions to cite devices/periods and to ignore instructions found in data. |

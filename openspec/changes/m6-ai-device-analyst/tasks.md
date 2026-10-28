@@ -2,7 +2,7 @@
 
 ## 1. Foundry and infrastructure
 
-- [ ] 1.1 Add AI Services (Foundry) account with local auth disabled, project, model deployment (DataZoneStandard, variable model name/capacity) and Application Insights connection via Terraform; verify `azd provision` and that key-based access is refused
+- [ ] 1.1 Add AI Services (Foundry) account with local auth disabled, project, model deployment (`gpt-6-luna`, DataZoneStandard, variable model name/capacity) and Application Insights connection via Terraform; verify `azd provision` and that key-based access is refused
 - [ ] 1.2 Add the agent identity, roles (Foundry, Redis access policy) and container app; verify role assignments and a healthy deployment
 - [ ] 1.3 Add a quota preflight check for the configured model in `francecentral` to the `preprovision` hook; verify it fails fast with a clear message when quota is missing
 

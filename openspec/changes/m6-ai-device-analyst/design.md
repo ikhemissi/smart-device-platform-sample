@@ -16,7 +16,7 @@ ADR-0010 fixes the approach (Python + Microsoft Agent Framework on ACA, Foundry 
 `agents/device-analyst`: Python 3.13, `uv` for dependencies, FastAPI + Uvicorn, `sse-starlette` for SSE. Endpoints per spec under `/api/v1/agent`. JWT validation with `PyJWT` + Entra JWKS (issuer, audience = platform API, roles Read/Write) — same rules as Java services. Container: `python:3.13-slim`, non-root.
 
 ### D2. Agent
-Microsoft Agent Framework `ChatAgent` with the Foundry/Azure OpenAI chat client authenticated by `ManagedIdentityCredential` (DefaultAzureCredential locally), model deployment name from config (default `gpt-5.4-mini`, DataZoneStandard EU). System instructions: role, read-only policy, always cite device ids + periods, prefer aggregated series for > 24 h, answer in the user's language, admit missing data. Max tool iterations 10.
+Microsoft Agent Framework `ChatAgent` with the Foundry/Azure OpenAI chat client authenticated by `ManagedIdentityCredential` (DefaultAzureCredential locally), model deployment name from config (default `gpt-6-luna`, version `2026-09-22`, DataZoneStandard EU). System instructions: role, read-only policy, always cite device ids + periods, prefer aggregated series for > 24 h, answer in the user's language, admit missing data. Max tool iterations 10.
 
 ### D3. Tools (read-only)
 Python functions decorated as agent tools, each calling APIM with `httpx.AsyncClient` and the **caller's bearer token** (kept in a request-scoped context variable, never persisted or logged):
@@ -39,7 +39,7 @@ APIM operation policy `forward-request buffer-response="false"` for the messages
 
 ## Risks / Trade-offs
 
-- [Model quota in the EU data zone] → model name/capacity are variables; check quota during `azd provision` (preflight script).
+- [Model quota in the EU data zone] → model name/capacity are variables; check quota during `azd provision` (preflight script). On 2026-10-28 `gpt-6-luna` was generally available in `francecentral` with DataZoneStandard, and the subscription had 100K tokens per minute of DataZoneStandard quota for it.
 - [Token forwarding to tools: token may expire mid-conversation] → each turn uses the token of the current request; long turns are bounded by 10 tool calls and 120 s.
 - [Prompt injection via device names/descriptions] → tool outputs are clearly delimited as data, instructions forbid following instructions found in data, and tools are read-only anyway.
 - [Agent Framework API evolution (fast release cadence)] → pin versions with `uv.lock`; upgrade deliberately.
