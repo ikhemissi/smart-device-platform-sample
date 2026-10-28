@@ -2,7 +2,7 @@
 
 End-to-end Azure demonstrator of a sensor platform: devices of several real-world binary formats send measurements through IoT Hub and Event Hubs, a batch decoder stores them in PostgreSQL, users browse devices and charts in a web portal, editors manage site certificates and alert thresholds, email alerts are raised for monitored devices, and an AI agent answers questions about the data.
 
-> **Status:** M1–M4 delivered and archived (baseline specs in `openspec/specs/`); M5 (threshold alerting) implemented and verified in the `sdp-dev` environment, to be archived after review; M6 (AI analyst) next — see `openspec list`.
+> **Status:** M1–M5 delivered and archived (baseline specs in `openspec/specs/`); next: the operations workbook (`operations-workbook`), then M6 (AI analyst) — see `openspec list`.
 
 ## Documentation
 
@@ -21,8 +21,9 @@ End-to-end Azure demonstrator of a sensor platform: devices of several real-worl
 | M2 | Device list in the web portal | `m2-device-catalog-portal` | Archived | [m2-device-list](docs/demo/m2-device-list.md) |
 | M3 | Device data and chart | `m3-telemetry-history-and-chart` | Archived | [m3-device-data-and-chart](docs/demo/m3-device-data-and-chart.md) |
 | M4 | Site certificate management | `m4-site-certificate-management` | Archived | [m4-site-certificates](docs/demo/m4-site-certificates.md) |
-| M5 | Threshold alerting | `m5-threshold-alerting` | Done, archive pending review | [m5-threshold-alerting](docs/demo/m5-threshold-alerting.md) |
-| M6 | AI analyst | `m6-ai-device-analyst` | Next | — |
+| M5 | Threshold alerting | `m5-threshold-alerting` | Archived | [m5-threshold-alerting](docs/demo/m5-threshold-alerting.md) |
+| — | Operations workbook (Azure Monitor: KPIs, latest errors, critical components) | `operations-workbook` | Planned | — |
+| M6 | AI analyst (model `gpt-6-luna`) | `m6-ai-device-analyst` | Planned | — |
 
 ## Architecture at a glance
 
