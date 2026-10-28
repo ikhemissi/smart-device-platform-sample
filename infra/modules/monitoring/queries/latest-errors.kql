@@ -1,0 +1,16 @@
+// Most recent exceptions, failed requests and failed dependencies of the platform services and the gateway.
+union
+    (exceptions
+        | project timestamp, Service = cloud_RoleName, Kind = 'Exception', Name = type,
+                  Message = coalesce(outerMessage, innermostMessage), operation_Id),
+    (requests
+        | where success == false
+        | project timestamp, Service = cloud_RoleName, Kind = 'Failed request', Name = name,
+                  Message = strcat(resultCode, ' ', url), operation_Id),
+    (dependencies
+        | where success == false
+        | project timestamp, Service = cloud_RoleName, Kind = 'Failed dependency', Name = strcat(type, ' ', name),
+                  Message = strcat(resultCode, ' ', target, ' ', tostring(customDimensions['error.type'])), operation_Id)
+| where Service startswith 'sdp-' or Service startswith 'apim-'
+| top 50 by timestamp desc
+| project Time = timestamp, Service, Kind, Name, Message = substring(Message, 0, 300), ['Operation id'] = operation_Id

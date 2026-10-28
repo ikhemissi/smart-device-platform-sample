@@ -2,7 +2,7 @@
 
 End-to-end Azure demonstrator of a sensor platform: devices of several real-world binary formats send measurements through IoT Hub and Event Hubs, a batch decoder stores them in PostgreSQL, users browse devices and charts in a web portal, editors manage site certificates and alert thresholds, email alerts are raised for monitored devices, and an AI agent answers questions about the data.
 
-> **Status:** M1–M5 delivered and archived (baseline specs in `openspec/specs/`); next: the operations workbook (`operations-workbook`), then M6 (AI analyst) — see `openspec list`.
+> **Status:** M1–M5 delivered and archived (baseline specs in `openspec/specs/`); operations workbook (`operations-workbook`) deployed, archive pending review; M6 (AI analyst) next — see `openspec list`.
 
 ## Documentation
 
@@ -22,7 +22,7 @@ End-to-end Azure demonstrator of a sensor platform: devices of several real-worl
 | M3 | Device data and chart | `m3-telemetry-history-and-chart` | Archived | [m3-device-data-and-chart](docs/demo/m3-device-data-and-chart.md) |
 | M4 | Site certificate management | `m4-site-certificate-management` | Archived | [m4-site-certificates](docs/demo/m4-site-certificates.md) |
 | M5 | Threshold alerting | `m5-threshold-alerting` | Archived | [m5-threshold-alerting](docs/demo/m5-threshold-alerting.md) |
-| — | Operations workbook (Azure Monitor: KPIs, latest errors, critical components) | `operations-workbook` | Planned | — |
+| — | Operations workbook (Azure Monitor: KPIs, latest errors, critical components) | `operations-workbook` | Done, archive pending review | [README: Monitoring](#deploy-to-azure) |
 | M6 | AI analyst (model `gpt-6-luna`) | `m6-ai-device-analyst` | Planned | — |
 
 ## Architecture at a glance
@@ -103,6 +103,8 @@ Environment settings (`azd env set <name> <value>`, then `azd provision`):
 | Setting | Default | Effect |
 |---|---|---|
 | `ALERTING_SUBSCRIPTION_FILTER` | `siteId = 'paris-01'` (when empty) | Service Bus SQL filter selecting the devices monitored for alerts, e.g. `siteId IN ('paris-01','lyon-01')` |
+
+**Monitoring.** Each environment has an Azure Monitor workbook, *Smart Device Platform — operations*: key indicators (devices reporting, measurements, ingestion latency, API traffic and errors, cache, alerts), the latest errors, and metrics of PostgreSQL, IoT Hub, Event Hubs, Service Bus and API Management. Open it with `azd env get-value OPERATIONS_WORKBOOK_URL` (or Application Insights → Workbooks); `scripts/check-workbook-queries.sh` checks its queries against the environment.
 
 Guided demos are listed in [Milestones](#milestones). Helper scripts: `scripts/psql.sh` (database with your Entra identity), `scripts/trace-device.sh` (follow a device's messages in Application Insights), `scripts/backfill-history.sh` (one-off 30-day demo history), `scripts/remove-test-site.sh` (remove a `test-*`/`e2e-*` site and its devices, DPS objects and records).
 

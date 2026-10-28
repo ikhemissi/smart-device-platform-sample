@@ -1,0 +1,5 @@
+// Device messages processed by the decoder, per 15 minutes and outcome.
+customMetrics
+| where name == 'sdp.ingestion.messages'
+| summarize Messages = sum(valueSum) by bin(timestamp, 15m), Outcome = tostring(customDimensions['sdp.ingestion.outcome'])
+| order by timestamp asc

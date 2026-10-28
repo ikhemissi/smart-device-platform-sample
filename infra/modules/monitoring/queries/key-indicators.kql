@@ -1,0 +1,49 @@
+// Key indicators of the platform for the workbook's time range (one row per tile).
+let services = dynamic(['sdp-device-api', 'sdp-provisioning-api']);
+let ingestion = customMetrics
+    | where name == 'sdp.ingestion.messages'
+    | summarize value = sum(valueSum) by outcome = tostring(customDimensions['sdp.ingestion.outcome']);
+let latency = customMetrics
+    | where name == 'sdp.ingestion.latency'
+    | summarize total = sum(valueSum), count = sum(valueCount), maximum = max(valueMax);
+let api = requests
+    | where cloud_RoleName in (services) and url has '/api/v1/';
+let cache = customMetrics
+    | where name == 'sdp.cache.lookups'
+    | summarize value = sum(valueSum) by outcome = tostring(customDimensions['sdp.cache.outcome']);
+let alerts = customMetrics
+    | where name in ('sdp.alerts.opened', 'sdp.alerts.closed')
+    | summarize value = sum(valueSum) by name;
+let emails = customMetrics
+    | where name == 'sdp.alerts.notifications'
+    | summarize value = sum(valueSum) by outcome = tostring(customDimensions['sdp.notification.outcome']);
+union
+    (dependencies
+        | where name == 'sdp.ingest.message'
+        | summarize v = dcount(tostring(customDimensions['sdp.device.id']))
+        | project Order = 1, Indicator = 'Devices reporting', Value = tostring(v), Detail = 'devices whose messages reached the decoder'),
+    (ingestion | summarize v = sumif(value, outcome == 'stored')
+        | project Order = 2, Indicator = 'Measurements stored', Value = tostring(tolong(coalesce(v, 0.0))), Detail = 'decoded and saved in PostgreSQL'),
+    (ingestion | summarize v = sumif(value, outcome == 'rejected')
+        | project Order = 3, Indicator = 'Messages rejected', Value = tostring(tolong(coalesce(v, 0.0))), Detail = 'unknown format or malformed payload'),
+    (latency
+        | project Order = 4, Indicator = 'Ingestion latency', Value = iff(count > 0, strcat(round(total / count, 2), ' s'), '–'),
+                  Detail = iff(count > 0, strcat('average · max ', round(maximum, 1), ' s'), 'no measurement')),
+    (api | summarize n = count()
+        | project Order = 5, Indicator = 'API requests', Value = tostring(n), Detail = 'device-api and provisioning-api'),
+    (api | summarize n = count(), failed = countif(success == false)
+        | project Order = 6, Indicator = 'API failure rate', Value = iff(n > 0, strcat(round(100.0 * failed / n, 2), ' %'), '–'),
+                  Detail = strcat(failed, ' failed requests')),
+    (api | summarize p95 = percentile(duration, 95)
+        | project Order = 7, Indicator = 'API duration (p95)', Value = iff(isnotnull(p95), strcat(round(p95, 0), ' ms'), '–'), Detail = '95th percentile'),
+    (cache | summarize hits = sumif(value, outcome == 'hit'), all = sum(value)
+        | project Order = 8, Indicator = 'History cache hit ratio', Value = iff(all > 0, strcat(round(100.0 * hits / all, 1), ' %'), '–'),
+                  Detail = strcat(tolong(coalesce(all, 0.0)), ' lookups')),
+    (alerts | summarize opened = sumif(value, name == 'sdp.alerts.opened'), closed = sumif(value, name == 'sdp.alerts.closed')
+        | project Order = 9, Indicator = 'Alerts opened', Value = tostring(tolong(coalesce(opened, 0.0))),
+                  Detail = strcat(tolong(coalesce(closed, 0.0)), ' back to normal')),
+    (emails | summarize sent = sumif(value, outcome == 'sent'), failed = sumif(value, outcome == 'failed')
+        | project Order = 10, Indicator = 'Alert emails sent', Value = tostring(tolong(coalesce(sent, 0.0))),
+                  Detail = strcat(tolong(coalesce(failed, 0.0)), ' failed after retries'))
+| order by Order asc
+| project Indicator, Value, Detail

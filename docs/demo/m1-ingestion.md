@@ -94,6 +94,8 @@ scripts/trace-device.sh paris-01-ruuvi5-001
 
 The output lists the device's send, the decoder receiving the batch (linked to the send), the decoding of that message (site, format, outcome), the database writes and the checkpoint. In the portal, the same journey is visible in Application Insights → *Transaction search* (search for the device id) and the *Application map* shows `sdp-device-simulator`, `sdp-telemetry-decoder`, Event Hubs, Blob Storage and PostgreSQL.
 
+For the whole platform at a glance, open the operations workbook (`azd env get-value OPERATIONS_WORKBOOK_URL`): devices reporting, measurements stored per 15 minutes and ingestion latency at the top; under *Critical components*, the IoT Hub telemetry, Event Hubs incoming messages and PostgreSQL charts follow the same curve.
+
 ## 5. A corrupted message is set aside, the rest keeps flowing
 
 Make 5% of the messages unreadable (unknown leading byte or truncated frame):
@@ -112,6 +114,8 @@ scripts/psql.sh -c "
 SELECT (SELECT count(*) FROM sdp.measurements WHERE measured_at > now() - interval '2 minutes') AS stored_2min,
        (SELECT count(*) FROM sdp.rejected_messages WHERE received_at > now() - interval '2 minutes') AS rejected_2min;"
 ```
+
+In the operations workbook, *Messages rejected* rises and *Device messages rejected per hour, by reason* shows the two reasons.
 
 Back to normal:
 

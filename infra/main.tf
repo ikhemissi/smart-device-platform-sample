@@ -204,3 +204,20 @@ module "apps" {
   # Workload identities must hold their roles before the apps start.
   depends_on = [time_sleep.rbac_propagation]
 }
+
+module "monitoring" {
+  source              = "./modules/monitoring"
+  resource_group_name = azurerm_resource_group.main.name
+  location            = var.location
+  environment_name    = var.environment_name
+  tenant_id           = data.azurerm_client_config.current.tenant_id
+  resources = {
+    application_insights = module.core.application_insights_id
+    postgres             = module.data.server_id
+    iothub               = module.ingestion.iothub_id
+    eventhubs            = module.ingestion.eventhubs_namespace_id
+    servicebus           = module.alerting.servicebus_namespace_id
+    api_management       = module.api.id
+  }
+  tags = local.tags
+}

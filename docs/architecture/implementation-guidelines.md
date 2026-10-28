@@ -65,6 +65,7 @@ Exact built-in role names are verified at implementation; a scoped custom role i
 | Naming | `service.name = sdp-<service>`, `deployment.environment = <azd env>`, domain attributes prefixed `sdp.` (`sdp.device.id`, `sdp.site.id`, `sdp.payload.format`). |
 | Domain metrics | `sdp.ingestion.messages{format,outcome,reason}`, `sdp.ingestion.batch.size`, `sdp.ingestion.latency`, `sdp.cache.hits/misses/errors`, `sdp.alerts.*`, agent token usage (GenAI semantic conventions). |
 | Logs | Structured JSON with trace and span ids. |
+| Operations workbook | One Azure Monitor workbook per environment (`infra/modules/monitoring`, azd output `OPERATIONS_WORKBOOK_URL`): key indicators, latest errors and platform metrics of PostgreSQL, IoT Hub, Event Hubs, Service Bus and API Management. Queries are files under `queries/` checked with `scripts/check-workbook-queries.sh`; new domain metrics worth showing are added there. |
 | Gateway & AI | APIM logs to the same Application Insights through its managed identity; the Foundry project is connected to it for agent traces. Prompt/response content capture is off by default. |
 
 ## 6. APIs

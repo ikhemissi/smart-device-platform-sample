@@ -1,0 +1,5 @@
+// Platform API requests per 15 minutes, with failures.
+requests
+| where cloud_RoleName in ('sdp-device-api', 'sdp-provisioning-api') and url has '/api/v1/'
+| summarize Requests = count(), Failed = countif(success == false) by bin(timestamp, 15m)
+| order by timestamp asc

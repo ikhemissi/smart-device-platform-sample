@@ -173,6 +173,7 @@ resource "azurerm_iothub_dps" "main" {
 }
 
 output "eventhubs_namespace_name" { value = azurerm_eventhub_namespace.main.name }
+output "eventhubs_namespace_id" { value = azurerm_eventhub_namespace.main.id }
 output "eventhubs_namespace_fqdn" { value = "${azurerm_eventhub_namespace.main.name}.servicebus.windows.net" }
 output "event_hub_name" { value = azurerm_eventhub.telemetry.name }
 output "event_hub_id" { value = azurerm_eventhub.telemetry.id }

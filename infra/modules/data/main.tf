@@ -109,3 +109,4 @@ resource "azurerm_postgresql_flexible_server_firewall_rule" "developer" {
 output "postgres_fqdn" { value = azurerm_postgresql_flexible_server.main.fqdn }
 output "database_name" { value = azurerm_postgresql_flexible_server_database.sdp.name }
 output "server_name" { value = azurerm_postgresql_flexible_server.main.name }
+output "server_id" { value = azurerm_postgresql_flexible_server.main.id }

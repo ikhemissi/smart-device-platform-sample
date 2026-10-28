@@ -129,6 +129,7 @@ azd provision
 
 - **Reliable and idempotent.** Emails are queued in the same database transaction as the alert, then sent with retries for 30 minutes. A failure is shown as *Alert failed* in the alert history. A measurement delivered twice, or late, never sends a second email.
 - **Disabling or deleting a threshold** closes its open alert without email; past alerts are kept.
+- **Operations workbook** (`azd env get-value OPERATIONS_WORKBOOK_URL`): the *Alerts opened* and *Alert emails sent* tiles count this demo's alerts; *Service Bus active and dead-lettered messages* shows the alerting subscription keeping up.
 - **Observability** (Application Insights, Logs):
 
   ```kusto

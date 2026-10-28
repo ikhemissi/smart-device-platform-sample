@@ -180,6 +180,7 @@ resource "azurerm_api_management_api_operation_policy" "role" {
 }
 
 output "name" { value = azurerm_api_management.main.name }
+output "id" { value = azurerm_api_management.main.id }
 output "gateway_url" { value = azurerm_api_management.main.gateway_url }
 output "api_base_url" { value = "${azurerm_api_management.main.gateway_url}${local.base_path}" }
 output "api_imported" { value = local.openapi != null }

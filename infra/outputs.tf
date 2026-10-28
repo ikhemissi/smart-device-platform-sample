@@ -175,3 +175,7 @@ output "COMMUNICATION_SERVICE_ENDPOINT" {
 output "EMAIL_SENDER_ADDRESS" {
   value = module.alerting.sender_address
 }
+
+output "OPERATIONS_WORKBOOK_URL" {
+  value = module.monitoring.workbook_url
+}
