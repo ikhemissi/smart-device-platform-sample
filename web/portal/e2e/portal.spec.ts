@@ -1,9 +1,13 @@
 import AxeBuilder from '@axe-core/playwright'
 import type { Page } from '@playwright/test'
-import { EDITOR, NO_ROLE, READER, expect, test } from './fixtures'
+import { EDITOR, NO_ROLE, READER, expect, expectAppAccessible, test } from './fixtures'
 
 async function axe(page: Page) {
-  const results = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa']).analyze()
+  // Fluent UI's focus manager (Tabster) inserts aria-hidden focus sentinels as soon as a dialog is mounted.
+  const results = await new AxeBuilder({ page })
+    .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
+    .exclude('[data-tabster-dummy]')
+    .analyze()
   return results.violations
     .filter((v) => v.impact === 'serious' || v.impact === 'critical')
     .map((v) => `${v.id}: ${v.help} (${v.nodes.map((n) => n.target.join(' ')).join(', ')})`)
@@ -29,6 +33,7 @@ test('signs in, filters by site and edits a device name that persists', async ({
   await dialog.getByRole('textbox', { name: /Display name/ }).fill('Paris lobby')
   await dialog.getByRole('button', { name: 'Save' }).click()
   await expect(dialog).toBeHidden()
+  await expectAppAccessible(page)
   await expect(page.getByText('Paris lobby', { exact: true })).toBeVisible()
 
   await page.reload()
@@ -91,6 +96,7 @@ test('the device list and edit dialog are operable with the keyboard only', asyn
   await expect(dialog.getByRole('textbox', { name: /Display name/ })).toBeVisible()
   await page.keyboard.press('Escape')
   await expect(dialog).toBeHidden()
+  await expectAppAccessible(page)
 
   // Paging (back to all devices).
   await page.goto('/devices')

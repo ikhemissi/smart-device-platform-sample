@@ -105,3 +105,45 @@ export interface Series {
   bucketSeconds?: number
   series: { metric: string; unit: string | null; points: SeriesPoint[] }[]
 }
+
+export type CertificateStatus = 'valid' | 'expiring' | 'expired'
+
+export interface SiteCertificate {
+  siteId: string
+  /** SHA-256, lowercase hex. */
+  fingerprint: string
+  slot: 'primary' | 'secondary'
+  subject: string
+  issuer: string
+  notBefore: string
+  notAfter: string
+  status: CertificateStatus
+  /** Object id of the Editor, or `deployment` / `reconciliation`. */
+  addedBy: string
+  addedByName: string | null
+  addedAt: string
+}
+
+export interface DeviceOperation {
+  id: string
+  siteId: string
+  kind: 'DISABLE_DEVICES' | 'ENABLE_DEVICES'
+  status: 'PENDING' | 'DONE' | 'FAILED'
+  deviceCount: number
+}
+
+export interface CertificateChange {
+  certificate: SiteCertificate
+  deviceOperation: DeviceOperation | null
+}
+
+export interface AuditEvent {
+  id: number
+  siteId: string
+  occurredAt: string
+  actorId: string
+  actorName: string | null
+  action: string
+  fingerprint: string | null
+  details: Record<string, unknown>
+}

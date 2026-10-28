@@ -1,3 +1,4 @@
+import { MotionBehaviourProvider } from '@fluentui/react-motion'
 import { render } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { HttpHandler } from 'msw'
@@ -29,10 +30,13 @@ export function renderPortal(
   queryClient.setDefaultOptions({ queries: { ...queryClient.getDefaultOptions().queries, retry: false } })
   const router = createMemoryRouter(routes, { initialEntries: [path] })
   const user = userEvent.setup(options.advanceTimers ? { advanceTimers: options.advanceTimers } : {})
+  // jsdom never finishes CSS motion: skip it, or dialogs stay in their (aria-hidden) enter state.
   const view = render(
-    <PortalProviders session={session} api={new ApiClient(API, session)} queryClient={queryClient}>
-      <RouterProvider router={router} />
-    </PortalProviders>,
+    <MotionBehaviourProvider value="skip">
+      <PortalProviders session={session} api={new ApiClient(API, session)} queryClient={queryClient}>
+        <RouterProvider router={router} />
+      </PortalProviders>
+    </MotionBehaviourProvider>,
   )
   return { ...view, router, session, user }
 }

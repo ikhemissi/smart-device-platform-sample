@@ -18,6 +18,6 @@ export async function proxyToEnvironment(page: Page) {
     // Server-to-server hop: no browser origin (the gateway only accepts the portal's origins).
     const { origin: _origin, referer: _referer, ...headers } = route.request().headers()
     const response = await route.fetch({ url: target, headers: { ...headers, authorization: `Bearer ${TOKEN}` } })
-    await route.fulfill({ response, headers: { ...response.headers(), 'access-control-allow-origin': '*', 'access-control-expose-headers': 'ETag' } })
+    await route.fulfill({ response, headers: { ...response.headers(), 'access-control-allow-origin': '*', 'access-control-expose-headers': 'ETag, Location' } })
   })
 }

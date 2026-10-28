@@ -25,6 +25,7 @@ CLI="$(command -v podman || command -v docker || true)"
 [[ -n "$CLI" ]] || { echo "psql, podman or docker is required" >&2; exit 1; }
 TTY=()
 [[ -t 0 && $# -eq 0 ]] && TTY=(-it)
+[[ ! -t 0 ]] && TTY=(-i)   # SQL piped on stdin
 NETWORK=()
 [[ "$(basename "$CLI")" == podman ]] && NETWORK=(--network slirp4netns)
 exec "$CLI" run --rm "${TTY[@]}" "${NETWORK[@]}" -e PGPASSWORD docker.io/library/postgres:18 \

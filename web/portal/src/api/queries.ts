@@ -7,6 +7,9 @@ export const queryKeys = {
   sites: ['sites'] as const,
   devices: (query: DeviceQuery) => ['devices', 'list', query] as const,
   device: (deviceId: string) => ['devices', 'detail', deviceId] as const,
+  allSiteCertificates: ['site-certificates'] as const,
+  siteCertificates: (siteId: string) => ['site-certificates', siteId] as const,
+  siteAudit: (siteId: string) => ['site-audit', siteId] as const,
   latest: (deviceId: string) => ['devices', 'latest', deviceId] as const,
   metrics: (deviceId: string) => ['devices', 'metrics', deviceId] as const,
   series: (deviceId: string, metrics: string[], period: string, from?: string, to?: string) =>
@@ -99,5 +102,56 @@ export function useSeries(request: SeriesRequest) {
     placeholderData: keepPreviousData,
     refetchInterval: live ? HISTORY_REFRESH_MS : false,
     refetchIntervalInBackground: false,
+  })
+}
+
+export function useAllSiteCertificates() {
+  const api = useApi()
+  return useQuery({ queryKey: queryKeys.allSiteCertificates, queryFn: () => api.allSiteCertificates() })
+}
+
+export function useSiteCertificates(siteId: string) {
+  const api = useApi()
+  return useQuery({ queryKey: queryKeys.siteCertificates(siteId), queryFn: () => api.siteCertificates(siteId) })
+}
+
+export function useSiteAudit(siteId: string) {
+  const api = useApi()
+  return useQuery({ queryKey: queryKeys.siteAudit(siteId), queryFn: () => api.siteAudit(siteId) })
+}
+
+/** After a trust change: certificates, audit, site list and device statuses may all have changed. */
+function useInvalidateTrust() {
+  const client = useQueryClient()
+  return (siteId: string) =>
+    Promise.all([
+      client.invalidateQueries({ queryKey: ['site-certificates'] }),
+      client.invalidateQueries({ queryKey: queryKeys.siteAudit(siteId) }),
+      client.invalidateQueries({ queryKey: queryKeys.sites }),
+      client.invalidateQueries({ queryKey: ['devices', 'list'] }),
+    ])
+}
+
+export function useCreateSite() {
+  const api = useApi()
+  const invalidate = useInvalidateTrust()
+  return useMutation({
+    mutationFn: ({ siteId, displayName }: { siteId: string; displayName: string }) => api.createSite(siteId, displayName),
+    onSuccess: (_, { siteId }) => invalidate(siteId),
+  })
+}
+
+export function useAddSiteCertificate(siteId: string) {
+  const api = useApi()
+  const invalidate = useInvalidateTrust()
+  return useMutation({ mutationFn: (file: File) => api.addSiteCertificate(siteId, file), onSuccess: () => invalidate(siteId) })
+}
+
+export function useRemoveSiteCertificate(siteId: string) {
+  const api = useApi()
+  const invalidate = useInvalidateTrust()
+  return useMutation({
+    mutationFn: (fingerprint: string) => api.removeSiteCertificate(siteId, fingerprint),
+    onSuccess: () => invalidate(siteId),
   })
 }

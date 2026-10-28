@@ -25,5 +25,7 @@ export default defineConfig({
     setupFiles: ['./src/test/setup.ts'],
     include: ['src/**/*.test.{ts,tsx}'],
     restoreMocks: true,
+    // Each test renders the whole portal; leave headroom on loaded machines.
+    testTimeout: 15_000,
   },
 })

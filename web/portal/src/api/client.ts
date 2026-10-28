@@ -1,5 +1,7 @@
 import type { Session } from '../auth/session'
 import type {
+  AuditEvent,
+  CertificateChange,
   CurrentUser,
   DeviceDetails,
   DeviceEdit,
@@ -10,6 +12,7 @@ import type {
   ReportedMetric,
   Series,
   Site,
+  SiteCertificate,
 } from './types'
 
 export class ApiError extends Error {
@@ -86,6 +89,38 @@ export class ApiClient {
       params.set('to', to.toISOString())
     }
     return this.json(`/devices/${encodeURIComponent(deviceId)}/series?${params}`)
+  }
+
+  async createSite(siteId: string, displayName: string): Promise<void> {
+    await this.request('/sites', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ siteId, displayName }),
+    })
+  }
+
+  allSiteCertificates(): Promise<SiteCertificate[]> {
+    return this.json('/site-certificates')
+  }
+
+  siteCertificates(siteId: string): Promise<SiteCertificate[]> {
+    return this.json(`/sites/${encodeURIComponent(siteId)}/certificates`)
+  }
+
+  siteAudit(siteId: string): Promise<AuditEvent[]> {
+    return this.json(`/sites/${encodeURIComponent(siteId)}/audit?limit=20`)
+  }
+
+  async addSiteCertificate(siteId: string, file: File): Promise<CertificateChange> {
+    const form = new FormData()
+    form.append('file', file)
+    const response = await this.request(`/sites/${encodeURIComponent(siteId)}/certificates`, { method: 'POST', body: form })
+    return (await response.json()) as CertificateChange
+  }
+
+  async removeSiteCertificate(siteId: string, fingerprint: string): Promise<CertificateChange> {
+    const response = await this.request(`/sites/${encodeURIComponent(siteId)}/certificates/${fingerprint}`, { method: 'DELETE' })
+    return (await response.json()) as CertificateChange
   }
 
   private async json<T>(path: string): Promise<T> {

@@ -189,7 +189,7 @@ export function DeviceListPage() {
         </>
       )}
 
-      {editing && <EditDeviceDialog deviceId={editing} onClose={() => setEditing(undefined)} />}
+      <EditDeviceDialog deviceId={editing} onClose={() => setEditing(undefined)} />
     </section>
   )
 }

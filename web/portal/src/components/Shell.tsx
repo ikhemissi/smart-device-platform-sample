@@ -58,9 +58,14 @@ export function Shell() {
         <Subtitle1 as="span">Smart Device Platform</Subtitle1>
         <nav aria-label="Sections" className={styles.nav}>
           {me.data?.canRead && (
-            <NavLink to="/devices" className={({ isActive }) => mergeClasses(styles.navLink, isActive && styles.active)}>
-              Devices
-            </NavLink>
+            <>
+              <NavLink to="/devices" className={({ isActive }) => mergeClasses(styles.navLink, isActive && styles.active)}>
+                Devices
+              </NavLink>
+              <NavLink to="/sites" className={({ isActive }) => mergeClasses(styles.navLink, isActive && styles.active)}>
+                Sites
+              </NavLink>
+            </>
           )}
         </nav>
         <div className={styles.user}>

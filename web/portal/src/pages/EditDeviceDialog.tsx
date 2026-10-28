@@ -22,14 +22,28 @@ import { useDevice, useUpdateDevice } from '../api/queries'
 import { explain } from '../api/errors'
 import { ErrorState } from '../components/ErrorState'
 import { type DeviceForm, type FormErrors, LIMITS, fromProblemErrors, toEdit, toForm } from './deviceForm'
+import { useOpenKey } from '../components/useOpenKey'
 
 const useStyles = makeStyles({
   form: { display: 'flex', flexDirection: 'column', gap: tokens.spacingVerticalM },
   row: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: tokens.spacingHorizontalM },
 })
 
+/**
+ * Editor-only device edit. The Fluent dialog stays mounted and is driven by `deviceId` (open when set): unmounting an open
+ * modal would leave the rest of the portal hidden from assistive technology.
+ */
+export function EditDeviceDialog({ deviceId, onClose }: { deviceId: string | undefined; onClose: () => void }) {
+  const key = useOpenKey(!!deviceId)
+  return (
+    <Dialog key={key} open={!!deviceId} modalType="modal" onOpenChange={(_, data) => !data.open && onClose()}>
+      <DialogSurface aria-describedby={undefined}>{deviceId && <EditDeviceForm deviceId={deviceId} onClose={onClose} />}</DialogSurface>
+    </Dialog>
+  )
+}
+
 /** Editor-only dialog: validates like the API, sends the entity tag and handles concurrent changes. */
-export function EditDeviceDialog({ deviceId, onClose }: { deviceId: string; onClose: () => void }) {
+function EditDeviceForm({ deviceId, onClose }: { deviceId: string; onClose: () => void }) {
   const styles = useStyles()
   const device = useDevice(deviceId)
   const update = useUpdateDevice(deviceId)
@@ -80,8 +94,7 @@ export function EditDeviceDialog({ deviceId, onClose }: { deviceId: string; onCl
 
   const name = device.data?.value.displayName ?? deviceId
   return (
-    <Dialog open modalType="modal" onOpenChange={(_, data) => !data.open && onClose()}>
-      <DialogSurface aria-describedby={undefined}>
+    <>
         <form onSubmit={(event) => void submit(event)} noValidate>
           <DialogBody>
             <DialogTitle>Edit {name}</DialogTitle>
@@ -136,7 +149,6 @@ export function EditDeviceDialog({ deviceId, onClose }: { deviceId: string; onCl
             </DialogActions>
           </DialogBody>
         </form>
-      </DialogSurface>
-    </Dialog>
+      </>
   )
 }

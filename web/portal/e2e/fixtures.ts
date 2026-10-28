@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto'
 import { type Page, type Route, test as base, expect } from '@playwright/test'
 import { FAKE_ENV } from './env.mjs'
 
@@ -80,10 +81,36 @@ function reading(metric: string, t: number): number {
 
 const LADDER = [60, 300, 900, 3600, 21_600, 86_400]
 
+interface FakeCertificate {
+  siteId: string
+  fingerprint: string
+  slot: 'primary' | 'secondary'
+  subject: string
+  issuer: string
+  notBefore: string
+  notAfter: string
+  status: 'valid' | 'expiring' | 'expired'
+  addedBy: string
+  addedByName: string | null
+  addedAt: string
+}
+
+/** Minimal multipart reader: content of the first part (the uploaded file). */
+function firstPart(body: Buffer, contentType: string): string {
+  const boundary = /boundary=([^;]+)/.exec(contentType)?.[1]
+  const text = body.toString('latin1')
+  if (!boundary) return text
+  const part = text.split(`--${boundary}`)[1] ?? ''
+  return part.slice(part.indexOf('\r\n\r\n') + 4).replace(/\r\n$/, '')
+}
+
 export class FakePlatform {
   user: FakeUser = EDITOR
   devices = seedDevices()
   /** Latest measurements per device (most recent first), extended by `report()`. */
+  readonly sites = new Map<string, string>()
+  readonly certificates: FakeCertificate[] = []
+  readonly audit: { siteId: string; action: string; fingerprint: string | null }[] = []
   private readonly latest = new Map<string, { measuredAt: string; payloadFormat: string; metrics: Record<string, number>; attributes: Record<string, string> }[]>()
   /** Access tokens presented to the API. */
   readonly tokens: string[] = []
@@ -162,7 +189,7 @@ export class FakePlatform {
     const cors = {
       'Access-Control-Allow-Origin': new URL(request.headers()['origin'] ?? 'http://localhost:4280').origin,
       'Access-Control-Allow-Headers': 'Authorization, Content-Type, If-Match',
-      'Access-Control-Allow-Methods': 'GET, PATCH',
+      'Access-Control-Allow-Methods': 'GET, POST, PATCH, DELETE',
       'Access-Control-Expose-Headers': 'ETag',
     }
     if (request.method() === 'OPTIONS') {
@@ -179,9 +206,60 @@ export class FakePlatform {
       return route.fulfill({ headers: cors, json: { objectId: this.user.oid, displayName: this.user.name, userPrincipalName: this.user.upn, canRead, canWrite } })
     }
     if (!canRead) return problem(403, 'Forbidden')
+    if (path === '/sites' && request.method() === 'POST') {
+      if (!canWrite) return problem(403, 'Forbidden')
+      const { siteId, displayName } = request.postDataJSON() as { siteId: string; displayName: string }
+      if (this.sites.has(siteId) || this.devices.some((d) => d.siteId === siteId)) return problem(409, 'Conflict')
+      this.sites.set(siteId, displayName)
+      this.audit.unshift({ siteId, action: 'SITE_CREATED', fingerprint: null })
+      return route.fulfill({ status: 201, headers: cors, json: { siteId, displayName, certificateCount: 0 } })
+    }
     if (path === '/sites') {
-      const sites = [...new Set(this.devices.map((d) => d.siteId))].sort()
-      return route.fulfill({ headers: cors, json: sites.map((siteId) => ({ siteId, displayName: siteId, deviceCount: this.devices.filter((d) => d.siteId === siteId).length })) })
+      const ids = [...new Set([...this.devices.map((d) => d.siteId), ...this.sites.keys()])].sort()
+      return route.fulfill({
+        headers: cors,
+        json: ids.map((siteId) => ({ siteId, displayName: this.sites.get(siteId) ?? siteId, deviceCount: this.devices.filter((d) => d.siteId === siteId).length })),
+      })
+    }
+    if (path === '/site-certificates') {
+      return route.fulfill({ headers: cors, json: this.certificates })
+    }
+    const trust = path.match(/^\/sites\/([^/]+)\/(certificates|audit)(?:\/([0-9a-f]{64}))?$/)
+    if (trust) {
+      const siteId = decodeURIComponent(trust[1])
+      if (!this.sites.has(siteId) && !this.devices.some((d) => d.siteId === siteId)) return problem(404, 'Not Found')
+      if (trust[2] === 'audit') {
+        return route.fulfill({
+          headers: cors,
+          json: this.audit.filter((a) => a.siteId === siteId).map((a, i) => ({ id: i + 1, siteId, occurredAt: new Date().toISOString(), actorId: this.user.oid, actorName: this.user.name, action: a.action, fingerprint: a.fingerprint, details: {} })),
+        })
+      }
+      const ofSite = () => this.certificates.filter((c) => c.siteId === siteId)
+      if (request.method() === 'GET') return route.fulfill({ headers: cors, json: ofSite() })
+      if (!canWrite) return problem(403, 'Forbidden')
+      if (request.method() === 'POST') {
+        const pem = firstPart(request.postDataBuffer() ?? Buffer.alloc(0), request.headers()['content-type'] ?? '')
+        if (pem.includes('PRIVATE KEY')) return problem(400, 'Certificate rejected')
+        if (ofSite().length >= 2) return problem(409, 'Conflict')
+        const fingerprint = createHash('sha256').update(pem).digest('hex')
+        const certificate: FakeCertificate = {
+          siteId, fingerprint, slot: ofSite().length === 0 ? 'primary' : 'secondary',
+          subject: `CN=${siteId} uploaded CA`, issuer: `CN=${siteId} uploaded CA`,
+          notBefore: new Date(Date.now() - 86_400_000).toISOString(), notAfter: new Date(Date.now() + 365 * 86_400_000).toISOString(),
+          status: 'valid', addedBy: this.user.oid, addedByName: this.user.name, addedAt: new Date().toISOString(),
+        }
+        this.certificates.push(certificate)
+        this.audit.unshift({ siteId, action: 'CERTIFICATE_ADDED', fingerprint })
+        return route.fulfill({ status: 201, headers: cors, json: { certificate, deviceOperation: null } })
+      }
+      const index = this.certificates.findIndex((c) => c.siteId === siteId && c.fingerprint === trust[3])
+      if (index < 0) return problem(404, 'Not Found')
+      const [removed] = this.certificates.splice(index, 1)
+      ofSite().forEach((c) => (c.slot = 'primary'))
+      this.audit.unshift({ siteId, action: 'CERTIFICATE_REMOVED', fingerprint: removed.fingerprint })
+      const devices = this.devices.filter((d) => d.siteId === siteId).length
+      const operation = ofSite().length === 0 ? { id: 'op-1', siteId, kind: 'DISABLE_DEVICES', status: 'DONE', deviceCount: devices } : null
+      return route.fulfill({ headers: cors, json: { certificate: removed, deviceOperation: operation } })
     }
     if (path === '/devices') {
       const q = url.searchParams
@@ -315,5 +393,10 @@ export const test = base.extend<{ platform: FakePlatform; cspViolations: string[
     expect(violations, 'Content Security Policy violations').toEqual([])
   },
 })
+
+/** Regression guard: no modal left the application hidden from assistive technology (aria-hidden on the app root). */
+export async function expectAppAccessible(page: Page) {
+  await expect(page.locator('#root')).not.toHaveAttribute('aria-hidden', 'true')
+}
 
 export { expect }

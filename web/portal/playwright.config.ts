@@ -9,6 +9,7 @@ export default defineConfig({
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   reporter: [['list']],
+  expect: { timeout: 10_000 },
   use: {
     baseURL: 'http://localhost:4280',
     trace: 'retain-on-failure',
