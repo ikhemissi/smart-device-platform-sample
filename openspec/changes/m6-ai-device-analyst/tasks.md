@@ -8,8 +8,8 @@
 
 ## 2. Fleet analytics API
 
-- [ ] 2.1 Implement `GET /api/v1/fleet/metric-summary` (site/device grouping, first/last values, validation); verify the humidity-comparison, battery-overview and invalid-metric scenarios with Testcontainers
-- [ ] 2.2 Implement `GET /api/v1/fleet/status`; verify the silent-devices scenario
+- [x] 2.1 Implement `GET /api/v1/fleet/metric-summary` (site/device grouping, first/last values, validation); verify the humidity-comparison, battery-overview and invalid-metric scenarios with Testcontainers
+- [x] 2.2 Implement `GET /api/v1/fleet/status`; verify the silent-devices scenario
 - [ ] 2.3 Measure 7-day summaries on a 100-device dataset and publish through APIM; verify p95 < 3 s at the gateway
 
 ## 3. Agent service

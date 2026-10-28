@@ -661,6 +661,102 @@
         "x-sdp-required-role" : "write"
       }
     },
+    "/api/v1/fleet/metric-summary" : {
+      "get" : {
+        "description" : "min, avg, max, sample and device counts, first and last values of a canonical metric from from (inclusive) to to (exclusive, defaults to now), at most 31 days. Groups without data are omitted.",
+        "operationId" : "getFleetMetricSummary",
+        "parameters" : [ {
+          "description" : "Canonical metric, e.g. humidity",
+          "in" : "query",
+          "name" : "metric",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "in" : "query",
+          "name" : "from",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "date-time"
+          }
+        }, {
+          "in" : "query",
+          "name" : "to",
+          "required" : false,
+          "schema" : {
+            "type" : "string",
+            "format" : "date-time"
+          }
+        }, {
+          "description" : "site or device",
+          "in" : "query",
+          "name" : "groupBy",
+          "required" : false,
+          "schema" : {
+            "type" : "string",
+            "default" : "site"
+          }
+        }, {
+          "description" : "Restrict to one site",
+          "in" : "query",
+          "name" : "siteId",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/MetricSummary"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "Summary of one metric per site or per device",
+        "tags" : [ "Fleet" ],
+        "x-sdp-required-role" : "read"
+      }
+    },
+    "/api/v1/fleet/status" : {
+      "get" : {
+        "description" : "Device counts per site and the most recently seen silent devices (at most 100 per site).",
+        "operationId" : "getFleetStatus",
+        "parameters" : [ {
+          "description" : "Restrict to one site",
+          "in" : "query",
+          "name" : "siteId",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "type" : "array",
+                  "items" : {
+                    "$ref" : "#/components/schemas/SiteStatus"
+                  }
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "Reporting and silent devices per site",
+        "tags" : [ "Fleet" ],
+        "x-sdp-required-role" : "read"
+      }
+    },
     "/api/v1/me" : {
       "get" : {
         "description" : "Available without any platform role so that clients can explain which permission to request.",
@@ -942,6 +1038,47 @@
           }
         }
       },
+      "Group" : {
+        "type" : "object",
+        "properties" : {
+          "avg" : {
+            "type" : "number",
+            "format" : "double"
+          },
+          "deviceId" : {
+            "type" : "string"
+          },
+          "devices" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "first" : {
+            "$ref" : "#/components/schemas/Reading"
+          },
+          "last" : {
+            "$ref" : "#/components/schemas/Reading"
+          },
+          "max" : {
+            "type" : "number",
+            "format" : "double"
+          },
+          "min" : {
+            "type" : "number",
+            "format" : "double"
+          },
+          "samples" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "siteId" : {
+            "type" : "string"
+          }
+        }
+      },
+      "GroupBy" : {
+        "type" : "string",
+        "enum" : [ "site", "device" ]
+      },
       "Location" : {
         "type" : "object",
         "properties" : {
@@ -1036,6 +1173,37 @@
           }
         }
       },
+      "MetricSummary" : {
+        "type" : "object",
+        "properties" : {
+          "from" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "groupBy" : {
+            "$ref" : "#/components/schemas/GroupBy"
+          },
+          "groups" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/Group"
+            }
+          },
+          "metric" : {
+            "type" : "string"
+          },
+          "siteId" : {
+            "type" : "string"
+          },
+          "to" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "unit" : {
+            "type" : "string"
+          }
+        }
+      },
       "Point" : {
         "type" : "object",
         "properties" : {
@@ -1056,6 +1224,19 @@
             "format" : "double"
           },
           "t" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "value" : {
+            "type" : "number",
+            "format" : "double"
+          }
+        }
+      },
+      "Reading" : {
+        "type" : "object",
+        "properties" : {
+          "at" : {
             "type" : "string",
             "format" : "date-time"
           },
@@ -1132,6 +1313,21 @@
           }
         }
       },
+      "SilentDevice" : {
+        "type" : "object",
+        "properties" : {
+          "deviceId" : {
+            "type" : "string"
+          },
+          "displayName" : {
+            "type" : "string"
+          },
+          "lastSeenAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          }
+        }
+      },
       "Site" : {
         "type" : "object",
         "properties" : {
@@ -1141,6 +1337,35 @@
           },
           "displayName" : {
             "type" : "string"
+          },
+          "siteId" : {
+            "type" : "string"
+          }
+        }
+      },
+      "SiteStatus" : {
+        "type" : "object",
+        "properties" : {
+          "devices" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "displayName" : {
+            "type" : "string"
+          },
+          "reporting" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "silent" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "silentDevices" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/SilentDevice"
+            }
           },
           "siteId" : {
             "type" : "string"

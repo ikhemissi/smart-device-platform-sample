@@ -52,12 +52,15 @@ public class BackfillTask {
 
     private final JdbcTemplate jdbc;
     private final TransactionTemplate tx;
+    private final MetricRollups rollups;
     private final MigratorProperties.Backfill settings;
     private final Clock clock;
 
-    public BackfillTask(JdbcTemplate jdbc, TransactionTemplate tx, MigratorProperties properties, Optional<Clock> clock) {
+    public BackfillTask(JdbcTemplate jdbc, TransactionTemplate tx, MigratorProperties properties, MetricRollups rollups,
+                        Optional<Clock> clock) {
         this.jdbc = jdbc;
         this.tx = tx;
+        this.rollups = rollups;
         this.settings = properties.backfill();
         this.clock = clock.orElse(Clock.systemUTC());
     }
@@ -80,6 +83,8 @@ public class BackfillTask {
             log.info("History backfill: {} measurements for {} ({} to {})", counts[0], device.deviceId(), from, device.firstSeenAt());
         }
         jdbc.execute("ANALYZE sdp.measurements");
+        // Past hours changed: fleet rollups are rebuilt by the next maintenance run.
+        rollups.reset();
         log.info("History backfill completed: {} devices, {} measurements, {} undecodable readings skipped, from {}",
                 devices.size(), total, skipped, from);
         return new Result(devices.size(), total, skipped);

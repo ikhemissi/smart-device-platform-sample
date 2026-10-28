@@ -9,7 +9,8 @@ import org.springframework.stereotype.Component;
 /**
  * Database housekeeping, safe to run repeatedly: applies the configured retention to partitioned tables,
  * runs pg_partman maintenance (pre-creates future partitions, drops expired ones), purges old deduplication keys
- * in bounded batches and forgets metrics a device has not reported within the retention period.
+ * in bounded batches, forgets metrics a device has not reported within the retention period and rolls up the hours
+ * that became complete for fleet summaries ({@link MetricRollups}).
  */
 @Component
 public class MaintenanceTask {
@@ -18,10 +19,12 @@ public class MaintenanceTask {
 
     private final JdbcTemplate jdbc;
     private final MigratorProperties properties;
+    private final MetricRollups rollups;
 
-    public MaintenanceTask(JdbcTemplate jdbc, MigratorProperties properties) {
+    public MaintenanceTask(JdbcTemplate jdbc, MigratorProperties properties, MetricRollups rollups) {
         this.jdbc = jdbc;
         this.properties = properties;
+        this.rollups = rollups;
     }
 
     public void run() {
@@ -30,6 +33,7 @@ public class MaintenanceTask {
         long purged = purgeLedger();
         int metrics = jdbc.update("DELETE FROM sdp.device_metrics WHERE last_seen_at < now() - ?::interval",
                 interval(properties.retention()));
+        rollups.run(properties.retention());
         log.info("Database maintenance completed: retention={}, ledgerRetention={}, ledgerKeysPurged={}, deviceMetricsPurged={}",
                 properties.retention(), properties.ledgerRetention(), purged, metrics);
     }
