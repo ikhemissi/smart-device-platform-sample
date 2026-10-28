@@ -116,7 +116,8 @@ Exact built-in role names are verified at implementation; a scoped custom role i
 
 | Topic | Guideline |
 |---|---|
-| Model | Default deployment `gpt-6-luna` (version `2026-09-22`), SKU DataZoneStandard (EU); name, version and capacity are variables. |
+| Model | Default deployment `gpt-6-luna` (version `2026-09-22`), SKU DataZoneStandard (EU), 50K tokens/min; name, version, SKU and capacity are azd settings (`AGENT_MODEL_*`) checked against quota before provisioning (`scripts/check-model-quota.sh`). |
+| Foundry | AI Services account with local authentication disabled and a project connected to Application Insights; the agent identity only holds `Cognitive Services OpenAI User`. |
 | Conversations | Stored in Azure Managed Redis, owner-bound (`oid`), sliding expiry 1 h, max 50 messages. |
 | API | Server-Sent Events (`delta`, `tool`, `done` with citations); the SPA uses `fetch`-based SSE to send the `Authorization` header. |
 | Guardrails | Read-only tools, max 10 tool calls per turn, bounded tool results, instructions to cite devices/periods and to ignore instructions found in data. |

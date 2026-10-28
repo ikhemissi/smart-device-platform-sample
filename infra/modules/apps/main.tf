@@ -16,6 +16,7 @@ variable "identities" {
     device_api       = object({ id = string, client_id = string, principal_id = string, name = string })
     provisioning_api = object({ id = string, client_id = string, principal_id = string, name = string })
     alert_service    = object({ id = string, client_id = string, principal_id = string, name = string })
+    device_analyst   = object({ id = string, client_id = string, principal_id = string, name = string })
   })
 }
 variable "application_insights" {
@@ -61,6 +62,14 @@ variable "alerting" {
 }
 variable "alert_service_image" { type = string }
 variable "portal_base_url" { type = string }
+variable "device_analyst_image" { type = string }
+variable "foundry" {
+  type = object({ project_endpoint = string, openai_endpoint = string, model_deployment_name = string })
+}
+variable "api_base_url" {
+  description = "Platform API base URL at the gateway; the agent's tools call it with the caller's token."
+  type        = string
+}
 variable "entra" {
   description = "Token validation settings of the platform API (ADR-0007)."
   type        = object({ tenant_id = string, api_client_id = string, api_identifier_uri = string })
@@ -155,6 +164,22 @@ locals {
     SDP_EMAIL_SENDER                          = var.alerting.sender_address
     SDP_PORTAL_BASE_URL                       = var.portal_base_url
   })
+
+  # Python agent (M6 design D1/D7): the Azure Monitor distro takes the credential in code, so no authentication string.
+  device_analyst_env = {
+    APPLICATIONINSIGHTS_CONNECTION_STRING = var.application_insights.connection_string
+    OTEL_RESOURCE_ATTRIBUTES              = "deployment.environment=${var.environment_name}"
+    OTEL_SERVICE_NAME                     = "sdp-device-analyst"
+    AZURE_CLIENT_ID                       = var.identities.device_analyst.client_id
+    FOUNDRY_PROJECT_ENDPOINT              = var.foundry.project_endpoint
+    AZURE_OPENAI_ENDPOINT                 = var.foundry.openai_endpoint
+    FOUNDRY_MODEL_DEPLOYMENT_NAME         = var.foundry.model_deployment_name
+    SDP_ENTRA_TENANT_ID                   = var.entra.tenant_id
+    SDP_API_AUDIENCES                     = "${var.entra.api_client_id},${var.entra.api_identifier_uri}"
+    SDP_API_BASE_URL                      = var.api_base_url
+    SDP_REDIS_HOST                        = var.redis.host
+    SDP_REDIS_PORT                        = tostring(var.redis.port)
+  }
 }
 
 # --- Telemetry decoder ----------------------------------------------------------------------------------------
@@ -541,6 +566,93 @@ resource "azurerm_container_app" "alert_service" {
   }
 }
 
+# --- AI device analyst (M6) -------------------------------------------------------------------------------------
+
+resource "azurerm_container_app" "device_analyst" {
+  name                         = "ca-analyst-${var.token}"
+  resource_group_name          = var.resource_group_name
+  container_app_environment_id = var.container_app_environment_id
+  revision_mode                = "Single"
+  workload_profile_name        = "Consumption"
+  tags                         = merge(var.tags, { "azd-service-name" = "device-analyst" })
+
+  identity {
+    type         = "UserAssigned"
+    identity_ids = [var.identities.device_analyst.id, var.identities.acr_pull.id]
+  }
+
+  registry {
+    server   = var.registry_server
+    identity = var.identities.acr_pull.id
+  }
+
+  # External ingress: APIM v2 reaches it without a VNet (ADR-0008); the service validates tokens itself (ADR-0007).
+  ingress {
+    external_enabled = true
+    target_port      = var.device_analyst_image != "" ? 8080 : 80
+    transport        = "auto"
+    traffic_weight {
+      latest_revision = true
+      percentage      = 100
+    }
+  }
+
+  template {
+    # One warm replica keeps the first answer of a demo fast.
+    min_replicas = 1
+    max_replicas = 3
+
+    container {
+      name   = "device-analyst"
+      image  = var.device_analyst_image != "" ? var.device_analyst_image : local.placeholder_image
+      cpu    = 0.5
+      memory = "1Gi"
+
+      dynamic "env" {
+        for_each = local.device_analyst_env
+        content {
+          name  = env.key
+          value = env.value
+        }
+      }
+
+      dynamic "liveness_probe" {
+        for_each = var.device_analyst_image != "" ? [1] : []
+        content {
+          transport               = "HTTP"
+          port                    = 8080
+          path                    = "/health/live"
+          initial_delay           = 10
+          interval_seconds        = 10
+          failure_count_threshold = 5
+        }
+      }
+
+      dynamic "readiness_probe" {
+        for_each = var.device_analyst_image != "" ? [1] : []
+        content {
+          transport               = "HTTP"
+          port                    = 8080
+          path                    = "/health/ready"
+          initial_delay           = 5
+          interval_seconds        = 10
+          failure_count_threshold = 6
+        }
+      }
+    }
+
+    # Conversations stream for up to 120 s, so few concurrent requests per replica.
+    http_scale_rule {
+      name                = "http"
+      concurrent_requests = "20"
+    }
+  }
+
+  lifecycle {
+    ignore_changes = [template[0].container[0].image]
+  }
+}
+
 # --- Database migrator jobs -------------------------------------------------------------------------------------
 
 resource "azurerm_container_app_job" "migrate" {
@@ -648,3 +760,5 @@ output "provisioning_api_app_name" { value = azurerm_container_app.provisioning_
 output "provisioning_api_url" { value = "https://${azurerm_container_app.provisioning_api.ingress[0].fqdn}" }
 output "maintenance_job_name" { value = azurerm_container_app_job.maintain.name }
 output "alert_service_app_name" { value = azurerm_container_app.alert_service.name }
+output "device_analyst_app_name" { value = azurerm_container_app.device_analyst.name }
+output "device_analyst_url" { value = "https://${azurerm_container_app.device_analyst.ingress[0].fqdn}" }

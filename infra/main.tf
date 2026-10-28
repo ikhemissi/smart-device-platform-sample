@@ -94,7 +94,10 @@ module "cache" {
   sku_name            = var.redis_sku
   high_availability   = var.redis_high_availability
   reader_principals = merge(
-    { device_api = module.identity.device_api.principal_id },
+    {
+      device_api     = module.identity.device_api.principal_id
+      device_analyst = module.identity.device_analyst.principal_id
+    },
     var.deployer_is_user ? { deployer = data.azurerm_client_config.current.object_id } : {},
   )
   tags = local.tags
@@ -192,8 +195,15 @@ module "apps" {
     communication_endpoint = module.alerting.communication_service_endpoint
     sender_address         = module.alerting.sender_address
   }
-  alert_service_image = var.alert_service_image
-  portal_base_url     = module.web.origin
+  alert_service_image  = var.alert_service_image
+  device_analyst_image = var.device_analyst_image
+  foundry = {
+    project_endpoint      = module.foundry.project_endpoint
+    openai_endpoint       = module.foundry.openai_endpoint
+    model_deployment_name = module.foundry.model_deployment_name
+  }
+  api_base_url    = module.api.api_base_url
+  portal_base_url = module.web.origin
   entra = {
     tenant_id          = data.azurerm_client_config.current.tenant_id
     api_client_id      = module.entra.api_client_id
@@ -218,6 +228,25 @@ module "monitoring" {
     eventhubs            = module.ingestion.eventhubs_namespace_id
     servicebus           = module.alerting.servicebus_namespace_id
     api_management       = module.api.id
+  }
+  tags = local.tags
+}
+
+module "foundry" {
+  source            = "./modules/foundry"
+  resource_group_id = azurerm_resource_group.main.id
+  location          = var.location
+  environment_name  = var.environment_name
+  token             = local.token
+  model = {
+    name     = coalesce(var.agent_model_name, "gpt-6-luna")
+    version  = coalesce(var.agent_model_version, "2026-09-22")
+    sku      = coalesce(var.agent_model_sku, "DataZoneStandard")
+    capacity = tonumber(coalesce(var.agent_model_capacity, "50"))
+  }
+  application_insights = {
+    id                = module.core.application_insights_id
+    connection_string = module.core.application_insights_connection_string
   }
   tags = local.tags
 }

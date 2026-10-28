@@ -8,6 +8,7 @@ locals {
     device_api       = module.identity.device_api.principal_id
     provisioning_api = module.identity.provisioning_api.principal_id
     alert_service    = module.identity.alert_service.principal_id
+    device_analyst   = module.identity.device_analyst.principal_id
   }
 }
 
@@ -122,6 +123,14 @@ resource "azurerm_role_assignment" "alert_service_email" {
   principal_type     = "ServicePrincipal"
 }
 
+# AI device analyst (M6 design D6): model inference only.
+resource "azurerm_role_assignment" "device_analyst_openai" {
+  scope                = module.foundry.account_id
+  role_definition_name = "Cognitive Services OpenAI User"
+  principal_id         = module.identity.device_analyst.principal_id
+  principal_type       = "ServicePrincipal"
+}
+
 # Deployer: needed by the post-provision bootstrap (site CAs, enrollment groups) and for troubleshooting.
 resource "azurerm_role_assignment" "deployer_key_vault" {
   scope                = module.core.key_vault_id
@@ -160,6 +169,14 @@ resource "azurerm_role_assignment" "deployer_email" {
   principal_id       = data.azurerm_client_config.current.object_id
 }
 
+# Deployer: runs the AI device analyst and its evaluation locally, uses the Foundry portal. "Foundry User" (formerly
+# "Azure AI User") is referenced by id because built-in role names change.
+resource "azurerm_role_assignment" "deployer_foundry" {
+  scope              = module.foundry.account_id
+  role_definition_id = "/subscriptions/${var.subscription_id}/providers/Microsoft.Authorization/roleDefinitions/53ca6127-db72-4b80-b1b0-d745d6d5456d"
+  principal_id       = data.azurerm_client_config.current.object_id
+}
+
 resource "time_sleep" "rbac_propagation" {
   create_duration = "60s"
   depends_on = [
@@ -177,5 +194,6 @@ resource "time_sleep" "rbac_propagation" {
     azurerm_role_assignment.decoder_servicebus_sender,
     azurerm_role_assignment.alert_service_servicebus_receiver,
     azurerm_role_assignment.alert_service_email,
+    azurerm_role_assignment.device_analyst_openai,
   ]
 }

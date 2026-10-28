@@ -119,6 +119,12 @@ variable "alert_service_image" {
   default     = ""
 }
 
+variable "device_analyst_image" {
+  description = "AI device analyst image deployed by azd (SERVICE_DEVICE_ANALYST_IMAGE_NAME); empty on the first run."
+  type        = string
+  default     = ""
+}
+
 variable "alerting_subscription_filter" {
   description = "Service Bus SQL filter selecting the devices monitored for alerts (properties siteId, deviceId, payloadFormat), e.g. \"siteId IN ('paris-01','lyon-01')\"; set with `azd env set ALERTING_SUBSCRIPTION_FILTER`. Empty: siteId = 'paris-01'."
   type        = string
@@ -129,4 +135,30 @@ variable "alerting_publish_enabled" {
   description = "Whether the decoder publishes persisted measurements to the Service Bus topic (ALERTING_PUBLISH_ENABLED)."
   type        = bool
   default     = true
+}
+
+# AI device analyst model (M6). Set with `azd env set AGENT_MODEL_*`; empty values fall back to the defaults below,
+# which scripts/check-model-quota.sh (pre-provision) mirrors.
+variable "agent_model_name" {
+  description = "Foundry chat model (AGENT_MODEL_NAME). Empty: gpt-6-luna."
+  type        = string
+  default     = ""
+}
+
+variable "agent_model_version" {
+  description = "Model version (AGENT_MODEL_VERSION). Empty: 2026-09-22."
+  type        = string
+  default     = ""
+}
+
+variable "agent_model_sku" {
+  description = "Deployment SKU (AGENT_MODEL_SKU); DataZoneStandard keeps processing in the EU data zone. Empty: DataZoneStandard."
+  type        = string
+  default     = ""
+}
+
+variable "agent_model_capacity" {
+  description = "Capacity in thousands of tokens per minute, bounded by the subscription quota (AGENT_MODEL_CAPACITY). Empty: 50."
+  type        = string
+  default     = ""
 }

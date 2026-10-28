@@ -179,3 +179,35 @@ output "EMAIL_SENDER_ADDRESS" {
 output "OPERATIONS_WORKBOOK_URL" {
   value = module.monitoring.workbook_url
 }
+
+output "AZURE_AI_ACCOUNT_NAME" {
+  value = module.foundry.account_name
+}
+
+output "AZURE_AI_PROJECT_NAME" {
+  value = module.foundry.project_name
+}
+
+output "AZURE_AI_PROJECT_ENDPOINT" {
+  value = module.foundry.project_endpoint
+}
+
+output "AZURE_OPENAI_ENDPOINT" {
+  value = module.foundry.openai_endpoint
+}
+
+output "AGENT_MODEL_DEPLOYMENT_NAME" {
+  value = module.foundry.model_deployment_name
+}
+
+output "DEVICE_ANALYST_APP_NAME" {
+  value = module.apps.device_analyst_app_name
+}
+
+output "DEVICE_ANALYST_URL" {
+  value = module.apps.device_analyst_url
+}
+
+output "DEVICE_ANALYST_IDENTITY_NAME" {
+  value = module.identity.device_analyst.name
+}
