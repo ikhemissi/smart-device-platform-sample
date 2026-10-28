@@ -1,6 +1,6 @@
 import { HttpResponse, http } from 'msw'
 import { setupServer } from 'msw/node'
-import type { CurrentUser, DeviceDetails, DeviceSummary, Site } from '../api/types'
+import type { CurrentUser, DeviceDetails, DeviceSummary, Measurement, ReportedMetric, Series, Site } from '../api/types'
 
 export const API = 'https://api.test/api/v1'
 
@@ -39,6 +39,45 @@ export function details(summary: DeviceSummary, changes: Partial<DeviceDetails> 
   return { ...summary, description: null, location: null, updatedAt: null, updatedBy: null, ...changes }
 }
 
+export const METRICS: ReportedMetric[] = [
+  { metric: 'humidity', unit: '%', description: 'Relative humidity', lastSeenAt: minutesAgo(1) },
+  { metric: 'pressure', unit: 'hPa', description: 'Atmospheric pressure', lastSeenAt: minutesAgo(1) },
+  { metric: 'temperature', unit: '°C', description: 'Air temperature', lastSeenAt: minutesAgo(1) },
+]
+
+/** Latest measurements, most recent first, one minute apart (newest `minutesAgo(offset)`). */
+export function latestMeasurements(count: number, offset = 1): Measurement[] {
+  return Array.from({ length: count }, (_, i) => ({
+    measuredAt: minutesAgo(offset + i),
+    payloadFormat: 'ruuvi-df5',
+    metrics: { temperature: 21 + i / 10, humidity: 45, pressure: 1013.2 },
+    attributes: { mac: 'CB:B8:33:4C:88:4F' },
+  }))
+}
+
+export function seriesResponse(request: URL, points = 12): Series {
+  const metrics = (request.searchParams.get('metrics') ?? '').split(',')
+  const from = request.searchParams.get('from')!
+  const to = request.searchParams.get('to') ?? new Date().toISOString()
+  const span = Date.parse(to) - Date.parse(from)
+  const aggregated = span > 3_600_000
+  return {
+    deviceId: 'lyon-01-ruuvi5-001',
+    from,
+    to,
+    resolution: aggregated ? '5m' : 'raw',
+    ...(aggregated ? { bucketSeconds: 300 } : {}),
+    series: metrics.map((metric) => ({
+      metric,
+      unit: METRICS.find((m) => m.metric === metric)?.unit ?? null,
+      points: Array.from({ length: points }, (_, i) => {
+        const t = new Date(Date.parse(from) + (i * span) / points).toISOString()
+        return aggregated ? { t, min: 20 + i / 10, avg: 21 + i / 10, max: 22 + i / 10, count: 10 } : { t, value: 21 + i / 10 }
+      }),
+    })),
+  }
+}
+
 /** Default fake API: filters like the real one so URL-driven views can be asserted. */
 export function apiHandlers(me: CurrentUser, log: Request[] = requests, token?: string) {
   const record = (request: Request) => {
@@ -66,6 +105,18 @@ export function apiHandlers(me: CurrentUser, log: Request[] = requests, token?: 
           (!search || d.deviceId.toLowerCase().includes(search) || (d.displayName ?? '').toLowerCase().includes(search)),
       )
       return HttpResponse.json({ items, page: Number(params.get('page') ?? 1), pageSize: 25, total: items.length })
+    }),
+    http.get(`${API}/devices/:id/measurements/latest`, ({ request }) => {
+      record(request)
+      return HttpResponse.json(latestMeasurements(Number(new URL(request.url).searchParams.get('count') ?? 20)))
+    }),
+    http.get(`${API}/devices/:id/metrics`, ({ request }) => {
+      record(request)
+      return HttpResponse.json(METRICS)
+    }),
+    http.get(`${API}/devices/:id/series`, ({ request }) => {
+      record(request)
+      return HttpResponse.json(seriesResponse(new URL(request.url)))
     }),
     http.get(`${API}/devices/:id`, ({ request, params }) => {
       record(request)

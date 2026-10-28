@@ -19,7 +19,7 @@ import {
 } from '@fluentui/react-components'
 import { ChevronLeftRegular, ChevronRightRegular, EditRegular } from '@fluentui/react-icons'
 import { useEffect, useState } from 'react'
-import { useSearchParams } from 'react-router'
+import { Link, useSearchParams } from 'react-router'
 import { useCurrentUser, useDevices, useSites } from '../api/queries'
 import type { DeviceSummary, SortField } from '../api/types'
 import { ErrorState } from '../components/ErrorState'
@@ -39,6 +39,7 @@ const useStyles = makeStyles({
   pager: { display: 'flex', alignItems: 'center', gap: tokens.spacingHorizontalM, justifyContent: 'flex-end' },
   empty: { padding: tokens.spacingVerticalXXL, textAlign: 'center' },
   secondary: { color: tokens.colorNeutralForeground3 },
+  deviceLink: { color: tokens.colorBrandForegroundLink, ':hover': { textDecoration: 'underline' } },
 })
 
 const COLUMNS: { label: string; sort?: SortField }[] = [
@@ -200,7 +201,7 @@ function DeviceRow({ device, canWrite, onEdit }: { device: DeviceSummary; canWri
     <TableRow>
       <TableCell>
         <TableCellLayout description={device.displayName ? <Caption1 className={styles.secondary}>{device.deviceId}</Caption1> : undefined}>
-          {name}
+          <Link to={`/devices/${encodeURIComponent(device.deviceId)}`} className={styles.deviceLink}>{name}</Link>
         </TableCellLayout>
       </TableCell>
       <TableCell>{device.siteId}</TableCell>

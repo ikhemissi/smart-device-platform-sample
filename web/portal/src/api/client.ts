@@ -1,5 +1,16 @@
 import type { Session } from '../auth/session'
-import type { CurrentUser, DeviceDetails, DeviceEdit, DevicePage, DeviceQuery, Problem, Site } from './types'
+import type {
+  CurrentUser,
+  DeviceDetails,
+  DeviceEdit,
+  DevicePage,
+  DeviceQuery,
+  Measurement,
+  Problem,
+  ReportedMetric,
+  Series,
+  Site,
+} from './types'
 
 export class ApiError extends Error {
   readonly status: number
@@ -58,6 +69,23 @@ export class ApiClient {
       body: JSON.stringify(edit),
     })
     return { value: (await response.json()) as DeviceDetails, etag: response.headers.get('ETag') ?? '' }
+  }
+
+  latestMeasurements(deviceId: string, count = 20): Promise<Measurement[]> {
+    return this.json(`/devices/${encodeURIComponent(deviceId)}/measurements/latest?count=${count}`)
+  }
+
+  deviceMetrics(deviceId: string): Promise<ReportedMetric[]> {
+    return this.json(`/devices/${encodeURIComponent(deviceId)}/metrics`)
+  }
+
+  /** `to` omitted: the server uses its own "now" (no client clock skew). */
+  series(deviceId: string, metrics: string[], from: Date, to: Date | undefined, maxPoints: number): Promise<Series> {
+    const params = new URLSearchParams({ metrics: metrics.join(','), from: from.toISOString(), maxPoints: String(maxPoints) })
+    if (to) {
+      params.set('to', to.toISOString())
+    }
+    return this.json(`/devices/${encodeURIComponent(deviceId)}/series?${params}`)
   }
 
   private async json<T>(path: string): Promise<T> {

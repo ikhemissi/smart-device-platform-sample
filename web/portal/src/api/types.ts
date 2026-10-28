@@ -71,3 +71,37 @@ export interface Problem {
   detail?: string
   errors?: Record<string, string[]>
 }
+
+export interface Measurement {
+  measuredAt: string
+  payloadFormat: string
+  metrics: Record<string, number>
+  attributes: Record<string, string>
+}
+
+export interface ReportedMetric {
+  metric: string
+  unit: string | null
+  description: string | null
+  lastSeenAt: string
+}
+
+/** A raw value (`value`) or an aggregated bucket (`min`, `avg`, `max`, `count`). */
+export interface SeriesPoint {
+  t: string
+  value?: number
+  min?: number
+  avg?: number
+  max?: number
+  count?: number
+}
+
+export interface Series {
+  deviceId: string
+  from: string
+  to: string
+  /** `raw`, or the bucket size: `1m`, `5m`, `15m`, `1h`, `6h`, `1d`. */
+  resolution: string
+  bucketSeconds?: number
+  series: { metric: string; unit: string | null; points: SeriesPoint[] }[]
+}

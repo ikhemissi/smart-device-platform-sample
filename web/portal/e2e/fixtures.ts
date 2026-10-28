@@ -56,9 +56,35 @@ function seedDevices(): Device[] {
   )
 }
 
+const RUUVI_METRICS = [
+  ['temperature', '°C', 'Air temperature'],
+  ['humidity', '%', 'Relative humidity'],
+  ['pressure', 'hPa', 'Atmospheric pressure'],
+  ['battery_voltage', 'V', 'Battery voltage'],
+] as const
+
+/** Deterministic readings: a daily temperature cycle and a slower humidity wave. */
+function reading(metric: string, t: number): number {
+  const hours = t / 3_600_000
+  switch (metric) {
+    case 'temperature':
+      return Math.round((21 + 3 * Math.sin((2 * Math.PI * (hours - 9)) / 24) + 0.3 * Math.sin(hours * 7)) * 100) / 100
+    case 'humidity':
+      return Math.round((48 - 6 * Math.sin((2 * Math.PI * (hours - 9)) / 24)) * 10) / 10
+    case 'pressure':
+      return Math.round((1012 + 2 * Math.sin(hours / 30)) * 10) / 10
+    default:
+      return 3.01
+  }
+}
+
+const LADDER = [60, 300, 900, 3600, 21_600, 86_400]
+
 export class FakePlatform {
   user: FakeUser = EDITOR
   devices = seedDevices()
+  /** Latest measurements per device (most recent first), extended by `report()`. */
+  private readonly latest = new Map<string, { measuredAt: string; payloadFormat: string; metrics: Record<string, number>; attributes: Record<string, string> }[]>()
   /** Access tokens presented to the API. */
   readonly tokens: string[] = []
   private nonce = ''
@@ -171,6 +197,18 @@ export class FakePlatform {
       const pageSize = Number(q.get('pageSize') ?? 25)
       return route.fulfill({ headers: cors, json: { items: items.slice((page - 1) * pageSize, page * pageSize), page, pageSize, total: items.length } })
     }
+    const history = path.match(/^\/devices\/([^/]+)\/(metrics|measurements\/latest|series)$/)
+    if (history) {
+      const deviceId = decodeURIComponent(history[1])
+      if (!this.devices.some((d) => d.deviceId === deviceId)) return problem(404, 'Not Found')
+      if (history[2] === 'metrics') {
+        return route.fulfill({ headers: cors, json: RUUVI_METRICS.map(([metric, unit, description]) => ({ metric, unit, description, lastSeenAt: new Date().toISOString() })) })
+      }
+      if (history[2] === 'measurements/latest') {
+        return route.fulfill({ headers: cors, json: this.latestOf(deviceId).slice(0, Number(url.searchParams.get('count') ?? 20)) })
+      }
+      return route.fulfill({ headers: cors, json: this.series(deviceId, url) })
+    }
     const match = path.match(/^\/devices\/(.+)$/)
     const device = match && this.devices.find((d) => d.deviceId === decodeURIComponent(match[1]))
     if (!device) return problem(404, 'Not Found')
@@ -184,6 +222,64 @@ export class FakePlatform {
       })
     }
     return route.fulfill({ headers: { ...cors, ETag: `"v${device.version}"` }, json: { ...this.summary(device), description: device.description, location: device.location, updatedAt: device.updatedAt, updatedBy: device.updatedBy } })
+  }
+
+  private latestOf(deviceId: string) {
+    if (!this.latest.has(deviceId)) {
+      const now = Math.floor(Date.now() / 30_000) * 30_000
+      this.latest.set(deviceId, Array.from({ length: 20 }, (_, i) => this.measurement(now - (i + 1) * 30_000)))
+    }
+    return this.latest.get(deviceId)!
+  }
+
+  private measurement(t: number) {
+    return {
+      measuredAt: new Date(t).toISOString(),
+      payloadFormat: 'ruuvi-df5',
+      metrics: Object.fromEntries(RUUVI_METRICS.map(([m]) => [m, reading(m, t)])),
+      attributes: { mac: 'CB:B8:33:4C:88:4F' },
+    }
+  }
+
+  /** The device reports a new measurement now. */
+  report(deviceId: string): string {
+    const list = this.latestOf(deviceId)
+    const next = this.measurement(Date.parse(list[0].measuredAt) + 30_000)
+    list.unshift(next)
+    return next.measuredAt
+  }
+
+  /** Series like the API: raw at 30 s reporting when it fits maxPoints, otherwise buckets from the fixed ladder. */
+  private series(deviceId: string, url: URL) {
+    const metrics = (url.searchParams.get('metrics') ?? '').split(',')
+    const from = Date.parse(url.searchParams.get('from')!)
+    const to = url.searchParams.has('to') ? Date.parse(url.searchParams.get('to')!) : Date.now()
+    const maxPoints = Number(url.searchParams.get('maxPoints') ?? 500)
+    const rawCount = Math.floor((to - from) / 30_000)
+    const bucket = rawCount <= maxPoints ? 0 : LADDER.find((b) => Math.ceil((to - from) / 1000 / b) <= maxPoints) ?? 86_400
+    const unit = (m: string) => RUUVI_METRICS.find(([k]) => k === m)?.[1] ?? null
+    const series = metrics.map((metric) => {
+      const points = []
+      if (!bucket) {
+        for (let t = Math.ceil(from / 30_000) * 30_000; t < to; t += 30_000) points.push({ t: new Date(t).toISOString(), value: reading(metric, t) })
+      } else {
+        const size = bucket * 1000
+        for (let b = Math.floor(from / size) * size; b < to; b += size) {
+          const values = []
+          for (let t = b; t < b + size; t += Math.max(30_000, size / 20)) values.push(reading(metric, t))
+          points.push({
+            t: new Date(b).toISOString(),
+            min: Math.min(...values),
+            avg: Math.round((values.reduce((a, v) => a + v, 0) / values.length) * 100) / 100,
+            max: Math.max(...values),
+            count: Math.round(size / 30_000),
+          })
+        }
+      }
+      return { metric, unit: unit(metric), points }
+    })
+    const resolution = bucket ? { 60: '1m', 300: '5m', 900: '15m', 3600: '1h', 21600: '6h', 86400: '1d' }[bucket] : 'raw'
+    return { deviceId, from: new Date(from).toISOString(), to: new Date(to).toISOString(), resolution, ...(bucket ? { bucketSeconds: bucket } : {}), series }
   }
 
   private summary(d: Device) {
