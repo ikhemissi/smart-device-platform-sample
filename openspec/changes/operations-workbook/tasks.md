@@ -8,6 +8,8 @@
 - [x] 1.4 Write the critical components section; verify every metric name exists in the resource's metric definitions (`az monitor metrics list-definitions`) and returns data for the period
 - [ ] 1.5 Validate the rendered template (valid JSON, no unresolved placeholder, every query bound to the time range) in a script run before provisioning, and provision `sdp-dev`; verify the open-the-workbook and time-range scenarios in the Azure portal
 
+- [x] 1.6 Move the key indicators to the top panel and add the site, device type and device id filters (device list limited by site and device type) to the device-level figures; verify with the query script for all values and for one site and one device that the figures change accordingly
+
 ## 2. Documentation
 
 - [x] 2.1 Reference the workbook in the observability guidelines (§5), the README and the demo guides; verify the links and the `OPERATIONS_WORKBOOK_URL` output

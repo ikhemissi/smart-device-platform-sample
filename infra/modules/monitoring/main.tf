@@ -1,6 +1,7 @@
 # Operations workbook (change operations-workbook, platform-observability spec): key indicators, latest errors and
 # Azure Monitor metrics of the critical components on one page. Built here with jsonencode(); the KQL queries live in
-# queries/*.kql (no time filter: the workbook's time range applies) and are checked by scripts/check-workbook-queries.sh.
+# queries/*.kql and the filter lists in parameters/*.kql (no time filter: the workbook's time range applies; {Site},
+# {DeviceType} and {DeviceId} are the filters) and are checked by scripts/check-workbook-queries.sh.
 
 variable "resource_group_name" { type = string }
 variable "location" { type = string }
@@ -24,15 +25,17 @@ locals {
   appi   = lower(var.resources.application_insights)
 
   header = {
-    type = 1
-    name = "header"
-    content = {
-      json = join("\n", [
-        "# Smart Device Platform — operations (${var.environment_name})",
-        "Key indicators, latest errors and the critical components of the platform. Every tile, list and chart follows the time range below.",
-      ])
-    }
+    type    = 1
+    name    = "header"
+    content = { json = "## Smart Device Platform — operations (${var.environment_name})" }
   }
+
+  # Device-level filters (values listed from the decoder's per-message spans; DeviceId follows Site and DeviceType).
+  filters = [
+    { id = "6c1b1e6c-3f0e-4b8e-9a52-1f3a8c3e0d02", name = "Site", label = "Site" },
+    { id = "6c1b1e6c-3f0e-4b8e-9a52-1f3a8c3e0d03", name = "DeviceType", label = "Device type" },
+    { id = "6c1b1e6c-3f0e-4b8e-9a52-1f3a8c3e0d04", name = "DeviceId", label = "Device ID" },
+  ]
 
   parameters = {
     type = 9
@@ -40,7 +43,7 @@ locals {
     content = {
       version = "KqlParameterItem/1.0"
       style   = "pills"
-      parameters = [{
+      parameters = concat([{
         id         = "6c1b1e6c-3f0e-4b8e-9a52-1f3a8c3e0d01"
         version    = "KqlParameterItem/1.0"
         name       = "TimeRange"
@@ -52,14 +55,32 @@ locals {
           allowCustom      = true
           selectableValues = [for ms in [3600000, 14400000, 43200000, local.day_ms, 3 * local.day_ms, 7 * local.day_ms, 30 * local.day_ms] : { durationMs = ms }]
         }
-      }]
+        }], [for f in local.filters : {
+        id                       = f.id
+        version                  = "KqlParameterItem/1.0"
+        name                     = f.name
+        label                    = f.label
+        type                     = 2
+        isRequired               = false
+        multiSelect              = true
+        quote                    = "'"
+        delimiter                = ","
+        query                    = file("${path.module}/parameters/${f.name}.kql")
+        value                    = ["value::all"]
+        typeSettings             = { additionalResourceOptions = ["value::all"], selectAllValue = "*", showDefault = false }
+        timeContextFromParameter = "TimeRange"
+        timeContext              = { durationMs = local.day_ms }
+        queryType                = 0
+        resourceType             = "microsoft.insights/components"
+        crossComponentResources  = [local.appi]
+      }])
     }
   }
 
   # A KQL query on Application Insights, bound to the time range.
   kql = { for name, item in {
     key-indicators = {
-      title = "Key indicators", visualization = "tiles", size = 0, width = "100", extra = {
+      title = "", visualization = "tiles", size = 0, width = "100", extra = {
         tileSettings = {
           showBorder      = true
           titleContent    = { columnMatch = "Indicator", formatter = 1 }
@@ -75,7 +96,7 @@ locals {
         gridSettings = { rowLimit = 50, filter = true, formatters = [{ columnMatch = "Operation id", formatter = 1 }] }
       }
     }
-    rejections = { title = "Device messages rejected per hour, by reason", visualization = "barchart", size = 1, width = "100", extra = {} }
+    rejections = { title = "Device messages rejected per hour, by reason", visualization = "barchart", size = 0, width = "100", extra = {} }
     } : name => {
     type        = 3
     name        = name
@@ -127,17 +148,17 @@ locals {
   }]
 
   section = { for name, text in {
-    indicators = "## Key indicators\nIngestion, platform API, history cache and alerting. API figures cover device-api and provisioning-api calls (health probes excluded)."
-    errors     = "## Latest errors\nNewest first. Copy an operation id into **Transaction search** of Application Insights to follow the whole transaction."
-    components = "## Critical components\nAzure Monitor metrics of the services that carry device data (IoT Hub → Event Hubs → PostgreSQL) and of alerting and the API gateway."
+    indicators = "Every tile, list and chart follows the time range. **Site, Device type and Device ID** filter the device figures: devices reporting, measurements stored and rejected, the messages trend and rejections. Ingestion latency follows the device type only. API (device-api and provisioning-api, health probes excluded), cache, alerting, errors and the Azure resource charts are platform-wide."
+    errors     = "## Latest errors\nPlatform-wide, newest first. Copy an operation id into **Transaction search** of Application Insights to follow the whole transaction."
+    components = "## Critical components\nPlatform-wide Azure Monitor metrics of the services that carry device data (IoT Hub → Event Hubs → PostgreSQL) and of alerting and the API gateway."
   } : name => { type = 1, name = "section-${name}", content = { json = text } } }
 
   workbook = {
     version = "Notebook/1.0"
     items = concat(
-      [local.header, local.parameters, local.section.indicators],
-      [local.kql["key-indicators"], local.kql["ingestion-trend"], local.kql["api-trend"]],
-      [local.section.errors, local.kql["latest-errors"], local.kql["rejections"]],
+      [local.header, local.parameters, local.kql["key-indicators"], local.section.indicators],
+      [local.kql["ingestion-trend"], local.kql["api-trend"], local.kql["rejections"]],
+      [local.section.errors, local.kql["latest-errors"]],
       [local.section.components],
       local.metrics,
     )
@@ -165,6 +186,10 @@ resource "azurerm_application_insights_workbook" "operations" {
     precondition {
       condition     = toset([for name in fileset("${path.module}/queries", "*.kql") : trimsuffix(name, ".kql")]) == toset(keys(local.kql))
       error_message = "Every query in modules/monitoring/queries must be shown by the workbook, and every workbook query must have its .kql file."
+    }
+    precondition {
+      condition     = toset([for name in fileset("${path.module}/parameters", "*.kql") : trimsuffix(name, ".kql")]) == toset([for f in local.filters : f.name])
+      error_message = "Every query in modules/monitoring/parameters must be a workbook filter, and every filter must have its .kql file."
     }
   }
 }

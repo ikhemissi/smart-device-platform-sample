@@ -104,7 +104,7 @@ Environment settings (`azd env set <name> <value>`, then `azd provision`):
 |---|---|---|
 | `ALERTING_SUBSCRIPTION_FILTER` | `siteId = 'paris-01'` (when empty) | Service Bus SQL filter selecting the devices monitored for alerts, e.g. `siteId IN ('paris-01','lyon-01')` |
 
-**Monitoring.** Each environment has an Azure Monitor workbook, *Smart Device Platform — operations*: key indicators (devices reporting, measurements, ingestion latency, API traffic and errors, cache, alerts), the latest errors, and metrics of PostgreSQL, IoT Hub, Event Hubs, Service Bus and API Management. Open it with `azd env get-value OPERATIONS_WORKBOOK_URL` (or Application Insights → Workbooks); `scripts/check-workbook-queries.sh` checks its queries against the environment.
+**Monitoring.** Each environment has an Azure Monitor workbook, *Smart Device Platform — operations*: key indicators (devices reporting, measurements, ingestion latency, API traffic and errors, cache, alerts), the latest errors, and metrics of PostgreSQL, IoT Hub, Event Hubs, Service Bus and API Management, with filters on time range, site, device type and device. Open it with `azd env get-value OPERATIONS_WORKBOOK_URL` (or Application Insights → Workbooks); `scripts/check-workbook-queries.sh` checks its queries against the environment.
 
 Guided demos are listed in [Milestones](#milestones). Helper scripts: `scripts/psql.sh` (database with your Entra identity), `scripts/trace-device.sh` (follow a device's messages in Application Insights), `scripts/backfill-history.sh` (one-off 30-day demo history), `scripts/remove-test-site.sh` (remove a `test-*`/`e2e-*` site and its devices, DPS objects and records).
 

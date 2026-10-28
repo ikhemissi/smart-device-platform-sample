@@ -13,8 +13,23 @@ Each environment SHALL include, deployed with its infrastructure, an Azure Monit
 - **WHEN** the operator selects the last 7 days
 - **THEN** every indicator, list and chart covers the last 7 days
 
+### Requirement: Workbook filters
+The workbook SHALL offer, next to the time range, multi-select filters on site, device type (from the payload format) and device id (default: all); the device list SHALL only offer devices of the selected sites and device types. These filters SHALL apply to the device-level figures; platform-wide figures SHALL state that they are not filtered.
+
+#### Scenario: One site
+- **WHEN** the operator selects site `paris-01`
+- **THEN** devices reporting and measurements stored only count `paris-01` devices, and the device filter only lists `paris-01` devices
+
+#### Scenario: Platform-wide figures
+- **WHEN** a site is selected
+- **THEN** API, cache, alerting, errors and Azure resource charts are unchanged and labelled as platform-wide, and the ingestion latency only follows the device type filter
+
+#### Scenario: One device
+- **WHEN** the operator selects one device
+- **THEN** devices reporting is 1 and the measurements trend shows that device's messages only
+
 ### Requirement: Key indicators
-The workbook SHALL show: devices reporting, measurements stored and rejected (by reason), ingestion latency (average and maximum), API requests with failure rate and 95th percentile duration, history cache hit ratio, alerts opened and closed, and alert emails sent and failed.
+The workbook SHALL show, in its top panel right below the time range and filters, devices reporting, measurements stored and rejected (by reason), ingestion latency (average and maximum), API requests with failure rate and 95th percentile duration, history cache hit ratio, alerts opened and closed, and alert emails sent and failed.
 
 #### Scenario: Ingestion activity
 - **WHEN** the simulator is running

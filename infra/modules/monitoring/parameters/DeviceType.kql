@@ -1,0 +1,8 @@
+// Device types (from the payload format) with messages in the time range; messages rejected before their type was known
+// are 'Unknown (rejected)'.
+dependencies
+| where name == 'sdp.ingest.message'
+| extend PayloadFormat = tostring(customDimensions['sdp.payload.format'])
+| summarize by DeviceType = case(PayloadFormat == 'ruuvi-df5', 'Ruuvi (DF5)', PayloadFormat == 'ruuvi-df3', 'Ruuvi (DF3)', PayloadFormat == 'bthome-v2', 'BTHome v2',
+                       PayloadFormat == 'cayenne-lpp', 'Cayenne LPP', PayloadFormat in ('', 'unknown'), 'Unknown (rejected)', PayloadFormat)
+| order by DeviceType asc

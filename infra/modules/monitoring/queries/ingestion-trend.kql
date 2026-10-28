@@ -1,5 +1,12 @@
-// Device messages processed by the decoder, per 15 minutes and outcome.
-customMetrics
-| where name == 'sdp.ingestion.messages'
-| summarize Messages = sum(valueSum) by bin(timestamp, 15m), Outcome = tostring(customDimensions['sdp.ingestion.outcome'])
+// Device messages processed by the decoder, per 15 minutes and outcome (Site, DeviceType and DeviceId filters).
+let messages = dependencies
+    | where name == 'sdp.ingest.message'
+    | extend PayloadFormat = tostring(customDimensions['sdp.payload.format'])
+    | extend Site = tostring(customDimensions['sdp.site.id']), Device = tostring(customDimensions['sdp.device.id']),
+             DeviceType = case(PayloadFormat == 'ruuvi-df5', 'Ruuvi (DF5)', PayloadFormat == 'ruuvi-df3', 'Ruuvi (DF3)', PayloadFormat == 'bthome-v2', 'BTHome v2',
+                       PayloadFormat == 'cayenne-lpp', 'Cayenne LPP', PayloadFormat in ('', 'unknown'), 'Unknown (rejected)', PayloadFormat),
+             Outcome = tostring(customDimensions['sdp.ingestion.outcome']), Reason = tostring(customDimensions['sdp.rejection.reason'])
+    | where ('*' in ({Site}) or Site in ({Site})) and ('*' in ({DeviceType}) or DeviceType in ({DeviceType})) and ('*' in ({DeviceId}) or Device in ({DeviceId}));
+messages
+| summarize Messages = count() by bin(timestamp, 15m), Outcome
 | order by timestamp asc

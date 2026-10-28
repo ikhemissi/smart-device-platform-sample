@@ -1,10 +1,20 @@
-// Key indicators of the platform for the workbook's time range (one row per tile).
+// Key indicators for the workbook's time range (one row per tile). Device-level figures follow the Site, DeviceType and
+// DeviceId filters (from the decoder's per-message spans); the latency follows DeviceType only; the others are platform-wide.
 let services = dynamic(['sdp-device-api', 'sdp-provisioning-api']);
-let ingestion = customMetrics
-    | where name == 'sdp.ingestion.messages'
-    | summarize value = sum(valueSum) by outcome = tostring(customDimensions['sdp.ingestion.outcome']);
+let messages = dependencies
+    | where name == 'sdp.ingest.message'
+    | extend PayloadFormat = tostring(customDimensions['sdp.payload.format'])
+    | extend Site = tostring(customDimensions['sdp.site.id']), Device = tostring(customDimensions['sdp.device.id']),
+             DeviceType = case(PayloadFormat == 'ruuvi-df5', 'Ruuvi (DF5)', PayloadFormat == 'ruuvi-df3', 'Ruuvi (DF3)', PayloadFormat == 'bthome-v2', 'BTHome v2',
+                       PayloadFormat == 'cayenne-lpp', 'Cayenne LPP', PayloadFormat in ('', 'unknown'), 'Unknown (rejected)', PayloadFormat),
+             Outcome = tostring(customDimensions['sdp.ingestion.outcome']), Reason = tostring(customDimensions['sdp.rejection.reason'])
+    | where ('*' in ({Site}) or Site in ({Site})) and ('*' in ({DeviceType}) or DeviceType in ({DeviceType})) and ('*' in ({DeviceId}) or Device in ({DeviceId}));
 let latency = customMetrics
     | where name == 'sdp.ingestion.latency'
+    | extend PayloadFormat = tostring(customDimensions['sdp.payload.format'])
+    | extend DeviceType = case(PayloadFormat == 'ruuvi-df5', 'Ruuvi (DF5)', PayloadFormat == 'ruuvi-df3', 'Ruuvi (DF3)', PayloadFormat == 'bthome-v2', 'BTHome v2',
+                       PayloadFormat == 'cayenne-lpp', 'Cayenne LPP', PayloadFormat in ('', 'unknown'), 'Unknown (rejected)', PayloadFormat)
+    | where '*' in ({DeviceType}) or DeviceType in ({DeviceType})
     | summarize total = sum(valueSum), count = sum(valueCount), maximum = max(valueMax);
 let api = requests
     | where cloud_RoleName in (services) and url has '/api/v1/';
@@ -18,19 +28,17 @@ let emails = customMetrics
     | where name == 'sdp.alerts.notifications'
     | summarize value = sum(valueSum) by outcome = tostring(customDimensions['sdp.notification.outcome']);
 union
-    (dependencies
-        | where name == 'sdp.ingest.message'
-        | summarize v = dcount(tostring(customDimensions['sdp.device.id']))
+    (messages | summarize v = dcount(Device)
         | project Order = 1, Indicator = 'Devices reporting', Value = tostring(v), Detail = 'devices whose messages reached the decoder'),
-    (ingestion | summarize v = sumif(value, outcome == 'stored')
-        | project Order = 2, Indicator = 'Measurements stored', Value = tostring(tolong(coalesce(v, 0.0))), Detail = 'decoded and saved in PostgreSQL'),
-    (ingestion | summarize v = sumif(value, outcome == 'rejected')
-        | project Order = 3, Indicator = 'Messages rejected', Value = tostring(tolong(coalesce(v, 0.0))), Detail = 'unknown format or malformed payload'),
+    (messages | summarize v = countif(Outcome == 'stored')
+        | project Order = 2, Indicator = 'Measurements stored', Value = tostring(v), Detail = 'decoded and saved in PostgreSQL'),
+    (messages | summarize v = countif(Outcome == 'rejected')
+        | project Order = 3, Indicator = 'Messages rejected', Value = tostring(v), Detail = 'unknown format or malformed payload'),
     (latency
         | project Order = 4, Indicator = 'Ingestion latency', Value = iff(count > 0, strcat(round(total / count, 2), ' s'), '–'),
-                  Detail = iff(count > 0, strcat('average · max ', round(maximum, 1), ' s'), 'no measurement')),
+                  Detail = iff(count > 0, strcat('average · max ', round(maximum, 1), ' s · all sites'), 'no measurement')),
     (api | summarize n = count()
-        | project Order = 5, Indicator = 'API requests', Value = tostring(n), Detail = 'device-api and provisioning-api'),
+        | project Order = 5, Indicator = 'API requests', Value = tostring(n), Detail = 'device-api and provisioning-api · platform-wide'),
     (api | summarize n = count(), failed = countif(success == false)
         | project Order = 6, Indicator = 'API failure rate', Value = iff(n > 0, strcat(round(100.0 * failed / n, 2), ' %'), '–'),
                   Detail = strcat(failed, ' failed requests')),

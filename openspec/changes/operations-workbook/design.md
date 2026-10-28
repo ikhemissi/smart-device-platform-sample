@@ -37,8 +37,8 @@ All workloads export OpenTelemetry to the environment's workspace-based Applicat
 
 Alternative considered: an Azure Portal dashboard. Rejected because workbooks support parameters, KQL grids and metric charts on one page and are the documented way to share monitoring views.
 
-### D3. Time range and access
-A global `TimeRange` parameter (default last 24 hours, options 1 h to 30 days) drives every query and metric item. Reading the workbook needs read access to the resource group and the Application Insights data (e.g. *Monitoring Reader*); no new role assignment is created. The deployer, as Owner, already has it. An azd output `OPERATIONS_WORKBOOK_URL` gives the portal link.
+### D3. Time range, filters and access
+A global `TimeRange` parameter (default last 24 hours, options 1 h to 30 days) drives every query and metric item. `Site`, `DeviceType` and `DeviceId` multi-select parameters (default all, `*`) are listed from the decoder's per-message spans (`sdp.ingest.message`, which carry site, device, payload format and outcome; the device type is a readable name of the payload format, e.g. *Ruuvi (DF5)*, and *Unknown (rejected)* for messages rejected before their format was known, one per message); the device-level indicators are therefore computed from these spans rather than from the `sdp.ingestion.messages` metric, which has no site or device dimension. The latency metric only has a format dimension, so only the device type filter applies to it. The key indicator tiles are the first item below the parameters. Reading the workbook needs read access to the resource group and the Application Insights data (e.g. *Monitoring Reader*); no new role assignment is created. The deployer, as Owner, already has it. An azd output `OPERATIONS_WORKBOOK_URL` gives the portal link.
 
 ## Risks / Trade-offs
 

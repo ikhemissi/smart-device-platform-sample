@@ -1,0 +1,5 @@
+// Sites with messages in the time range.
+dependencies
+| where name == 'sdp.ingest.message'
+| summarize by Site = tostring(customDimensions['sdp.site.id'])
+| order by Site asc

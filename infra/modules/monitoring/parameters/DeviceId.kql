@@ -1,0 +1,10 @@
+// Devices of the selected sites and device types with messages in the time range.
+dependencies
+| where name == 'sdp.ingest.message'
+| extend PayloadFormat = tostring(customDimensions['sdp.payload.format'])
+| extend Site = tostring(customDimensions['sdp.site.id']), Device = tostring(customDimensions['sdp.device.id']),
+         DeviceType = case(PayloadFormat == 'ruuvi-df5', 'Ruuvi (DF5)', PayloadFormat == 'ruuvi-df3', 'Ruuvi (DF3)', PayloadFormat == 'bthome-v2', 'BTHome v2',
+                       PayloadFormat == 'cayenne-lpp', 'Cayenne LPP', PayloadFormat in ('', 'unknown'), 'Unknown (rejected)', PayloadFormat)
+| where ('*' in ({Site}) or Site in ({Site})) and ('*' in ({DeviceType}) or DeviceType in ({DeviceType}))
+| summarize by Device
+| order by Device asc
