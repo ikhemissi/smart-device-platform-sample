@@ -50,6 +50,13 @@ sdp:
     batch:
       max-size: ${SDP_BATCH_MAX_SIZE:500}
       max-wait: ${SDP_BATCH_MAX_WAIT:5s}
+    # Persisted measurements published for alerting (ADR-0009); off until the topic exists.
+    publication:
+      enabled: ${ALERTING_PUBLISH_ENABLED:false}
+      fully-qualified-namespace: ${SDP_SERVICEBUS_NAMESPACE:}
+      topic: ${SDP_SERVICEBUS_TOPIC:measurements}
+      # Service Bus emulator only (local development); never used in Azure.
+      connection-string: ${SDP_SERVICEBUS_EMULATOR_CONNECTION_STRING:}
     retry:
       initial-backoff: 1s
       max-backoff: 30s

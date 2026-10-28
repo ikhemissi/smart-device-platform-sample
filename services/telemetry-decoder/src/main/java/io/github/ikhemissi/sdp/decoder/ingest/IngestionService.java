@@ -14,9 +14,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Decodes and persists one batch. Persistence is retried with exponential back-off until it succeeds, so the
- * caller only acknowledges (checkpoints) a batch once it is stored (spec telemetry-ingestion: "Batch processing of
- * device messages"). While persistence fails the service reports itself unhealthy.
+ * Decodes, persists and publishes one batch. Persistence, then publication of the stored measurements (alerting,
+ * ADR-0009), are each retried with exponential back-off until they succeed, so the caller only acknowledges
+ * (checkpoints) a batch once it is stored and published (spec telemetry-ingestion: "Batch processing of device
+ * messages"; spec threshold-alerting: "Measurement publication for alerting"). While either fails the service reports
+ * itself unhealthy.
  */
 public class IngestionService {
 
@@ -39,6 +41,7 @@ public class IngestionService {
     }
 
     private final TelemetryStore store;
+    private final MeasurementPublisher publisher;
     private final IngestionTelemetry telemetry;
     private final Duration initialBackoff;
     private final Duration maxBackoff;
@@ -49,7 +52,13 @@ public class IngestionService {
 
     public IngestionService(TelemetryStore store, IngestionTelemetry telemetry, Duration initialBackoff,
                             Duration maxBackoff, Sleeper sleeper, Clock clock) {
+        this(store, MeasurementPublisher.NONE, telemetry, initialBackoff, maxBackoff, sleeper, clock);
+    }
+
+    public IngestionService(TelemetryStore store, MeasurementPublisher publisher, IngestionTelemetry telemetry,
+                            Duration initialBackoff, Duration maxBackoff, Sleeper sleeper, Clock clock) {
         this.store = store;
+        this.publisher = publisher;
         this.telemetry = telemetry;
         this.initialBackoff = initialBackoff;
         this.maxBackoff = maxBackoff;
@@ -65,7 +74,15 @@ public class IngestionService {
             batch.rejections().forEach(r -> log.warn("Rejected device message: device={} site={} key={} reason={} detail={}",
                     r.deviceId(), r.siteId(), r.messageKey(), r.reason(), r.detail()));
             try {
-                StoreResult result = persistWithRetry(batch);
+                StoreResult result = withRetry("Persisting", () -> store.persist(batch));
+                // Every stored measurement, including those an earlier attempt already stored: that attempt may have
+                // failed to publish them. Re-published messages are dropped by the topic's duplicate detection.
+                if (!batch.measurements().isEmpty()) {
+                    withRetry("Publishing", () -> {
+                        publisher.publish(batch.measurements());
+                        return null;
+                    });
+                }
                 telemetry.completeMessages(batch.outcomes(), messageSpans, result.duplicateKeys(), clock.instant());
                 log.debug("Batch persisted: partition={} size={} result={}", partitionId, messages.size(), result.counts());
                 return result.counts();
@@ -82,15 +99,15 @@ public class IngestionService {
         }
     }
 
-    private StoreResult persistWithRetry(DecodedBatch batch) {
+    private <T> T withRetry(String step, java.util.function.Supplier<T> action) {
         Duration backoff = initialBackoff;
         int attempt = 0;
         while (true) {
             attempt++;
             try {
-                StoreResult result = store.persist(batch);
+                T result = action.get();
                 if (!health.get().healthy()) {
-                    log.info("Persistence recovered after {} attempt(s)", attempt);
+                    log.info("{} recovered after {} attempt(s)", step, attempt);
                 }
                 health.set(new Health(true, null, null));
                 return result;
@@ -99,9 +116,10 @@ public class IngestionService {
                 Instant since = previous.healthy() ? clock.instant() : previous.failingSince();
                 health.set(new Health(false, since, e.getClass().getSimpleName() + ": " + e.getMessage()));
                 if (!running.get()) {
-                    throw new IngestionAbortedException("Stopping with an unpersisted batch; it will be redelivered", e);
+                    throw new IngestionAbortedException("Stopping with an unacknowledgeable batch (" + step.toLowerCase()
+                            + " failed); it will be redelivered", e);
                 }
-                log.warn("Persisting batch failed (attempt {}), retrying in {}: {}", attempt, backoff, e.toString());
+                log.warn("{} batch failed (attempt {}), retrying in {}: {}", step, attempt, backoff, e.toString());
                 try {
                     sleeper.sleep(backoff);
                 } catch (InterruptedException ie) {
@@ -117,7 +135,7 @@ public class IngestionService {
         return health.get();
     }
 
-    /** Stops retrying: an in-flight unpersisted batch is abandoned (not acknowledged) and will be redelivered. */
+    /** Stops retrying: an in-flight unpersisted or unpublished batch is abandoned (not acknowledged) and redelivered. */
     public void stop() {
         running.set(false);
     }

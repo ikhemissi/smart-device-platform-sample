@@ -95,6 +95,54 @@ class IngestionServiceTest {
     }
 
     @Test
+    void publishesStoredMeasurementsRetryingPublicationWithoutStoringAgain() {
+        AtomicInteger persisted = new AtomicInteger();
+        AtomicInteger publishAttempts = new AtomicInteger();
+        List<DecodedBatch.Measurement> published = new ArrayList<>();
+        TelemetryStore store = batch -> {
+            persisted.incrementAndGet();
+            return new StoreResult(new PersistResult(batch.measurements().size(), batch.rejections().size(), 0), Set.of());
+        };
+        IngestionService[] holder = new IngestionService[1];
+        List<IngestionService.Health> healthDuringRetries = new ArrayList<>();
+        MeasurementPublisher publisher = measurements -> {
+            if (publishAttempts.incrementAndGet() <= 2) {
+                healthDuringRetries.add(holder[0].health());
+                throw new IllegalStateException("Service Bus unavailable");
+            }
+            published.addAll(measurements);
+        };
+        holder[0] = new IngestionService(store, publisher, new IngestionTelemetry(otel), Duration.ofSeconds(1),
+                Duration.ofSeconds(4), sleeps::add, clock);
+
+        holder[0].ingest("0", List.of(message("dev-1", "paris-01", "k1", RUUVI_DF5), message("dev-2", "lyon-01", "k1", RUUVI_DF5),
+                message("dev-3", "paris-01", "k3", "7F01")));
+
+        assertThat(persisted).as("stored once").hasValue(1);
+        assertThat(publishAttempts).hasValue(3);
+        assertThat(published).extracting(DecodedBatch.Measurement::deviceId).as("decoded measurements only")
+                .containsExactly("dev-1", "dev-2");
+        assertThat(healthDuringRetries.getLast().healthy()).isFalse();
+        assertThat(holder[0].health().healthy()).isTrue();
+    }
+
+    @Test
+    void stoppingAbortsAnUnpublishedBatch() {
+        IngestionService[] holder = new IngestionService[1];
+        TelemetryStore store = batch -> new StoreResult(new PersistResult(1, 0, 0), Set.of());
+        MeasurementPublisher publisher = measurements -> {
+            holder[0].stop();
+            throw new IllegalStateException("Service Bus unavailable");
+        };
+        holder[0] = new IngestionService(store, publisher, new IngestionTelemetry(otel), Duration.ofSeconds(1),
+                Duration.ofSeconds(4), sleeps::add, clock);
+
+        assertThatThrownBy(() -> holder[0].ingest("0", List.of(message("dev", "paris-01", "k", RUUVI_DF5))))
+                .isInstanceOf(IngestionService.IngestionAbortedException.class)
+                .hasMessageContaining("publishing failed");
+    }
+
+    @Test
     void emitsMetricsAndLinkedSpansPerMessage() {
         TelemetryMessage traced = new TelemetryMessage("paris-01-ruuvi5-001", "paris-01",
                 Instant.parse("2026-10-27T09:00:00Z"), "k1", BatchDecoderTest.message("x", "y", "z", RUUVI_DF5).payload(), TRACEPARENT);
