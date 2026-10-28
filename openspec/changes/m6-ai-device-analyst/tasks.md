@@ -29,7 +29,7 @@
 ## 5. Portal
 
 - [x] 5.1 Implement the assistant panel (open from any page, streaming rendering, tool activity, citations as links, new conversation, device context on device pages, feature flag); verify component tests with a mocked SSE stream
-- [ ] 5.2 Playwright smoke test: ask a question from a device page and follow a citation link; verify it passes against the environment
+- [x] 5.2 Playwright smoke test: ask a question from a device page and follow a citation link; verify it passes against the environment
 
 ## 6. Evaluation and verification
 
