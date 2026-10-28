@@ -1,15 +1,18 @@
-package io.github.ikhemissi.sdp.decoder.ingest;
+package io.github.ikhemissi.sdp.codecs;
 
 import java.math.BigDecimal;
 import java.util.Map;
 
-/** Minimal JSON object writer for metric and attribute maps (stored as jsonb). */
-final class Json {
+/**
+ * Canonical JSON form of decoded metrics and attributes, as stored in {@code measurements.metrics} and
+ * {@code measurements.attributes} (jsonb). Numbers keep the decoder's exact decimal values.
+ */
+public final class MetricsJson {
 
-    private Json() {
+    private MetricsJson() {
     }
 
-    static String numbers(Map<String, BigDecimal> values) {
+    public static String numbers(Map<String, BigDecimal> values) {
         StringBuilder sb = new StringBuilder("{");
         values.forEach((k, v) -> {
             if (sb.length() > 1) {
@@ -20,7 +23,7 @@ final class Json {
         return sb.append('}').toString();
     }
 
-    static String strings(Map<String, String> values) {
+    public static String strings(Map<String, String> values) {
         StringBuilder sb = new StringBuilder("{");
         values.forEach((k, v) -> {
             if (sb.length() > 1) {

@@ -1,6 +1,6 @@
 package io.github.ikhemissi.sdp.simulator.transport;
 
-import io.github.ikhemissi.sdp.simulator.fleet.SimulatedDevice;
+import io.github.ikhemissi.sdp.fleet.SimulatedDevice;
 import java.util.HexFormat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

@@ -158,6 +158,39 @@ class JdbcTelemetryStoreIT {
         assertThat(admin.queryForObject("SELECT display_name FROM sdp.sites WHERE site_id = ?", String.class, site)).isEqualTo(site);
     }
 
+    @Test
+    void reportedMetricsAreRecordedPerDevice() {
+        String dev = device("ruuvi5-metrics");
+
+        persist(message(dev, "paris-01", "m1", t0, RUUVI_DF5));
+
+        assertThat(admin.queryForList("SELECT metric FROM sdp.device_metrics WHERE device_id = ? ORDER BY metric", String.class, dev))
+                .containsExactly("acceleration_x", "acceleration_y", "acceleration_z", "battery_voltage", "humidity",
+                        "measurement_sequence", "movement_counter", "pressure", "temperature", "tx_power");
+        assertThat(admin.queryForObject("SELECT DISTINCT last_seen_at FROM sdp.device_metrics WHERE device_id = ?", Timestamp.class, dev)
+                .toInstant()).isEqualTo(t0);
+    }
+
+    @Test
+    void metricLastSeenOnlyMovesForwardAndIgnoresSmallSteps() {
+        String dev = device("ruuvi5-metrics-time");
+        persist(message(dev, "paris-01", "m1", t0, RUUVI_DF5));
+
+        persist(message(dev, "paris-01", "m2", t0.plus(10, ChronoUnit.MINUTES), RUUVI_DF5));
+        assertThat(lastSeen(dev, "temperature")).as("less than an hour later: not rewritten").isEqualTo(t0);
+
+        persist(message(dev, "paris-01", "m3", t0.plus(2, ChronoUnit.HOURS), RUUVI_DF5));
+        assertThat(lastSeen(dev, "temperature")).isEqualTo(t0.plus(2, ChronoUnit.HOURS));
+
+        persist(message(dev, "paris-01", "m0", t0.minus(5, ChronoUnit.HOURS), RUUVI_DF5));
+        assertThat(lastSeen(dev, "temperature")).as("late older message").isEqualTo(t0.plus(2, ChronoUnit.HOURS));
+    }
+
+    private Instant lastSeen(String deviceId, String metric) {
+        return admin.queryForObject("SELECT last_seen_at FROM sdp.device_metrics WHERE device_id = ? AND metric = ?",
+                Timestamp.class, deviceId, metric).toInstant();
+    }
+
     private int count(String table, String deviceId) {
         return admin.queryForObject("SELECT count(*) FROM " + table + " WHERE device_id = ?", Integer.class, deviceId);
     }

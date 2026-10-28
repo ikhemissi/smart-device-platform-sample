@@ -20,6 +20,10 @@
         </dependency>
         <dependency>
             <groupId>io.github.ikhemissi.sdp</groupId>
+            <artifactId>device-fleet</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.github.ikhemissi.sdp</groupId>
             <artifactId>platform-common</artifactId>
         </dependency>
         <dependency>

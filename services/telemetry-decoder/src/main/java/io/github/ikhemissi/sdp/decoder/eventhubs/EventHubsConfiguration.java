@@ -8,6 +8,8 @@ import com.azure.storage.blob.BlobContainerAsyncClient;
 import com.azure.storage.blob.BlobContainerClientBuilder;
 import io.github.ikhemissi.sdp.decoder.DecoderProperties;
 import io.github.ikhemissi.sdp.decoder.ingest.IngestionService;
+import io.github.ikhemissi.sdp.decoder.ingest.WatermarkStore;
+import java.time.Clock;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -45,8 +47,9 @@ public class EventHubsConfiguration {
     }
 
     @Bean
-    EventBatchHandler eventBatchHandler(IngestionService ingestion) {
-        return new EventBatchHandler(ingestion);
+    EventBatchHandler eventBatchHandler(IngestionService ingestion, WatermarkStore watermarks, Clock clock,
+                                        DecoderProperties properties) {
+        return new EventBatchHandler(ingestion, watermarks, clock, properties.batch().maxWait());
     }
 
     @Bean
@@ -57,7 +60,10 @@ public class EventHubsConfiguration {
                 .consumerGroup(eh.consumerGroup())
                 .checkpointStore(new BlobCheckpointStore(checkpointContainer))
                 .processEventBatch(handler::onBatch, properties.batch().maxSize(), properties.batch().maxWait())
-                .processError(handler::onError);
+                .processPartitionInitialization(handler::onInitialization)
+                .processError(handler::onError)
+                // Tells whether a batch ends at the partition's last enqueued event (ingestion watermark).
+                .trackLastEnqueuedEventProperties(true);
         if (StringUtils.hasText(eh.connectionString())) {
             builder.connectionString(eh.connectionString(), eh.eventHubName());
         } else if (StringUtils.hasText(eh.fullyQualifiedNamespace())) {

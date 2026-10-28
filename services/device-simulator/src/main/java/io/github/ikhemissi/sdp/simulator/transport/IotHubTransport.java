@@ -12,7 +12,7 @@ import io.github.ikhemissi.sdp.simulator.certs.DeviceCertificateFactory;
 import io.github.ikhemissi.sdp.simulator.certs.DeviceCertificateFactory.DeviceCredentials;
 import io.github.ikhemissi.sdp.simulator.certs.SiteCaProvider;
 import io.github.ikhemissi.sdp.simulator.certs.X509DeviceSecurityProvider;
-import io.github.ikhemissi.sdp.simulator.fleet.SimulatedDevice;
+import io.github.ikhemissi.sdp.fleet.SimulatedDevice;
 import java.time.Clock;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

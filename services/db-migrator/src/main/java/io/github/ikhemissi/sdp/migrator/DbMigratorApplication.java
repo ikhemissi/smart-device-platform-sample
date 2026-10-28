@@ -41,10 +41,13 @@ public class DbMigratorApplication {
     }
 
     @Bean
-    ApplicationRunner maintenanceRunner(MigratorProperties properties, MaintenanceTask maintenance) {
+    ApplicationRunner maintenanceRunner(MigratorProperties properties, MaintenanceTask maintenance, BackfillTask backfill) {
         return args -> {
             if (properties.tasks().contains(Task.MAINTAIN)) {
                 maintenance.run();
+            }
+            if (properties.tasks().contains(Task.BACKFILL)) {
+                backfill.run();
             }
         };
     }

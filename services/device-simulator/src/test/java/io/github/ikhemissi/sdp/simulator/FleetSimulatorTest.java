@@ -4,8 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
 
 import io.github.ikhemissi.sdp.codecs.PayloadFormat;
-import io.github.ikhemissi.sdp.simulator.fleet.PayloadFactory;
-import io.github.ikhemissi.sdp.simulator.fleet.SimulatedDevice;
+import io.github.ikhemissi.sdp.fleet.PayloadFactory;
+import io.github.ikhemissi.sdp.fleet.SimulatedDevice;
 import io.github.ikhemissi.sdp.simulator.transport.DeviceTransport;
 import io.opentelemetry.api.trace.SpanKind;
 import io.opentelemetry.sdk.OpenTelemetrySdk;

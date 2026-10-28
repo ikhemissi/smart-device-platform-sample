@@ -83,6 +83,24 @@ class MigrationIT extends PostgresTestBase {
                 .containsExactly("recent");
     }
 
+    @Test
+    void maintenanceForgetsMetricsNotReportedWithinRetention() {
+        jdbc.update("INSERT INTO sdp.sites (site_id, display_name) VALUES ('metrics-site', 'm') ON CONFLICT DO NOTHING");
+        jdbc.update("""
+                INSERT INTO sdp.devices (device_id, site_id, last_payload_format, first_seen_at, last_seen_at)
+                VALUES ('metrics-device', 'metrics-site', 'ruuvi-df5', now() - interval '40 days', now())
+                ON CONFLICT DO NOTHING""");
+        jdbc.update("""
+                INSERT INTO sdp.device_metrics (device_id, metric, last_seen_at) VALUES
+                  ('metrics-device', 'co2', now() - interval '31 days'),
+                  ('metrics-device', 'temperature', now() - interval '1 minute')""");
+
+        maintenance.run();
+
+        assertThat(jdbc.queryForList("SELECT metric FROM sdp.device_metrics WHERE device_id = 'metrics-device'", String.class))
+                .containsExactly("temperature");
+    }
+
     private void insertMeasurement(String deviceId, String measuredAtExpression) {
         jdbc.update("""
                 INSERT INTO sdp.measurements (device_id, site_id, measured_at, received_at, message_key, payload_format, raw_payload, metrics)

@@ -78,6 +78,20 @@ class DecoderPipelineIT {
                 assertThat(checkpointedSequenceNumbers().values()).hasSize(2));
         assertThat(admin.queryForObject("SELECT count(*) FROM sdp.devices WHERE device_id LIKE ?", Integer.class,
                 "it-" + run + "-ok-%")).isEqualTo(4);
+        assertThat(admin.queryForObject("SELECT count(DISTINCT device_id) FROM sdp.device_metrics WHERE device_id LIKE ? AND metric = 'temperature'",
+                Integer.class, "it-" + run + "-ok-%")).as("metrics reported after one batch").isEqualTo(4);
+    }
+
+    @Test
+    void ingestionWatermarksAdvanceOnEveryPartition() {
+        send(4, "watermark");
+        await().atMost(Duration.ofSeconds(60)).untilAsserted(() -> assertThat(measurements("watermark")).isEqualTo(4));
+        java.sql.Timestamp sent = admin.queryForObject(
+                "SELECT max(measured_at) FROM sdp.measurements WHERE device_id LIKE ?", java.sql.Timestamp.class, "it-" + run + "-watermark-%");
+
+        await().atMost(Duration.ofSeconds(60)).untilAsserted(() -> assertThat(admin.queryForList(
+                "SELECT partition_id FROM sdp.ingestion_watermarks WHERE watermark > ?", String.class, sent))
+                .as("caught-up partitions move past the last persisted message").containsExactlyInAnyOrder("0", "1"));
     }
 
     @Test

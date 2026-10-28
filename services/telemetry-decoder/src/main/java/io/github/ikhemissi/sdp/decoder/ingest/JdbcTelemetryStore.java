@@ -1,5 +1,6 @@
 package io.github.ikhemissi.sdp.decoder.ingest;
 
+import io.github.ikhemissi.sdp.codecs.MetricsJson;
 import io.github.ikhemissi.sdp.decoder.ingest.DecodedBatch.Measurement;
 import io.github.ikhemissi.sdp.decoder.ingest.DecodedBatch.Rejection;
 import java.sql.Array;
@@ -23,7 +24,8 @@ import org.springframework.transaction.support.TransactionTemplate;
 /**
  * PostgreSQL implementation (ADR-0004, M1 design D3/D4). In one transaction: create unknown sites, record message
  * keys in the deduplication ledger, insert only the measurements/rejections whose key is new, then register or
- * update devices. Sites and devices are written in sorted order to avoid deadlocks between decoder replicas.
+ * update devices and the metrics they report. Sites, devices and device metrics are written in sorted order to avoid
+ * deadlocks between decoder replicas.
  */
 @Repository
 public class JdbcTelemetryStore implements TelemetryStore {
@@ -58,6 +60,16 @@ public class JdbcTelemetryStore implements TelemetryStore {
                    last_payload_format = CASE WHEN EXCLUDED.last_seen_at >= sdp.devices.last_seen_at
                                               THEN EXCLUDED.last_payload_format
                                               ELSE sdp.devices.last_payload_format END
+            """;
+
+    // Last-seen times only matter at the scale of the retention period: skip updates of less than an hour to avoid
+    // rewriting every (device, metric) row on every batch.
+    private static final String UPSERT_DEVICE_METRICS = """
+            INSERT INTO sdp.device_metrics (device_id, metric, last_seen_at)
+            SELECT * FROM unnest(?::text[], ?::text[], ?::timestamptz[])
+            ON CONFLICT (device_id, metric) DO UPDATE
+               SET last_seen_at = EXCLUDED.last_seen_at
+             WHERE sdp.device_metrics.last_seen_at < EXCLUDED.last_seen_at - interval '1 hour'
             """;
 
     private final JdbcTemplate jdbc;
@@ -113,10 +125,11 @@ public class JdbcTelemetryStore implements TelemetryStore {
                 ps.setString(5, m.messageKey());
                 ps.setString(6, m.payloadFormat());
                 ps.setBytes(7, m.rawPayload());
-                ps.setString(8, Json.numbers(m.metrics()));
-                ps.setString(9, Json.strings(m.attributes()));
+                ps.setString(8, MetricsJson.numbers(m.metrics()));
+                ps.setString(9, MetricsJson.strings(m.attributes()));
             });
             upsertDevices(measurements);
+            upsertDeviceMetrics(measurements);
         }
         if (!rejections.isEmpty()) {
             jdbc.batchUpdate(INSERT_REJECTION, rejections, rejections.size(), (ps, r) -> {
@@ -179,6 +192,34 @@ public class JdbcTelemetryStore implements TelemetryStore {
             ps.setString(3, d.format());
             ps.setTimestamp(4, Timestamp.from(d.firstSeen()));
             ps.setTimestamp(5, Timestamp.from(d.lastSeen()));
+        });
+    }
+
+    private void upsertDeviceMetrics(List<Measurement> measurements) {
+        Map<String, Instant> lastSeen = new java.util.TreeMap<>();
+        for (Measurement m : measurements) {
+            for (String metric : m.metrics().keySet()) {
+                lastSeen.merge(m.deviceId() + '\n' + metric, m.measuredAt(), (a, b) -> a.isAfter(b) ? a : b);
+            }
+        }
+        if (lastSeen.isEmpty()) {
+            return;
+        }
+        List<String> devices = new ArrayList<>();
+        List<String> metrics = new ArrayList<>();
+        List<Timestamp> times = new ArrayList<>();
+        lastSeen.forEach((key, time) -> {
+            int separator = key.indexOf('\n');
+            devices.add(key.substring(0, separator));
+            metrics.add(key.substring(separator + 1));
+            times.add(Timestamp.from(time));
+        });
+        jdbc.update(con -> {
+            PreparedStatement ps = con.prepareStatement(UPSERT_DEVICE_METRICS);
+            ps.setArray(1, textArray(con, devices));
+            ps.setArray(2, textArray(con, metrics));
+            ps.setArray(3, con.createArrayOf("timestamptz", times.toArray()));
+            return ps;
         });
     }
 

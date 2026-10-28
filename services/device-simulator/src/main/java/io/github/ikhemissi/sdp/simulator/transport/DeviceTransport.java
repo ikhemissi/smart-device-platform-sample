@@ -1,6 +1,6 @@
 package io.github.ikhemissi.sdp.simulator.transport;
 
-import io.github.ikhemissi.sdp.simulator.fleet.SimulatedDevice;
+import io.github.ikhemissi.sdp.fleet.SimulatedDevice;
 
 /** How simulated devices connect and send messages. */
 public interface DeviceTransport {

@@ -1,9 +1,9 @@
 package io.github.ikhemissi.sdp.simulator;
 
-import io.github.ikhemissi.sdp.simulator.fleet.Anomaly;
-import io.github.ikhemissi.sdp.simulator.fleet.PayloadFactory;
-import io.github.ikhemissi.sdp.simulator.fleet.ReadingModel;
-import io.github.ikhemissi.sdp.simulator.fleet.SimulatedDevice;
+import io.github.ikhemissi.sdp.fleet.Anomaly;
+import io.github.ikhemissi.sdp.fleet.PayloadFactory;
+import io.github.ikhemissi.sdp.fleet.ReadingModel;
+import io.github.ikhemissi.sdp.fleet.SimulatedDevice;
 import io.github.ikhemissi.sdp.simulator.transport.DeviceTransport;
 import io.github.ikhemissi.sdp.simulator.transport.DeviceTransport.DeviceConnection;
 import io.github.ikhemissi.sdp.simulator.transport.DeviceTransport.OutgoingMessage;

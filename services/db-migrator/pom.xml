@@ -18,6 +18,11 @@
             <groupId>io.github.ikhemissi.sdp</groupId>
             <artifactId>db-schema</artifactId>
         </dependency>
+        <!-- Demo history backfill (opt-in task): same readings, payloads and decoding as the live pipeline. -->
+        <dependency>
+            <groupId>io.github.ikhemissi.sdp</groupId>
+            <artifactId>device-fleet</artifactId>
+        </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-jdbc</artifactId>
@@ -33,7 +38,6 @@
         <dependency>
             <groupId>org.postgresql</groupId>
             <artifactId>postgresql</artifactId>
-            <scope>runtime</scope>
         </dependency>
         <dependency>
             <groupId>com.azure.spring</groupId>

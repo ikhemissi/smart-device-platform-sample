@@ -22,6 +22,12 @@ sdp:
     tasks: ${SDP_MIGRATOR_TASKS:migrate,maintain}
     retention: ${SDP_RETENTION:30d}
     ledger-retention: ${SDP_LEDGER_RETENTION:7d}
+    # Demo history backfill, run only when the task list includes `backfill` (scripts/backfill-history.sh).
+    backfill:
+      days: ${SDP_BACKFILL_DAYS:30}
+      interval: ${SDP_BACKFILL_INTERVAL:30s}
+      jitter: ${SDP_BACKFILL_JITTER:5s}
+      sites: ${SDP_BACKFILL_SITES:}
     # Workload identities created as database principals before each migration, then granted their group role.
     principals:
       - name: ${SDP_DECODER_PRINCIPAL_NAME:}

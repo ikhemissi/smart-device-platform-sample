@@ -19,6 +19,7 @@
 
     <modules>
         <module>libs/payload-codecs</module>
+        <module>libs/device-fleet</module>
         <module>libs/platform-common</module>
         <module>libs/db-schema</module>
         <module>libs/test-support</module>
@@ -63,6 +64,11 @@
             <dependency>
                 <groupId>io.github.ikhemissi.sdp</groupId>
                 <artifactId>payload-codecs</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.github.ikhemissi.sdp</groupId>
+                <artifactId>device-fleet</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>

@@ -1,4 +1,4 @@
-package io.github.ikhemissi.sdp.simulator.fleet;
+package io.github.ikhemissi.sdp.fleet;
 
 import io.github.ikhemissi.sdp.codecs.PayloadCodecs;
 import java.util.Arrays;

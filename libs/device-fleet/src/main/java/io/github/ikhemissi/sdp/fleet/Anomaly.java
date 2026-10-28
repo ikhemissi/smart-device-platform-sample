@@ -1,4 +1,4 @@
-package io.github.ikhemissi.sdp.simulator.fleet;
+package io.github.ikhemissi.sdp.fleet;
 
 import java.time.Duration;
 import java.time.Instant;
