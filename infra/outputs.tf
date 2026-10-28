@@ -127,3 +127,11 @@ output "WEB_URL" {
 output "STATIC_WEB_APP_NAME" {
   value = module.web.name
 }
+
+output "REDIS_NAME" {
+  value = module.cache.name
+}
+
+output "REDIS_HOST" {
+  value = module.cache.hostname
+}

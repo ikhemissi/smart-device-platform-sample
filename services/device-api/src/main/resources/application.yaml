@@ -48,3 +48,10 @@ sdp:
   devices:
     # A device is "reporting" when last seen within this window, "silent" otherwise.
     reporting-window: ${SDP_REPORTING_WINDOW:15m}
+  history:
+    retention: ${SDP_RETENTION:30d}
+    partitions: ${SDP_EVENTHUB_PARTITIONS:4}
+  cache:
+    # Azure Managed Redis (Entra ID authentication); the history cache is disabled when empty.
+    host: ${SDP_REDIS_HOST:}
+    port: ${SDP_REDIS_PORT:10000}

@@ -30,6 +30,7 @@ variable "eventhubs" {
     checkpoint_account_name  = string
     checkpoint_container     = string
     checkpoint_container_url = string
+    partition_count          = number
   })
 }
 variable "dps_id_scope" { type = string }
@@ -38,6 +39,7 @@ variable "decoder_image" { type = string }
 variable "simulator_image" { type = string }
 variable "simulator_settings" { type = map(string) }
 variable "device_api_image" { type = string }
+variable "redis" { type = object({ host = string, port = number }) }
 variable "entra" {
   description = "Token validation settings of the platform API (ADR-0007)."
   type        = object({ tenant_id = string, api_client_id = string, api_identifier_uri = string })
@@ -94,6 +96,9 @@ locals {
     SDP_DB_USERNAME                           = var.identities.device_api.name
     SDP_ENTRA_TENANT_ID                       = var.entra.tenant_id
     SDP_API_AUDIENCES                         = "${var.entra.api_client_id},${var.entra.api_identifier_uri}"
+    SDP_EVENTHUB_PARTITIONS                   = tostring(var.eventhubs.partition_count)
+    SDP_REDIS_HOST                            = var.redis.host
+    SDP_REDIS_PORT                            = tostring(var.redis.port)
   })
 }
 

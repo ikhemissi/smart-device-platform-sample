@@ -176,6 +176,7 @@ output "eventhubs_namespace_name" { value = azurerm_eventhub_namespace.main.name
 output "eventhubs_namespace_fqdn" { value = "${azurerm_eventhub_namespace.main.name}.servicebus.windows.net" }
 output "event_hub_name" { value = azurerm_eventhub.telemetry.name }
 output "event_hub_id" { value = azurerm_eventhub.telemetry.id }
+output "event_hub_partition_count" { value = azurerm_eventhub.telemetry.partition_count }
 output "decoder_consumer_group" { value = azurerm_eventhub_consumer_group.decoder.name }
 output "checkpoint_storage_account_name" { value = azurerm_storage_account.checkpoints.name }
 output "checkpoint_container_name" { value = azurerm_storage_container.checkpoints.name }

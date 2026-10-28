@@ -75,6 +75,21 @@ module "data" {
   tags         = local.tags
 }
 
+module "cache" {
+  source              = "./modules/cache"
+  resource_group_name = azurerm_resource_group.main.name
+  location            = var.location
+  environment_name    = var.environment_name
+  token               = local.token
+  sku_name            = var.redis_sku
+  high_availability   = var.redis_high_availability
+  reader_principals = merge(
+    { device_api = module.identity.device_api.principal_id },
+    var.deployer_is_user ? { deployer = data.azurerm_client_config.current.object_id } : {},
+  )
+  tags = local.tags
+}
+
 module "web" {
   source              = "./modules/web"
   resource_group_name = azurerm_resource_group.main.name
@@ -138,6 +153,7 @@ module "apps" {
     checkpoint_account_name  = module.ingestion.checkpoint_storage_account_name
     checkpoint_container     = module.ingestion.checkpoint_container_name
     checkpoint_container_url = module.ingestion.checkpoint_container_url
+    partition_count          = module.ingestion.event_hub_partition_count
   }
   dps_id_scope       = module.ingestion.dps_id_scope
   key_vault_uri      = module.core.key_vault_uri
@@ -145,6 +161,10 @@ module "apps" {
   simulator_image    = var.simulator_image
   simulator_settings = merge({ SDP_SIM_SITES = join(",", var.demo_sites) }, var.simulator_settings)
   device_api_image   = var.device_api_image
+  redis = {
+    host = module.cache.hostname
+    port = module.cache.port
+  }
   entra = {
     tenant_id          = data.azurerm_client_config.current.tenant_id
     api_client_id      = module.entra.api_client_id

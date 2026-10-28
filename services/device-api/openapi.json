@@ -175,6 +175,206 @@
         "x-sdp-required-role" : "write"
       }
     },
+    "/api/v1/devices/{deviceId}/measurements" : {
+      "get" : {
+        "description" : "from (inclusive) to to (exclusive), at most 31 days, ascending time order, paged with an opaque cursor.",
+        "operationId" : "listMeasurements",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "deviceId",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "in" : "query",
+          "name" : "from",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "date-time"
+          }
+        }, {
+          "in" : "query",
+          "name" : "to",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "date-time"
+          }
+        }, {
+          "in" : "query",
+          "name" : "cursor",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "in" : "query",
+          "name" : "pageSize",
+          "required" : false,
+          "schema" : {
+            "maximum" : 1000,
+            "minimum" : 1,
+            "type" : "integer",
+            "format" : "int32",
+            "default" : 500
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/MeasurementPage"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "Measurements of a device in a time range",
+        "tags" : [ "Device history" ],
+        "x-sdp-required-role" : "read"
+      }
+    },
+    "/api/v1/devices/{deviceId}/measurements/latest" : {
+      "get" : {
+        "operationId" : "listLatestMeasurements",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "deviceId",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "in" : "query",
+          "name" : "count",
+          "required" : false,
+          "schema" : {
+            "maximum" : 100,
+            "minimum" : 1,
+            "type" : "integer",
+            "format" : "int32",
+            "default" : 20
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "type" : "array",
+                  "items" : {
+                    "$ref" : "#/components/schemas/Measurement"
+                  }
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "Latest measurements of a device, most recent first",
+        "tags" : [ "Device history" ],
+        "x-sdp-required-role" : "read"
+      }
+    },
+    "/api/v1/devices/{deviceId}/metrics" : {
+      "get" : {
+        "operationId" : "listDeviceMetrics",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "deviceId",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "type" : "array",
+                  "items" : {
+                    "$ref" : "#/components/schemas/ReportedMetric"
+                  }
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "Metrics the device reported within the retention period",
+        "tags" : [ "Device history" ],
+        "x-sdp-required-role" : "read"
+      }
+    },
+    "/api/v1/devices/{deviceId}/series" : {
+      "get" : {
+        "description" : "Raw points when the range holds at most maxPoints measurements, otherwise min/avg/max/count buckets of the smallest of 1m, 5m, 15m, 1h, 6h, 1d giving at most maxPoints buckets. to defaults to now; the range is at most 31 days.",
+        "operationId" : "getSeries",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "deviceId",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "description" : "Comma-separated metric keys, e.g. temperature,humidity",
+          "in" : "query",
+          "name" : "metrics",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "in" : "query",
+          "name" : "from",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "date-time"
+          }
+        }, {
+          "in" : "query",
+          "name" : "to",
+          "required" : false,
+          "schema" : {
+            "type" : "string",
+            "format" : "date-time"
+          }
+        }, {
+          "in" : "query",
+          "name" : "maxPoints",
+          "required" : false,
+          "schema" : {
+            "maximum" : 2000,
+            "minimum" : 1,
+            "type" : "integer",
+            "format" : "int32",
+            "default" : 500
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Series"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "Chart series of 1 to 4 metrics",
+        "tags" : [ "Device history" ],
+        "x-sdp-required-role" : "read"
+      }
+    },
     "/api/v1/me" : {
       "get" : {
         "description" : "Available without any platform role so that clients can explain which permission to request.",
@@ -385,6 +585,108 @@
         },
         "nullable" : true
       },
+      "Measurement" : {
+        "type" : "object",
+        "properties" : {
+          "attributes" : {
+            "type" : "object",
+            "additionalProperties" : {
+              "type" : "string"
+            }
+          },
+          "measuredAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "metrics" : {
+            "type" : "object",
+            "additionalProperties" : {
+              "type" : "object"
+            }
+          },
+          "payloadFormat" : {
+            "type" : "string"
+          }
+        }
+      },
+      "MeasurementPage" : {
+        "type" : "object",
+        "properties" : {
+          "items" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/Measurement"
+            }
+          },
+          "nextCursor" : {
+            "type" : "string"
+          }
+        }
+      },
+      "MetricSeries" : {
+        "type" : "object",
+        "properties" : {
+          "metric" : {
+            "type" : "string"
+          },
+          "points" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/Point"
+            }
+          },
+          "unit" : {
+            "type" : "string"
+          }
+        }
+      },
+      "Point" : {
+        "type" : "object",
+        "properties" : {
+          "avg" : {
+            "type" : "number",
+            "format" : "double"
+          },
+          "count" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "max" : {
+            "type" : "number",
+            "format" : "double"
+          },
+          "min" : {
+            "type" : "number",
+            "format" : "double"
+          },
+          "t" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "value" : {
+            "type" : "number",
+            "format" : "double"
+          }
+        }
+      },
+      "ReportedMetric" : {
+        "type" : "object",
+        "properties" : {
+          "description" : {
+            "type" : "string"
+          },
+          "lastSeenAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "metric" : {
+            "type" : "string"
+          },
+          "unit" : {
+            "type" : "string"
+          }
+        }
+      },
       "SdpUser" : {
         "type" : "object",
         "properties" : {
@@ -402,6 +704,35 @@
           },
           "userPrincipalName" : {
             "type" : "string"
+          }
+        }
+      },
+      "Series" : {
+        "type" : "object",
+        "properties" : {
+          "bucketSeconds" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "deviceId" : {
+            "type" : "string"
+          },
+          "from" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "resolution" : {
+            "type" : "string"
+          },
+          "series" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/MetricSeries"
+            }
+          },
+          "to" : {
+            "type" : "string",
+            "format" : "date-time"
           }
         }
       },

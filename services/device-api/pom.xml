@@ -47,6 +47,19 @@
             <groupId>com.azure.spring</groupId>
             <artifactId>spring-cloud-azure-starter-jdbc-postgresql</artifactId>
         </dependency>
+        <!-- History cache: Azure Managed Redis with Microsoft Entra ID authentication (M3 design D2). -->
+        <dependency>
+            <groupId>io.lettuce</groupId>
+            <artifactId>lettuce-core</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.azure</groupId>
+            <artifactId>azure-identity</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.opentelemetry</groupId>
+            <artifactId>opentelemetry-api</artifactId>
+        </dependency>
         <dependency>
             <groupId>org.springdoc</groupId>
             <artifactId>springdoc-openapi-starter-webmvc-api</artifactId>

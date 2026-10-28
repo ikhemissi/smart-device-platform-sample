@@ -94,3 +94,15 @@ variable "preauthorize_azure_cli" {
   type        = bool
   default     = true
 }
+
+variable "redis_sku" {
+  description = "Azure Managed Redis SKU for the history cache (Balanced_B0 is the smallest)."
+  type        = string
+  default     = "Balanced_B0"
+}
+
+variable "redis_high_availability" {
+  description = "Replicate the cache (doubles cost); not needed for a cache that can be rebuilt from the database."
+  type        = bool
+  default     = false
+}
