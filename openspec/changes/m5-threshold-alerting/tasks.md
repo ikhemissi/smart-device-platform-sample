@@ -32,7 +32,7 @@
 
 ## 6. End-to-end verification
 
-- [ ] 6.1 With the simulator, inject a 12 °C anomaly for 5 minutes on a monitored device with max 8 °C (in `sdp-dev`, where simulated rooms report 13–23 °C: a 35 °C anomaly above max 28 °C); verify one alert email within 2 minutes and one resolution email after the anomaly ends
+- [x] 6.1 With the simulator, inject a 12 °C anomaly for 5 minutes on a monitored device with max 8 °C (in `sdp-dev`, where simulated rooms report 13–23 °C: a 35 °C anomaly above max 28 °C); verify one alert email within 2 minutes and one resolution email after the anomaly ends
 - [x] 6.2 Inject the same anomaly on an unmonitored device; verify no alert and no email
 - [x] 6.3 Write the M5 demo guide `docs/demo/m5-threshold-alerting.md` (incl. changing the subscription filter); verify a dry run follows it as written
 
