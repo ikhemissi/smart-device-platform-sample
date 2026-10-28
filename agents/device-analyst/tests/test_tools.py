@@ -76,7 +76,7 @@ async def test_not_found_is_returned_to_the_model(tools, context):
     respx.get(f"{API}/devices/does-not-exist").respond(
         404, json={"title": "Not Found", "detail": "Device 'does-not-exist' does not exist."}
     )
-    respx.get(f"{API}/devices/does-not-exist/metrics").respond(404, json={"title": "Not Found"})
+    respx.get(f"{API}/devices").respond(json={"items": [], "page": 0, "pageSize": 5, "total": 0})
 
     result = json.loads(await call(tools, "get_device", device_id="does-not-exist"))
 
@@ -178,7 +178,10 @@ async def test_latest_measurements_are_bounded_and_drop_attributes(tools):
     result = data(await call(tools, "get_latest_measurements", device_id="d1", count=20))
 
     assert route.calls.last.request.url.params["count"] == "20"
-    assert result == [{"measuredAt": "2026-10-28T11:59:30Z", "metrics": {"temperature": 21.123}}]
+    assert result == {
+        "deviceId": "d1",
+        "measurements": [{"measuredAt": "2026-10-28T11:59:30Z", "metrics": {"temperature": 21.123}}],
+    }
 
 
 @respx.mock
@@ -216,3 +219,40 @@ async def test_site_scoped_searches_cite_the_site(tools, context):
     respx.get(f"{API}/devices").respond(json={"items": [], "page": 0, "pageSize": 50, "total": 0})
     await call(tools, "search_devices", site_id="paris-01", status="reporting")
     assert context.citations == [{"kind": "site", "siteId": "paris-01"}]
+
+
+@respx.mock
+async def test_devices_can_be_named_instead_of_identified(tools, context):
+    respx.get(f"{API}/devices/Lyon cold room/series").respond(
+        404, json={"detail": "Device 'Lyon cold room' does not exist."}
+    )
+    search = respx.get(f"{API}/devices").respond(
+        json={"items": [{"deviceId": "lyon-01-cayenne-001", "displayName": "Lyon cold room"}], "total": 1}
+    )
+    respx.get(f"{API}/devices/lyon-01-cayenne-001/series").respond(
+        json={"deviceId": "lyon-01-cayenne-001", "from": "a", "to": "b", "series": []}
+    )
+
+    result = data(await call(tools, "get_series", device_id="Lyon cold room", metrics=["temperature"]))
+
+    assert search.calls.last.request.url.params["search"] == "Lyon cold room"
+    assert result["deviceId"] == "lyon-01-cayenne-001"
+    assert context.citations[0]["deviceId"] == "lyon-01-cayenne-001"
+
+
+@respx.mock
+async def test_ambiguous_names_list_the_candidates(tools):
+    respx.get(f"{API}/devices/cold room/thresholds").respond(404)
+    respx.get(f"{API}/devices").respond(
+        json={
+            "items": [
+                {"deviceId": "lyon-01-cayenne-001", "displayName": "Lyon cold room"},
+                {"deviceId": "paris-01-cayenne-002", "displayName": "Paris cold room"},
+            ],
+            "total": 2,
+        }
+    )
+
+    result = json.loads(await call(tools, "get_thresholds", device_id="cold room"))
+
+    assert result["error"].startswith("ambiguous: 'cold room' matches several devices: lyon-01-cayenne-001 (Lyon")

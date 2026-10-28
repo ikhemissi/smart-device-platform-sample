@@ -40,6 +40,9 @@ dev = [
     "respx>=0.23.1",
     "ruff>=0.17.3",
 ]
+eval = [
+    "azure-ai-evaluation>=1.18.10",
+]
 
 [tool.ruff]
 line-length = 120

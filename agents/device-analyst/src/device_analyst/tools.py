@@ -2,7 +2,6 @@
 result (rounded numbers, no raw attributes, bounded lists with an explicit truncation marker) and records what it
 consulted: a `tool` activity for the stream and citations for the answer. Errors are returned to the model as data."""
 
-import asyncio
 import json
 from collections.abc import Callable
 from contextvars import ContextVar
@@ -85,6 +84,7 @@ def iso(at: datetime) -> str:
 
 
 Iso = Annotated[str | None, Field(description="ISO 8601 UTC time, e.g. 2026-10-28T08:00:00Z")]
+DeviceRef = Annotated[str, Field(description="Device id (e.g. paris-01-ruuvi5-001) or its name (e.g. Lyon cold room)")]
 
 
 def build_tools(api: PlatformApi, now: Callable[[], datetime] = lambda: datetime.now(UTC)) -> list[FunctionTool]:
@@ -100,6 +100,23 @@ def build_tools(api: PlatformApi, now: Callable[[], datetime] = lambda: datetime
         _recorder().calls += 1
         return await api.get(path, params)
 
+    async def device_call(ref: str, suffix: str = "", params: dict[str, Any] | None = None) -> tuple[str, Any]:
+        """Calls a device operation with a device id or, when no device has that id, its unique name match: one tool
+        round instead of a search followed by a read. Returns the device id used and the result."""
+        try:
+            return ref, await call(f"/devices/{segment(ref)}{suffix}", params)
+        except ApiError as e:
+            if not str(e).startswith("not found"):
+                raise
+            matches = (await call("/devices", {"search": ref, "pageSize": 5}))["items"]
+            if not matches:
+                raise
+            if len(matches) > 1:
+                names = ", ".join(f"{m['deviceId']} ({m.get('displayName') or 'no name'})" for m in matches)
+                raise ApiError(f"ambiguous: '{ref}' matches several devices: {names}; use an exact device id") from e
+            device_id = matches[0]["deviceId"]
+            return device_id, await call(f"/devices/{segment(device_id)}{suffix}", params)
+
     @tool(description="List the sites with their number of devices.")
     async def list_sites() -> str:
         try:
@@ -110,7 +127,7 @@ def build_tools(api: PlatformApi, now: Callable[[], datetime] = lambda: datetime
 
     @tool(
         description="Per site: number of devices, reporting devices, silent devices (not seen for 15 minutes) and "
-        "the most recently seen silent devices with their last-seen time."
+        "the silent devices with their last-seen time (complete up to 100 per site, most recently seen first)."
     )
     async def fleet_status(site_id: Annotated[str | None, Field(description="Restrict to one site")] = None) -> str:
         try:
@@ -120,7 +137,7 @@ def build_tools(api: PlatformApi, now: Callable[[], datetime] = lambda: datetime
         for site in status:
             if site_id:
                 _recorder().cite({"kind": "site", "siteId": site["siteId"]})
-            site["silentDevices"] = bounded(site.get("silentDevices", []), 20, site.get("silent"))
+            site["silentDevices"] = bounded(site.get("silentDevices", []), 100, site.get("silent"))
         return as_data(status)
 
     @tool(
@@ -169,11 +186,10 @@ def build_tools(api: PlatformApi, now: Callable[[], datetime] = lambda: datetime
         description="Details of one device (name, site, location, status, first/last seen) and the metrics it "
         "reports with their units."
     )
-    async def get_device(device_id: Annotated[str, Field(description="Exact device id")]) -> str:
+    async def get_device(device_id: DeviceRef) -> str:
         try:
-            device, metrics = await asyncio.gather(
-                call(f"/devices/{segment(device_id)}"), call(f"/devices/{segment(device_id)}/metrics")
-            )
+            device_id, device = await device_call(device_id)
+            metrics = await call(f"/devices/{segment(device_id)}/metrics")
         except ApiError as e:
             return error(e)
         _recorder().cite({"kind": "device", "deviceId": device_id})
@@ -182,17 +198,18 @@ def build_tools(api: PlatformApi, now: Callable[[], datetime] = lambda: datetime
 
     @tool(description="The latest measurements of a device, most recent first (at most 20).")
     async def get_latest_measurements(
-        device_id: Annotated[str, Field(description="Exact device id")],
+        device_id: DeviceRef,
         count: Annotated[int, Field(ge=1, le=LATEST_MAX, description="Number of measurements, 1 to 20")] = 5,
     ) -> str:
         try:
-            measurements = await call(
-                f"/devices/{segment(device_id)}/measurements/latest", {"count": min(count, LATEST_MAX)}
+            device_id, measurements = await device_call(
+                device_id, "/measurements/latest", {"count": min(count, LATEST_MAX)}
             )
         except ApiError as e:
             return error(e)
         _recorder().cite({"kind": "device", "deviceId": device_id})
-        return as_data([{"measuredAt": m["measuredAt"], "metrics": m["metrics"]} for m in measurements])
+        latest = [{"measuredAt": m["measuredAt"], "metrics": m["metrics"]} for m in measurements]
+        return as_data({"deviceId": device_id, "measurements": latest})
 
     @tool(
         description="Evolution of 1 to 4 metrics of a device over a period (at most 31 days): statistics per metric "
@@ -200,15 +217,16 @@ def build_tools(api: PlatformApi, now: Callable[[], datetime] = lambda: datetime
         "trend questions."
     )
     async def get_series(
-        device_id: Annotated[str, Field(description="Exact device id")],
+        device_id: DeviceRef,
         metrics: Annotated[list[str], Field(min_length=1, max_length=4, description="Metric keys")],
         from_time: Iso = None,
         to_time: Iso = None,
     ) -> str:
         start, end = window(from_time, to_time)
         try:
-            series = await call(
-                f"/devices/{segment(device_id)}/series",
+            device_id, series = await device_call(
+                device_id,
+                "/series",
                 {"metrics": ",".join(metrics), "from": iso(start), "to": iso(end), "maxPoints": SERIES_POINTS},
             )
         except ApiError as e:
@@ -232,7 +250,7 @@ def build_tools(api: PlatformApi, now: Callable[[], datetime] = lambda: datetime
     )
     async def list_alerts(
         site_id: Annotated[str | None, Field(description="Site id")] = None,
-        device_id: Annotated[str | None, Field(description="Exact device id")] = None,
+        device_id: Annotated[str | None, Field(description="Device id or name")] = None,
         status: Annotated[Literal["open", "closed"] | None, Field(description="open or closed")] = None,
         from_time: Iso = None,
         to_time: Iso = None,
@@ -241,7 +259,7 @@ def build_tools(api: PlatformApi, now: Callable[[], datetime] = lambda: datetime
         params = {"from": iso(start), "to": iso(end), "limit": MAX_ITEMS}
         try:
             if device_id:
-                alerts = await call(f"/devices/{segment(device_id)}/alerts", params)
+                device_id, alerts = await device_call(device_id, "/alerts", params)
                 if status:
                     alerts = [a for a in alerts if a.get("status") == status]
             else:
@@ -253,12 +271,12 @@ def build_tools(api: PlatformApi, now: Callable[[], datetime] = lambda: datetime
         return as_data(bounded([{k: v for k, v in a.items() if k != "notifications"} for a in alerts]))
 
     @tool(description="Alert thresholds configured for a device (metric, min and/or max).")
-    async def get_thresholds(device_id: Annotated[str, Field(description="Exact device id")]) -> str:
+    async def get_thresholds(device_id: DeviceRef) -> str:
         try:
-            thresholds = await call(f"/devices/{segment(device_id)}/thresholds")
+            device_id, thresholds = await device_call(device_id, "/thresholds")
         except ApiError as e:
             return error(e)
-        return as_data(thresholds)
+        return as_data({"deviceId": device_id, "thresholds": thresholds})
 
     return [
         list_sites,

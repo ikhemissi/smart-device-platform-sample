@@ -107,3 +107,11 @@ async def test_invalid_messages_are_400(store):
             )
             assert response.status_code == 400, body
             assert "content" in response.json()["errors"]
+
+
+async def test_reasoning_effort_and_stateless_requests_reach_the_model():
+    model = ScriptedChatClient([("text", "ok")])
+    async for _ in Analyst(model, [], reasoning_effort="low").run([], "hi"):
+        pass
+    assert model.options[0]["reasoning"] == {"effort": "low"}
+    assert model.options[0]["store"] is False

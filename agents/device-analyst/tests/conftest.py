@@ -60,9 +60,11 @@ class ScriptedChatClient(FunctionInvocationLayer, ChatMiddlewareLayer, ChatTelem
         super().__init__(function_invocation_configuration={"max_function_calls": 10})
         self.steps = list(steps)
         self.calls: list[list[Message]] = []
+        self.options: list[dict] = []
 
     def _inner_get_response(self, *, messages, stream, options, **kwargs):
         self.calls.append(list(messages))
+        self.options.append(dict(options))
         step = self.steps.pop(0) if self.steps else ("text", "(no more script)")
         if step[0] == "tool":
             contents = [

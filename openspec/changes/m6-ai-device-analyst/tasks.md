@@ -20,7 +20,7 @@
 - [x] 3.4 Implement conversation storage in Redis with ownership, sliding TTL and message cap; verify tests for the other-user 404, follow-up and expiry scenarios (fakeredis)
 - [x] 3.5 Implement SSE streaming (`delta`, `tool`, `done` with citations); verify an integration test consumes a full stream
 - [x] 3.6 Enable OpenTelemetry (Azure Monitor distro, Agent Framework instrumentation, httpx propagation); verify the trace-of-a-turn scenario in Application Insights
-- [ ] 3.7 Document configuration, local run and evaluation in `agents/device-analyst/README.md`; verify commands run as written
+- [x] 3.7 Document configuration, local run and evaluation in `agents/device-analyst/README.md`; verify commands run as written
 
 ## 4. Gateway
 
@@ -33,8 +33,8 @@
 
 ## 6. Evaluation and verification
 
-- [ ] 6.1 Create `evals/questions.jsonl` covering PRD-006 example questions, the modification-refusal, unknown-device and French-language cases; verify the evaluation script runs and reports groundedness, relevance and tool-call accuracy
-- [ ] 6.2 Run the evaluation on a seeded environment; verify ≥ 90% of questions stream first text within 5 s and record scores and thresholds in the README
+- [x] 6.1 Create `evals/questions.jsonl` covering PRD-006 example questions, the modification-refusal, unknown-device and French-language cases; verify the evaluation script runs and reports groundedness, relevance and tool-call accuracy
+- [x] 6.2 Run the evaluation on a seeded environment; verify ≥ 90% of questions stream first text within 5 s and record scores and thresholds in the README
 - [ ] 6.3 Write the M6 demo guide `docs/demo/m6-ai-analyst.md`; verify a dry run follows it as written
 
 ## Workflow follow-up

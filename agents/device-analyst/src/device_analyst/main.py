@@ -23,18 +23,23 @@ from .tools import build_tools
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
 settings = Settings()
+# Locally, credentials come from developer tools (Azure CLI): allow more than the default 10 s on a busy machine.
+# In Azure, the workload identity (AZURE_CLIENT_ID) is used and this does not apply.
+DEVELOPER_TOOL_TIMEOUT = 60
 telemetry.configure(settings)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-    credential = DefaultAzureCredential()
+    credential = DefaultAzureCredential(process_timeout=DEVELOPER_TOOL_TIMEOUT)
     redis = Redis(
         host=settings.redis_host,
         port=settings.redis_port,
         ssl=True,
         decode_responses=False,
-        credential_provider=create_from_default_azure_credential(("https://redis.azure.com/.default",)),
+        credential_provider=create_from_default_azure_credential(
+            ("https://redis.azure.com/.default",), app_kwargs={"process_timeout": DEVELOPER_TOOL_TIMEOUT}
+        ),
         socket_timeout=5,
         health_check_interval=30,
     )
@@ -47,12 +52,14 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     )
     app.state.token_validator = TokenValidator(settings.tenant_id, settings.api_audiences)
     app.state.store = ConversationStore(redis, settings.conversation_ttl_seconds, settings.max_conversation_messages)
-    app.state.analyst = Analyst(client, build_tools(PlatformApi(http)))
+    app.state.analyst = Analyst(client, build_tools(PlatformApi(http)), reasoning_effort=settings.reasoning_effort)
     try:
-        # Warm up the Redis connection (first Entra token) before the first readiness probe.
+        # Warm up before the first readiness probe: the Redis connection and the model's Entra token (getting the
+        # first token takes seconds, which would delay the first answer).
         await app.state.store.ping()
+        await credential.get_token("https://cognitiveservices.azure.com/.default")
     except Exception as e:  # noqa: BLE001 - readiness reports it
-        logging.getLogger(__name__).warning("Redis is not reachable yet: %r", e)
+        logging.getLogger(__name__).warning("Warm-up failed: %r", e)
     try:
         yield
     finally:
