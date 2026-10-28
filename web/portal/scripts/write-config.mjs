@@ -19,6 +19,8 @@ export function portalFiles(env) {
     clientId: env.WEB_CLIENT_ID,
     apiScope: env.API_SCOPE,
     apiBaseUrl: env.API_BASE_URL,
+    // The assistant entry point appears once the device analyst is deployed (PORTAL_ASSISTANT=false hides it).
+    assistantEnabled: env.PORTAL_ASSISTANT ? env.PORTAL_ASSISTANT === 'true' : Boolean(env.DEVICE_ANALYST_URL),
   }
   const csp = [
     "default-src 'self'",

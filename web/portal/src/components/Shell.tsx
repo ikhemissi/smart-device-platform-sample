@@ -1,8 +1,11 @@
 import { Body1Strong, Button, Spinner, Subtitle1, makeStyles, mergeClasses, tokens } from '@fluentui/react-components'
-import { SignOutRegular } from '@fluentui/react-icons'
-import { NavLink, Outlet } from 'react-router'
+import { SignOutRegular, SparkleRegular } from '@fluentui/react-icons'
+import { useState } from 'react'
+import { NavLink, Outlet, useMatch } from 'react-router'
 import { useCurrentUser } from '../api/queries'
 import { useSession } from '../auth/session'
+import { useFeatures } from '../features'
+import { AssistantPanel } from './assistant/AssistantPanel'
 import { AccessDenied } from '../pages/AccessDenied'
 import { ErrorState } from './ErrorState'
 
@@ -39,6 +42,10 @@ export function Shell() {
   const styles = useStyles()
   const session = useSession()
   const me = useCurrentUser()
+  const features = useFeatures()
+  const [assistantOpen, setAssistantOpen] = useState(false)
+  const devicePage = useMatch('/devices/:deviceId')
+  const assistant = features.assistant && me.data?.canRead === true
 
   let content
   if (me.isPending) {
@@ -69,6 +76,17 @@ export function Shell() {
           )}
         </nav>
         <div className={styles.user}>
+          {assistant && (
+            <Button
+              appearance="transparent"
+              className={styles.signOut}
+              icon={<SparkleRegular />}
+              aria-expanded={assistantOpen}
+              onClick={() => setAssistantOpen((open) => !open)}
+            >
+              Assistant
+            </Button>
+          )}
           {me.data && <Body1Strong>{me.data.displayName}</Body1Strong>}
           <Button appearance="transparent" className={styles.signOut} icon={<SignOutRegular />} onClick={() => void session.signOut()}>
             Sign out
@@ -78,6 +96,9 @@ export function Shell() {
       <main id="main" className={styles.main} tabIndex={-1}>
         {content}
       </main>
+      {assistant && (
+        <AssistantPanel open={assistantOpen} onClose={() => setAssistantOpen(false)} deviceId={devicePage?.params.deviceId} />
+      )}
     </>
   )
 }

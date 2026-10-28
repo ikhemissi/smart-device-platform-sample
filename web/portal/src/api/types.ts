@@ -204,3 +204,29 @@ export interface Alert {
   lastBreachAt: string
   notifications: AlertNotification[]
 }
+
+/** AI assistant (M6). A citation names a device (with the metrics and period used) or a site. */
+export interface Citation {
+  kind: 'device' | 'site'
+  deviceId?: string
+  siteId?: string
+  metrics?: string[]
+  from?: string
+  to?: string
+}
+
+export interface AssistantConversation {
+  id: string
+  createdAt: string
+}
+
+/** Data the assistant consulted while answering, with its tool arguments. */
+export interface ToolActivity {
+  name: string
+  arguments: Record<string, unknown>
+}
+
+export interface AnswerHandlers {
+  onTool(tool: ToolActivity): void
+  onDelta(text: string): void
+}

@@ -6,6 +6,7 @@ import { RouterProvider, createMemoryRouter } from 'react-router'
 import { vi } from 'vitest'
 import { ApiClient } from '../api/client'
 import type { CurrentUser } from '../api/types'
+import type { Features } from '../features'
 import { PortalProviders } from '../providers'
 import { createQueryClient } from '../queryClient'
 import { routes } from '../routes'
@@ -20,7 +21,7 @@ let renders = 0
 export function renderPortal(
   path: string,
   me: CurrentUser,
-  options: { advanceTimers?: (ms: number) => unknown; handlers?: HttpHandler[] } = {},
+  options: { advanceTimers?: (ms: number) => unknown; handlers?: HttpHandler[]; features?: Features } = {},
 ) {
   const token = `test-token-${++renders}`
   // Overrides first: within one call the first matching handler wins.
@@ -33,7 +34,7 @@ export function renderPortal(
   // jsdom never finishes CSS motion: skip it, or dialogs stay in their (aria-hidden) enter state.
   const view = render(
     <MotionBehaviourProvider value="skip">
-      <PortalProviders session={session} api={new ApiClient(API, session)} queryClient={queryClient}>
+      <PortalProviders session={session} api={new ApiClient(API, session)} queryClient={queryClient} features={options.features}>
         <RouterProvider router={router} />
       </PortalProviders>
     </MotionBehaviourProvider>,

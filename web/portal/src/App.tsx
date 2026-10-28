@@ -42,7 +42,12 @@ function Portal({ msal, config }: { msal: PublicClientApplication; config: Runti
     }
   })
   return (
-    <PortalProviders session={state.session} api={state.api} queryClient={state.queryClient}>
+    <PortalProviders
+      session={state.session}
+      api={state.api}
+      queryClient={state.queryClient}
+      features={{ assistant: config.assistantEnabled }}
+    >
       <RouterProvider router={state.router} />
     </PortalProviders>
   )

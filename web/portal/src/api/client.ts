@@ -1,5 +1,8 @@
 import type { Session } from '../auth/session'
 import type {
+  AnswerHandlers,
+  AssistantConversation,
+  Citation,
   Alert,
   AuditEvent,
   CertificateChange,
@@ -159,6 +162,49 @@ export class ApiClient {
     return this.json(`/devices/${encodeURIComponent(deviceId)}/alerts?limit=50`)
   }
 
+  createConversation(): Promise<AssistantConversation> {
+    return this.request('/agent/conversations', { method: 'POST' }).then((r) => r.json() as Promise<AssistantConversation>)
+  }
+
+  async deleteConversation(id: string): Promise<void> {
+    await this.request(`/agent/conversations/${encodeURIComponent(id)}`, { method: 'DELETE' })
+  }
+
+  /**
+   * Asks a question; the answer arrives as Server-Sent Events (tool activity, text deltas) and resolves with its
+   * citations. An `error` event or an interrupted stream rejects with an ApiError.
+   */
+  async ask(
+    conversationId: string,
+    content: string,
+    deviceId: string | undefined,
+    handlers: AnswerHandlers,
+    signal?: AbortSignal,
+  ): Promise<Citation[]> {
+    const response = await this.request(`/agent/conversations/${encodeURIComponent(conversationId)}/messages`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Accept: 'text/event-stream' },
+      body: JSON.stringify({ content, ...(deviceId ? { context: { deviceId } } : {}) }),
+      signal,
+    })
+    for await (const event of readEvents(response)) {
+      const data = JSON.parse(event.data || '{}') as Record<string, unknown>
+      switch (event.name) {
+        case 'tool':
+          handlers.onTool({ name: String(data.name), arguments: (data.arguments as Record<string, unknown>) ?? {} })
+          break
+        case 'delta':
+          handlers.onDelta(String(data.text ?? ''))
+          break
+        case 'done':
+          return (data.citations as Citation[]) ?? []
+        case 'error':
+          throw new ApiError(502, { title: String(data.title ?? 'Error'), detail: String(data.detail ?? '') })
+      }
+    }
+    throw new ApiError(0, { title: 'Interrupted', detail: 'The answer was interrupted. Try again.' })
+  }
+
   private async json<T>(path: string): Promise<T> {
     return (await (await this.request(path)).json()) as T
   }
@@ -167,11 +213,16 @@ export class ApiClient {
     const token = await this.session.getAccessToken()
     const headers = new Headers(init.headers)
     headers.set('Authorization', `Bearer ${token}`)
-    headers.set('Accept', 'application/json')
+    if (!headers.has('Accept')) {
+      headers.set('Accept', 'application/json')
+    }
     let response: Response
     try {
       response = await fetch(`${this.baseUrl}${path}`, { ...init, headers })
-    } catch {
+    } catch (error) {
+      if (error instanceof DOMException && error.name === 'AbortError') {
+        throw error
+      }
       throw new ApiError(0, { title: 'Network error' })
     }
     if (!response.ok) {
@@ -184,5 +235,35 @@ export class ApiClient {
       throw new ApiError(response.status, problem)
     }
     return response
+  }
+}
+
+/** Server-Sent Events of a fetch response (`event:` and `data:` fields; comments and pings are skipped). */
+export async function* readEvents(response: Response): AsyncGenerator<{ name: string; data: string }> {
+  const reader = response.body!.pipeThrough(new TextDecoderStream()).getReader()
+  let buffer = ''
+  for (;;) {
+    const { value, done } = await reader.read()
+    if (done) {
+      return
+    }
+    buffer += value.replace(/\r\n?/g, '\n')
+    let end: number
+    while ((end = buffer.indexOf('\n\n')) >= 0) {
+      const block = buffer.slice(0, end)
+      buffer = buffer.slice(end + 2)
+      let name = 'message'
+      const data: string[] = []
+      for (const line of block.split('\n')) {
+        if (line.startsWith('event:')) {
+          name = line.slice(6).trim()
+        } else if (line.startsWith('data:')) {
+          data.push(line.slice(5).replace(/^ /, ''))
+        }
+      }
+      if (data.length > 0) {
+        yield { name, data: data.join('\n') }
+      }
+    }
   }
 }

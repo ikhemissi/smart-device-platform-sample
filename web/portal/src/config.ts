@@ -4,6 +4,8 @@ export interface RuntimeConfig {
   clientId: string
   apiScope: string
   apiBaseUrl: string
+  /** The AI assistant (M6) is deployed behind the API. */
+  assistantEnabled: boolean
 }
 
 export async function loadConfig(): Promise<RuntimeConfig> {
@@ -17,5 +19,9 @@ export async function loadConfig(): Promise<RuntimeConfig> {
       throw new Error(`config.json is missing "${key}"`)
     }
   }
-  return { ...(config as RuntimeConfig), apiBaseUrl: config.apiBaseUrl!.replace(/\/+$/, '') }
+  return {
+    ...(config as RuntimeConfig),
+    apiBaseUrl: config.apiBaseUrl!.replace(/\/+$/, ''),
+    assistantEnabled: config.assistantEnabled === true,
+  }
 }
