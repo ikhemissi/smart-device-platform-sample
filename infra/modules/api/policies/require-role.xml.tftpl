@@ -1,5 +1,6 @@
-<!-- Operation-level role check generated from the operation's x-sdp-required-role (${required_role}), and routing
-     to the operation's service when it is not the default backend (M4 design D6). -->
+<!-- Operation-level role check generated from the operation's x-sdp-required-role (${required_role}), routing
+     to the operation's service when it is not the default backend (M4 design D6) and, for streamed answers (M6),
+     a per-user message quota and unbuffered forwarding. -->
 <policies>
   <inbound>
     <base />
@@ -23,9 +24,17 @@
       </when>
     </choose>
 %{ endif ~}
+%{ if streaming ~}
+    <rate-limit-by-key calls="${messages_per_min}" renewal-period="60" remaining-calls-header-name="X-RateLimit-Remaining"
+                       counter-key="@("agent-" + ((Jwt)context.Variables["jwt"]).Claims.GetValueOrDefault("oid", context.Request.IpAddress))" />
+%{ endif ~}
   </inbound>
   <backend>
+%{ if streaming ~}
+    <forward-request timeout="120" buffer-response="false" />
+%{ else ~}
     <base />
+%{ endif ~}
   </backend>
   <outbound>
     <base />

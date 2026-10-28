@@ -26,6 +26,7 @@ class Settings(BaseSettings):
     capture_content: bool = Field(default=False, validation_alias="SDP_AGENT_CAPTURE_CONTENT")
     conversation_ttl_seconds: int = Field(default=3600, validation_alias="SDP_AGENT_CONVERSATION_TTL_SECONDS")
     max_conversation_messages: int = Field(default=50, validation_alias="SDP_AGENT_MAX_MESSAGES")
+    messages_per_minute: int = Field(default=20, validation_alias="SDP_AGENT_MESSAGES_PER_MINUTE")
     max_tool_calls: int = Field(default=10, validation_alias="SDP_AGENT_MAX_TOOL_CALLS")
     turn_timeout_seconds: float = Field(default=110, validation_alias="SDP_AGENT_TURN_TIMEOUT_SECONDS")
 

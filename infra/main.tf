@@ -142,6 +142,8 @@ module "api" {
   openapi_file              = "${path.root}/../services/device-api/openapi.json"
   provisioning_api_url      = module.apps.provisioning_api_url
   provisioning_openapi_file = "${path.root}/../services/provisioning-api/openapi.json"
+  agent_api_url             = module.apps.device_analyst_url
+  agent_openapi_file        = "${path.root}/../agents/device-analyst/openapi.json"
   tags                      = local.tags
 }
 

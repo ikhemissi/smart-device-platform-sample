@@ -24,8 +24,9 @@ portal ──SSE──▶ APIM /api/v1/agent/* ──▶ device-analyst (this se
 Every operation requires an Entra access token for the platform API with `DeviceData.Read` (or `Write`); errors are
 problem details. A conversation belongs to its creator (others get 404), expires one hour after its last message and
 keeps its 50 latest messages; a second message while one is being answered gets 409. Citations are
-`{kind: "device", deviceId, metrics?, from?, to?}` or `{kind: "site", siteId}`. The gateway adds a per-user rate limit
-(20 messages per minute).
+`{kind: "device", deviceId, metrics?, from?, to?}` or `{kind: "site", siteId}`. A user may send 20 messages per minute
+(sliding window in Redis, 429 with `Retry-After`); API Management applies the same limit as an outer guard and streams
+answers without buffering (`openapi.json` is imported by the gateway; a test keeps it in line with the routes).
 
 Tools (all read-only): `list_sites`, `fleet_status`, `metric_summary`, `search_devices`, `get_device`,
 `get_latest_measurements`, `get_series`, `list_alerts`, `get_thresholds` — see `src/device_analyst/tools.py`.
@@ -44,6 +45,7 @@ Environment variables (set by Terraform in Azure, `infra/modules/apps`):
 | `APPLICATIONINSIGHTS_CONNECTION_STRING` | Trace export to Application Insights (Entra authentication) |
 | `SDP_AGENT_CAPTURE_CONTENT` | `true` records prompts, answers and tool results in traces (`azd env set AGENT_CAPTURE_CONTENT true` for demos) |
 | `SDP_AGENT_MAX_TOOL_CALLS`, `SDP_AGENT_TURN_TIMEOUT_SECONDS` | Limits per turn (10, 110 s) |
+| `SDP_AGENT_MESSAGES_PER_MINUTE` | Messages per user and minute (20) |
 | `SDP_AGENT_CONVERSATION_TTL_SECONDS`, `SDP_AGENT_MAX_MESSAGES` | Conversation expiry and size (3600, 50) |
 
 ## Run locally

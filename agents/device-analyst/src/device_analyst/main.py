@@ -61,7 +61,11 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         await credential.close()
 
 
-app = create_app(lifespan=lifespan, turn_timeout_seconds=settings.turn_timeout_seconds)
+app = create_app(
+    lifespan=lifespan,
+    turn_timeout_seconds=settings.turn_timeout_seconds,
+    messages_per_minute=settings.messages_per_minute,
+)
 
 
 def main() -> None:

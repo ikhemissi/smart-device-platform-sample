@@ -39,6 +39,7 @@ def create_app(
     store: ConversationStore | None = None,
     analyst: Analyst | None = None,
     turn_timeout_seconds: float = 110,
+    messages_per_minute: int = 20,
     lifespan=None,
 ) -> FastAPI:
     """The API. Dependencies are given by tests, or created by `lifespan` (see main.py) for the real service."""
@@ -52,6 +53,7 @@ def create_app(
     if analyst is not None:
         app.state.analyst = analyst
     app.state.turn_timeout_seconds = turn_timeout_seconds
+    app.state.messages_per_minute = messages_per_minute
 
     @app.exception_handler(ProblemError)
     async def problem(request: Request, error: ProblemError) -> JSONResponse:
@@ -80,29 +82,37 @@ def create_app(
             log.warning("Readiness check failed: %r", e)
             return JSONResponse({"status": "DOWN"}, status_code=503)
 
-    @app.post(PREFIX + "/conversations", status_code=201)
+    @app.post(PREFIX + "/conversations", status_code=201, operation_id="createAgentConversation")
     async def create(request: Request, user: CurrentUser) -> dict[str, Any]:
         conversation = await request.app.state.store.create(user.object_id)
         return {"id": conversation.id, "createdAt": conversation.created_at, "messages": []}
 
-    @app.get(PREFIX + "/conversations/{conversation_id}")
+    @app.get(PREFIX + "/conversations/{conversation_id}", operation_id="getAgentConversation")
     async def read(request: Request, conversation_id: str, user: CurrentUser) -> dict[str, Any]:
         conversation = await request.app.state.store.get(conversation_id, user.object_id)
         if conversation is None:
             raise not_found(f"Conversation '{conversation_id}' does not exist or has expired.")
         return {"id": conversation.id, "createdAt": conversation.created_at, "messages": conversation.transcript()}
 
-    @app.delete(PREFIX + "/conversations/{conversation_id}", status_code=204)
+    @app.delete(PREFIX + "/conversations/{conversation_id}", status_code=204, operation_id="deleteAgentConversation")
     async def delete(request: Request, conversation_id: str, user: CurrentUser) -> Response:
         if not await request.app.state.store.delete(conversation_id, user.object_id):
             raise not_found(f"Conversation '{conversation_id}' does not exist or has expired.")
         return Response(status_code=204)
 
-    @app.post(PREFIX + "/conversations/{conversation_id}/messages")
+    @app.post(PREFIX + "/conversations/{conversation_id}/messages", operation_id="sendAgentMessage")
     async def message(
         request: Request, conversation_id: str, body: MessageRequest, user: CurrentUser
     ) -> EventSourceResponse:
         store: ConversationStore = request.app.state.store
+        wait = await store.allow_message(user.object_id, request.app.state.messages_per_minute)
+        if wait is not None:
+            raise ProblemError(
+                429,
+                "Too Many Requests",
+                f"At most {request.app.state.messages_per_minute} messages per minute; retry in {wait} s.",
+                headers={"Retry-After": str(wait)},
+            )
         conversation = await store.get(conversation_id, user.object_id)
         if conversation is None:
             raise not_found(f"Conversation '{conversation_id}' does not exist or has expired.")

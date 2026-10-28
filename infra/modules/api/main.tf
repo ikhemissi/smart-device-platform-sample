@@ -30,6 +30,19 @@ variable "provisioning_openapi_file" {
   description = "OpenAPI document exported by the provisioning API; its operations are routed to that backend."
   type        = string
 }
+variable "agent_api_url" {
+  description = "Device analyst (M6) base URL; its operations are routed there."
+  type        = string
+}
+variable "agent_openapi_file" {
+  description = "OpenAPI document of the device analyst (committed in agents/device-analyst)."
+  type        = string
+}
+variable "agent_messages_per_minute" {
+  description = "Messages a user may send to the device analyst per minute (spec device-analyst-agent)."
+  type        = number
+  default     = 20
+}
 variable "rate_limit_calls_per_minute" {
   type    = number
   default = 600
@@ -41,18 +54,20 @@ locals {
   methods      = ["get", "post", "put", "patch", "delete"]
   device_api   = fileexists(var.openapi_file) ? jsondecode(file(var.openapi_file)) : null
   provisioning = fileexists(var.provisioning_openapi_file) ? jsondecode(file(var.provisioning_openapi_file)) : null
-  # One API (M4 design D6): both services' documents merged per path and method. The device API is the default
-  # backend; provisioning operations are routed to their service by an operation-level policy.
+  agent        = fileexists(var.agent_openapi_file) ? jsondecode(file(var.agent_openapi_file)) : null
+  # One API (M4 design D6): the services' documents merged per path and method. The device API is the default
+  # backend; provisioning and agent operations are routed to their service by an operation-level policy.
+  documents = [for d in [local.device_api, local.provisioning, local.agent] : d if d != null]
   paths = {
-    for path in distinct(concat(keys(try(local.device_api.paths, {})), keys(try(local.provisioning.paths, {})))) :
-    path => merge(lookup(try(local.device_api.paths, {}), path, {}), lookup(try(local.provisioning.paths, {}), path, {}))
+    for path in distinct(flatten([for d in local.documents : keys(d.paths)])) :
+    path => merge([for d in local.documents : lookup(d.paths, path, {})]...)
   }
   api_description = "Devices, telemetry history and site trust of the Smart Device Platform. Requires a Microsoft Entra ID access token for the platform API; operations declare the app role they need in x-sdp-required-role."
   openapi = local.device_api == null ? null : merge(local.device_api, {
     info  = merge(local.device_api.info, { title = "Smart Device Platform API", description = local.api_description })
     paths = local.paths
     components = merge(local.device_api.components, {
-      schemas = merge(lookup(local.device_api.components, "schemas", {}), try(local.provisioning.components.schemas, {}))
+      schemas = merge([for d in local.documents : try(d.components.schemas, {})]...)
     })
   })
   # Operations are imported relative to the API path (api/v1); the backends keep the full path.
@@ -69,6 +84,15 @@ locals {
   provisioning_operations = flatten([
     for path, item in try(local.provisioning.paths, {}) : [for method, op in item : op.operationId if contains(local.methods, method)]
   ])
+  agent_operations = flatten([
+    for path, item in try(local.agent.paths, {}) : [for method, op in item : op.operationId if contains(local.methods, method)]
+  ])
+  # Answers are streamed (Server-Sent Events): no response buffering, longer timeout, per-user message quota.
+  streaming_operations = ["sendAgentMessage"]
+  operation_backends = merge(
+    { for id in local.provisioning_operations : id => "provisioning-api" },
+    { for id in local.agent_operations : id => "device-analyst" },
+  )
 }
 
 resource "azurerm_api_management" "main" {
@@ -161,22 +185,37 @@ resource "azurerm_api_management_backend" "provisioning_api" {
   description         = "Site trust: sites, site certificates, audit (M4)"
 }
 
+resource "azurerm_api_management_backend" "device_analyst" {
+  name                = "device-analyst"
+  api_management_name = azurerm_api_management.main.name
+  resource_group_name = var.resource_group_name
+  protocol            = "http"
+  url                 = "${var.agent_api_url}${local.base_path}"
+  description         = "AI device analyst (M6)"
+}
+
 resource "azurerm_api_management_api_operation_policy" "role" {
   for_each = {
     for id, role in local.operation_roles : id => role
-    if role != "authenticated" || contains(local.provisioning_operations, id)
+    if role != "authenticated" || contains(keys(local.operation_backends), id)
   }
   api_name            = azurerm_api_management_api.platform[0].name
   api_management_name = azurerm_api_management.main.name
   resource_group_name = var.resource_group_name
   operation_id        = each.key
   xml_content = templatefile("${path.module}/policies/require-role.xml.tftpl", {
-    backend_id    = contains(local.provisioning_operations, each.key) ? azurerm_api_management_backend.provisioning_api.name : ""
-    required_role = each.value
-    app_role      = each.value == "write" ? "DeviceData.Write" : "DeviceData.Read"
-    detail        = each.value == "write" ? "The Edit device data permission (DeviceData.Write) is required." : "The Query device data permission (DeviceData.Read) is required."
+    backend_id       = lookup(local.operation_backends, each.key, "")
+    streaming        = contains(local.streaming_operations, each.key)
+    messages_per_min = var.agent_messages_per_minute
+    required_role    = each.value
+    app_role         = each.value == "write" ? "DeviceData.Write" : "DeviceData.Read"
+    detail           = each.value == "write" ? "The Edit device data permission (DeviceData.Write) is required." : "The Query device data permission (DeviceData.Read) is required."
   })
-  depends_on = [azurerm_api_management_api_policy.platform, azurerm_api_management_backend.provisioning_api]
+  depends_on = [
+    azurerm_api_management_api_policy.platform,
+    azurerm_api_management_backend.provisioning_api,
+    azurerm_api_management_backend.device_analyst,
+  ]
 }
 
 output "name" { value = azurerm_api_management.main.name }

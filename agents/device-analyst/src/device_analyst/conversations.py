@@ -4,6 +4,7 @@ at most 50 messages (oldest turns are dropped). Tool calls and results are kept 
 questions keep their context while the model input stays bounded."""
 
 import json
+import time
 import uuid
 from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime
@@ -13,6 +14,7 @@ from agent_framework import Message
 from redis.asyncio import Redis
 
 KEY_PREFIX = "sdp:agent:conv:"
+RATE_PREFIX = "sdp:agent:rate:"
 LOCK_SECONDS = 150
 TURNS_WITH_TOOLS = 3
 
@@ -112,6 +114,24 @@ class ConversationStore:
 
     async def unlock(self, conversation_id: str) -> None:
         await self._redis.delete(KEY_PREFIX + conversation_id + ":lock")
+
+    async def allow_message(self, owner: str, per_minute: int) -> int | None:
+        """Counts a message of `owner` in a sliding one-minute window shared by all replicas; returns None when allowed,
+        otherwise the seconds to wait. API Management also limits, but its distributed counters are approximate."""
+        key = f"{RATE_PREFIX}{owner}"
+        now = time.time()
+        async with self._redis.pipeline(transaction=True) as pipe:
+            pipe.zremrangebyscore(key, 0, now - 60)
+            pipe.zcard(key)
+            count = (await pipe.execute())[1]
+        if count >= per_minute:
+            oldest = await self._redis.zrange(key, 0, 0, withscores=True)
+            return max(1, int(60 - (now - oldest[0][1])) + 1) if oldest else 60
+        async with self._redis.pipeline(transaction=True) as pipe:
+            pipe.zadd(key, {uuid.uuid4().hex: now})
+            pipe.expire(key, 120)
+            await pipe.execute()
+        return None
 
     async def ping(self) -> bool:
         return bool(await self._redis.ping())

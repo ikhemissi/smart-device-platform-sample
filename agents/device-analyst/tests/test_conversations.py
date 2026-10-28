@@ -103,3 +103,23 @@ async def test_delete_and_concurrent_messages(store):
             await client.delete(f"/api/v1/agent/conversations/{conversation.id}", headers=auth())
         ).status_code == 204
         assert (await client.get(f"/api/v1/agent/conversations/{conversation.id}", headers=auth())).status_code == 404
+
+
+async def test_the_21st_message_within_a_minute_is_429(store):
+    """Scenario: a user sends 21 messages within one minute."""
+    app = make_app(store, Analyst(ScriptedChatClient([("text", "ok")] * 25), []))
+    async with client_for(app) as client:
+        statuses = []
+        for _ in range(21):
+            conversation = (await client.post("/api/v1/agent/conversations", headers=auth())).json()["id"]
+            response = await client.post(
+                f"/api/v1/agent/conversations/{conversation}/messages", headers=auth(), json={"content": "hi"}
+            )
+            statuses.append(response.status_code)
+        assert statuses == [200] * 20 + [429]
+        assert 1 <= int(response.headers["retry-after"]) <= 61
+        assert response.headers["content-type"] == "application/problem+json"
+        other = await client.post(
+            f"/api/v1/agent/conversations/{conversation}/messages", headers=auth(BOB), json={"content": "hi"}
+        )
+        assert other.status_code == 404, "the limit is per user"

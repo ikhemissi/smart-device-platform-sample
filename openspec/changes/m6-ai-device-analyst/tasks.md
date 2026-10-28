@@ -24,7 +24,7 @@
 
 ## 4. Gateway
 
-- [ ] 4.1 Add `/api/v1/agent/*` operations with unbuffered streaming, 120 s timeout, Read-role check and per-user rate limit (20/min) in APIM; verify streaming works through APIM and the 21st message returns 429
+- [x] 4.1 Add `/api/v1/agent/*` operations with unbuffered streaming, 120 s timeout, Read-role check and per-user rate limit (20/min) in APIM; verify streaming works through APIM and the 21st message returns 429
 
 ## 5. Portal
 

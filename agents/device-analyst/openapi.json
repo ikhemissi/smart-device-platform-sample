@@ -1,0 +1,115 @@
+{
+  "openapi": "3.0.1",
+  "info": {
+    "title": "Smart Device Platform — device analyst",
+    "version": "1"
+  },
+  "paths": {
+    "/api/v1/agent/conversations": {
+      "post": {
+        "tags": ["Assistant"],
+        "summary": "Start a conversation with the device analyst",
+        "operationId": "createAgentConversation",
+        "x-sdp-required-role": "read",
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/AgentConversation"}}}
+          }
+        }
+      }
+    },
+    "/api/v1/agent/conversations/{conversationId}": {
+      "get": {
+        "tags": ["Assistant"],
+        "summary": "Messages of a conversation (only its creator can read it; it expires 1 h after its last message)",
+        "operationId": "getAgentConversation",
+        "x-sdp-required-role": "read",
+        "parameters": [{"name": "conversationId", "in": "path", "required": true, "schema": {"type": "string"}}],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/AgentConversation"}}}
+          },
+          "404": {"description": "Not found or expired"}
+        }
+      },
+      "delete": {
+        "tags": ["Assistant"],
+        "summary": "Delete a conversation",
+        "operationId": "deleteAgentConversation",
+        "x-sdp-required-role": "read",
+        "parameters": [{"name": "conversationId", "in": "path", "required": true, "schema": {"type": "string"}}],
+        "responses": {"204": {"description": "Deleted"}, "404": {"description": "Not found or expired"}}
+      }
+    },
+    "/api/v1/agent/conversations/{conversationId}/messages": {
+      "post": {
+        "tags": ["Assistant"],
+        "summary": "Ask a question; the answer is streamed as Server-Sent Events",
+        "description": "Events: tool ({name, arguments}) when data is consulted, delta ({text}) with answer text, then done ({conversationId, citations}) or error ({title, detail}). At most 20 messages per minute per user.",
+        "operationId": "sendAgentMessage",
+        "x-sdp-required-role": "read",
+        "parameters": [{"name": "conversationId", "in": "path", "required": true, "schema": {"type": "string"}}],
+        "requestBody": {
+          "required": true,
+          "content": {"application/json": {"schema": {"$ref": "#/components/schemas/AgentMessageRequest"}}}
+        },
+        "responses": {
+          "200": {"description": "Answer stream", "content": {"text/event-stream": {"schema": {"type": "string"}}}},
+          "400": {"description": "Invalid message"},
+          "404": {"description": "Not found or expired"},
+          "409": {"description": "The previous message is still being answered"},
+          "429": {"description": "Too many messages"}
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "AgentMessageRequest": {
+        "type": "object",
+        "required": ["content"],
+        "properties": {
+          "content": {"type": "string", "minLength": 1, "maxLength": 2000},
+          "context": {
+            "type": "object",
+            "properties": {"deviceId": {"type": "string", "description": "Device the user is looking at"}}
+          }
+        }
+      },
+      "AgentConversation": {
+        "type": "object",
+        "required": ["id", "createdAt", "messages"],
+        "properties": {
+          "id": {"type": "string"},
+          "createdAt": {"type": "string", "format": "date-time"},
+          "messages": {"type": "array", "items": {"$ref": "#/components/schemas/AgentMessage"}}
+        }
+      },
+      "AgentMessage": {
+        "type": "object",
+        "required": ["role", "content"],
+        "properties": {
+          "role": {"type": "string", "enum": ["user", "assistant"]},
+          "content": {"type": "string"},
+          "at": {"type": "string", "format": "date-time"},
+          "context": {"type": "object", "properties": {"deviceId": {"type": "string"}}},
+          "citations": {"type": "array", "items": {"$ref": "#/components/schemas/AgentCitation"}}
+        }
+      },
+      "AgentCitation": {
+        "type": "object",
+        "required": ["kind"],
+        "properties": {
+          "kind": {"type": "string", "enum": ["device", "site"]},
+          "deviceId": {"type": "string"},
+          "siteId": {"type": "string"},
+          "metrics": {"type": "array", "items": {"type": "string"}},
+          "from": {"type": "string", "format": "date-time"},
+          "to": {"type": "string", "format": "date-time"}
+        }
+      }
+    }
+  }
+}
