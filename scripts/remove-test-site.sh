@@ -36,6 +36,7 @@ DELETE FROM sdp.alert_notifications WHERE alert_id IN (SELECT id FROM sdp.alert_
 DELETE FROM sdp.alert_events WHERE site_id = :'site';
 DELETE FROM sdp.alert_thresholds WHERE device_id IN (SELECT device_id FROM sdp.devices WHERE site_id = :'site');
 DELETE FROM sdp.device_metrics WHERE device_id IN (SELECT device_id FROM sdp.devices WHERE site_id = :'site');
+DELETE FROM sdp.metric_rollups_hourly WHERE site_id = :'site';
 DELETE FROM sdp.measurements WHERE site_id = :'site';
 DELETE FROM sdp.devices WHERE site_id = :'site';
 DELETE FROM sdp.site_operations WHERE site_id = :'site';
