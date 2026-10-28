@@ -39,3 +39,6 @@ sdp:
       - name: ${SDP_PROVISIONING_API_PRINCIPAL_NAME:}
         object-id: ${SDP_PROVISIONING_API_PRINCIPAL_OBJECT_ID:}
         group-role: sdp_provisioning
+      - name: ${SDP_ALERT_SERVICE_PRINCIPAL_NAME:}
+        object-id: ${SDP_ALERT_SERVICE_PRINCIPAL_OBJECT_ID:}
+        group-role: sdp_alerting

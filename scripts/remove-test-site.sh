@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Removes a test site created through the provisioning API from the current azd environment: its DPS enrollment group,
-# its DPS CA certificates, its devices in IoT Hub and its database records (sites, devices and their data).
+# its DPS CA certificates, its devices in IoT Hub and its database records (sites, devices, their data, thresholds and alerts).
 # The platform API deliberately cannot delete sites; this script is for test sites only (ids starting with e2e- or test-).
 #   scripts/remove-test-site.sh <site-id>
 set -euo pipefail
@@ -32,6 +32,9 @@ done
 
 scripts/psql.sh -q -v site="$site" <<'SQL'
 BEGIN;
+DELETE FROM sdp.alert_notifications WHERE alert_id IN (SELECT id FROM sdp.alert_events WHERE site_id = :'site');
+DELETE FROM sdp.alert_events WHERE site_id = :'site';
+DELETE FROM sdp.alert_thresholds WHERE device_id IN (SELECT device_id FROM sdp.devices WHERE site_id = :'site');
 DELETE FROM sdp.device_metrics WHERE device_id IN (SELECT device_id FROM sdp.devices WHERE site_id = :'site');
 DELETE FROM sdp.measurements WHERE site_id = :'site';
 DELETE FROM sdp.devices WHERE site_id = :'site';
