@@ -14,12 +14,12 @@
 
 ## 3. Agent service
 
-- [ ] 3.1 Scaffold `agents/device-analyst` (uv, FastAPI, Dockerfile, ruff, pytest) with JWT validation and role checks; verify tests for 401/403 and the user-without-permission scenario
-- [ ] 3.2 Implement read-only tools calling APIM with the caller's token, result compaction and error mapping; verify unit tests with a mocked API (incl. not found and truncation)
-- [ ] 3.3 Implement the agent (instructions, tool registration, max iterations, device context); verify a local run answers the "devices reporting at paris-01" question against the dev environment
-- [ ] 3.4 Implement conversation storage in Redis with ownership, sliding TTL and message cap; verify tests for the other-user 404, follow-up and expiry scenarios (fakeredis)
-- [ ] 3.5 Implement SSE streaming (`delta`, `tool`, `done` with citations); verify an integration test consumes a full stream
-- [ ] 3.6 Enable OpenTelemetry (Azure Monitor distro, Agent Framework instrumentation, httpx propagation); verify the trace-of-a-turn scenario in Application Insights
+- [x] 3.1 Scaffold `agents/device-analyst` (uv, FastAPI, Dockerfile, ruff, pytest) with JWT validation and role checks; verify tests for 401/403 and the user-without-permission scenario
+- [x] 3.2 Implement read-only tools calling APIM with the caller's token, result compaction and error mapping; verify unit tests with a mocked API (incl. not found and truncation)
+- [x] 3.3 Implement the agent (instructions, tool registration, max iterations, device context); verify a local run answers the "devices reporting at paris-01" question against the dev environment
+- [x] 3.4 Implement conversation storage in Redis with ownership, sliding TTL and message cap; verify tests for the other-user 404, follow-up and expiry scenarios (fakeredis)
+- [x] 3.5 Implement SSE streaming (`delta`, `tool`, `done` with citations); verify an integration test consumes a full stream
+- [x] 3.6 Enable OpenTelemetry (Azure Monitor distro, Agent Framework instrumentation, httpx propagation); verify the trace-of-a-turn scenario in Application Insights
 - [ ] 3.7 Document configuration, local run and evaluation in `agents/device-analyst/README.md`; verify commands run as written
 
 ## 4. Gateway

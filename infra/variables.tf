@@ -162,3 +162,9 @@ variable "agent_model_capacity" {
   type        = string
   default     = ""
 }
+
+variable "agent_capture_content" {
+  description = "Record prompts, answers and tool results of the AI device analyst in traces (AGENT_CAPTURE_CONTENT, \"true\" for demos). Empty: false."
+  type        = string
+  default     = ""
+}

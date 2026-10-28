@@ -64,7 +64,7 @@ variable "alert_service_image" { type = string }
 variable "portal_base_url" { type = string }
 variable "device_analyst_image" { type = string }
 variable "foundry" {
-  type = object({ project_endpoint = string, openai_endpoint = string, model_deployment_name = string })
+  type = object({ project_endpoint = string, openai_endpoint = string, model_deployment_name = string, capture_content = bool })
 }
 variable "api_base_url" {
   description = "Platform API base URL at the gateway; the agent's tools call it with the caller's token."
@@ -179,6 +179,7 @@ locals {
     SDP_API_BASE_URL                      = var.api_base_url
     SDP_REDIS_HOST                        = var.redis.host
     SDP_REDIS_PORT                        = tostring(var.redis.port)
+    SDP_AGENT_CAPTURE_CONTENT             = tostring(var.foundry.capture_content)
   }
 }
 

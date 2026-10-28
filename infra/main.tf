@@ -201,6 +201,7 @@ module "apps" {
     project_endpoint      = module.foundry.project_endpoint
     openai_endpoint       = module.foundry.openai_endpoint
     model_deployment_name = module.foundry.model_deployment_name
+    capture_content       = lower(coalesce(var.agent_capture_content, "false")) == "true"
   }
   api_base_url    = module.api.api_base_url
   portal_base_url = module.web.origin
