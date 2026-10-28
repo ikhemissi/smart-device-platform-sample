@@ -1,6 +1,6 @@
 # device-api
 
-Platform API for the device catalog and telemetry history: the signed-in user's permissions, devices, sites, measurements and chart series. It is published through API Management at `https://<apim>.azure-api.net/api/v1` and implements the `device-catalog`, `user-access` and `telemetry-history` specs (ADR-0007).
+Platform API for the device catalog, telemetry history and alerting: the signed-in user's permissions, devices, sites, measurements, chart series, alert thresholds and alert history. It is published through API Management at `https://<apim>.azure-api.net/api/v1` and implements the `device-catalog`, `user-access`, `telemetry-history` and `threshold-alerting` specs (ADR-0007, ADR-0009).
 
 ## Endpoints
 
@@ -15,9 +15,16 @@ Platform API for the device catalog and telemetry history: the signed-in user's 
 | `GET /api/v1/devices/{deviceId}/measurements` | `DeviceData.Read` | Measurements with `from` ≤ time < `to` (at most 31 days), ascending, paged by an opaque `cursor` (`pageSize` default 500, maximum 1,000; `nextCursor` is null on the last page) |
 | `GET /api/v1/devices/{deviceId}/series` | `DeviceData.Read` | Chart series of 1–4 `metrics` from `from` to `to` (default now, at most 31 days). Raw points when the range holds at most `maxPoints` (default 500, maximum 2,000) measurements, otherwise min/avg/max/count buckets of the smallest of 1m, 5m, 15m, 1h, 6h, 1d giving at most `maxPoints` buckets; `resolution` and `bucketSeconds` state which. Buckets are aligned on a fixed UTC grid |
 | `GET /api/v1/devices/{deviceId}/metrics` | `DeviceData.Read` | Metrics the device reported within the retention period, with unit and description (channel-suffixed Cayenne keys such as `temperature_ch2` use the base metric's unit) |
+| `GET /api/v1/devices/{deviceId}/thresholds` | `DeviceData.Read` | The device's alert thresholds, each with its `etag` and the id of its open alert, if any |
+| `POST /api/v1/devices/{deviceId}/thresholds` | `DeviceData.Write` | Adds a threshold: a `metric` the device reports, `min` and/or `max` (min < max), 1–10 `recipients` (email addresses), `enabled` (default true). At most 20 per device (409 beyond) |
+| `PUT /api/v1/devices/{deviceId}/thresholds/{thresholdId}` | `DeviceData.Write` | Replaces a threshold; `If-Match` with its entity tag is required (missing → 428, outdated → 412). Disabling it or changing its metric closes its open alert without email |
+| `DELETE /api/v1/devices/{deviceId}/thresholds/{thresholdId}` | `DeviceData.Write` | Deletes a threshold (204) and closes its open alert without email; its past alerts are kept. `If-Match` is optional |
+| `GET /api/v1/devices/{deviceId}/alerts` | `DeviceData.Read` | The device's alerts open at some point between `from` (default 30 days ago) and `to` (default now; at most 92 days), most recent first (`limit` default 100, maximum 500) |
+| `GET /api/v1/alerts` | `DeviceData.Read` | Alerts of all devices, filtered by `status` (`open`, `closed`, `cancelled`) and `siteId`, same period and limit |
 
 - A device is `reporting` when it was last seen within `SDP_REPORTING_WINDOW` (15 minutes), `silent` otherwise.
 - The ETag covers only the editable fields and the last change, so incoming telemetry does not invalidate an edit in progress.
+- An alert carries the threshold as it was when the alert opened (`thresholdMin`, `thresholdMax`), its `direction` (`ABOVE`/`BELOW`), status (`OPEN`, `CLOSED` when back to normal, `CANCELLED` when its threshold was disabled or deleted), opened/closed times, first, worst and last values, and its emails (`ALERT`, `REMINDER`, `RESOLVED`; `PENDING`, `SENT` or `FAILED`). Alerts are evaluated and emailed by the [alert service](../alert-service); threshold changes reach it within 30 seconds.
 - Errors are RFC 9457 problem details (`application/problem+json`); validation errors list the messages per field in `errors`.
 
 ## History cache
@@ -45,7 +52,9 @@ The OpenAPI 3.0 document is [openapi.json](openapi.json). API Management imports
   - a platform handler without the annotation is refused, so the check fails closed.
 - **Database**: the managed identity `id-device-api-*` is a member of `sdp_catalog`, which has:
   - `SELECT` on sites, devices, measurements and metric definitions;
-  - `UPDATE` only on the editable device columns and the audit columns.
+  - `UPDATE` only on the editable device columns and the audit columns;
+  - thresholds: full access to `alert_thresholds` and their evaluation state (locked during a change, so it is serialised with the alert service);
+  - alerts: `SELECT`, and `UPDATE` of `status` and `closed_at` only (cancellation).
 
   Edits record the editor's object id (`updated_by`), display name (`updated_by_name`) and time.
 

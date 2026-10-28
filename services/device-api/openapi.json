@@ -9,6 +9,76 @@
     "entra" : [ ]
   } ],
   "paths" : {
+    "/api/v1/alerts" : {
+      "get" : {
+        "description" : "Filter by status and site; alerts open at some point between from (default: 30 days ago) and to (default: now), most recent first.",
+        "operationId" : "listAlerts",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "status",
+          "required" : false,
+          "schema" : {
+            "pattern" : "(?i)open|closed|cancelled",
+            "type" : "string",
+            "enum" : [ "open", "closed", "cancelled" ]
+          }
+        }, {
+          "in" : "query",
+          "name" : "siteId",
+          "required" : false,
+          "schema" : {
+            "maxLength" : 40,
+            "minLength" : 1,
+            "type" : "string"
+          }
+        }, {
+          "in" : "query",
+          "name" : "from",
+          "required" : false,
+          "schema" : {
+            "type" : "string",
+            "format" : "date-time"
+          }
+        }, {
+          "in" : "query",
+          "name" : "to",
+          "required" : false,
+          "schema" : {
+            "type" : "string",
+            "format" : "date-time"
+          }
+        }, {
+          "in" : "query",
+          "name" : "limit",
+          "required" : false,
+          "schema" : {
+            "maximum" : 500,
+            "minimum" : 1,
+            "type" : "integer",
+            "format" : "int32",
+            "default" : 100
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "type" : "array",
+                  "items" : {
+                    "$ref" : "#/components/schemas/Alert"
+                  }
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "Alerts of all devices",
+        "tags" : [ "Alerting" ],
+        "x-sdp-required-role" : "read"
+      }
+    },
     "/api/v1/devices" : {
       "get" : {
         "description" : "Filter by site and status, search id and display name (case-insensitive), sort and page.",
@@ -173,6 +243,65 @@
         "summary" : "Edit a device's information",
         "tags" : [ "Devices" ],
         "x-sdp-required-role" : "write"
+      }
+    },
+    "/api/v1/devices/{deviceId}/alerts" : {
+      "get" : {
+        "description" : "Alerts open at some point between from (default: 30 days ago) and to (default: now), most recent first, with the threshold as it was and the notifications sent.",
+        "operationId" : "listDeviceAlerts",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "deviceId",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "in" : "query",
+          "name" : "from",
+          "required" : false,
+          "schema" : {
+            "type" : "string",
+            "format" : "date-time"
+          }
+        }, {
+          "in" : "query",
+          "name" : "to",
+          "required" : false,
+          "schema" : {
+            "type" : "string",
+            "format" : "date-time"
+          }
+        }, {
+          "in" : "query",
+          "name" : "limit",
+          "required" : false,
+          "schema" : {
+            "maximum" : 500,
+            "minimum" : 1,
+            "type" : "integer",
+            "format" : "int32",
+            "default" : 100
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "type" : "array",
+                  "items" : {
+                    "$ref" : "#/components/schemas/Alert"
+                  }
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "Alerts of a device",
+        "tags" : [ "Alerting" ],
+        "x-sdp-required-role" : "read"
       }
     },
     "/api/v1/devices/{deviceId}/measurements" : {
@@ -375,6 +504,163 @@
         "x-sdp-required-role" : "read"
       }
     },
+    "/api/v1/devices/{deviceId}/thresholds" : {
+      "get" : {
+        "operationId" : "listThresholds",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "deviceId",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "type" : "array",
+                  "items" : {
+                    "$ref" : "#/components/schemas/Threshold"
+                  }
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "Thresholds of a device",
+        "tags" : [ "Alerting" ],
+        "x-sdp-required-role" : "read"
+      },
+      "post" : {
+        "description" : "A metric the device reports, a minimum and/or a maximum (min < max), and 1 to 10 email recipients; at most 20 thresholds per device. Changes are applied by the alert service within 30 seconds.",
+        "operationId" : "createThreshold",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "deviceId",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/ThresholdInput"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Threshold"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "Add a threshold to a device",
+        "tags" : [ "Alerting" ],
+        "x-sdp-required-role" : "write"
+      }
+    },
+    "/api/v1/devices/{deviceId}/thresholds/{thresholdId}" : {
+      "delete" : {
+        "description" : "Closes its open alert without notification; past alerts are kept. If-Match is optional.",
+        "operationId" : "deleteThreshold",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "deviceId",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "in" : "path",
+          "name" : "thresholdId",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        }, {
+          "in" : "header",
+          "name" : "If-Match",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK"
+          }
+        },
+        "summary" : "Delete a threshold",
+        "tags" : [ "Alerting" ],
+        "x-sdp-required-role" : "write"
+      },
+      "put" : {
+        "description" : "Replaces the threshold; requires If-Match with its entity tag. Disabling it, or changing its metric, closes its open alert without notification.",
+        "operationId" : "updateThreshold",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "deviceId",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "in" : "path",
+          "name" : "thresholdId",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        }, {
+          "in" : "header",
+          "name" : "If-Match",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/ThresholdInput"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Threshold"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "Change, enable or disable a threshold",
+        "tags" : [ "Alerting" ],
+        "x-sdp-required-role" : "write"
+      }
+    },
     "/api/v1/me" : {
       "get" : {
         "description" : "Available without any platform role so that clients can explain which permission to request.",
@@ -422,6 +708,116 @@
   },
   "components" : {
     "schemas" : {
+      "Alert" : {
+        "type" : "object",
+        "properties" : {
+          "closedAt" : {
+            "type" : "string",
+            "format" : "date-time",
+            "nullable" : true
+          },
+          "deviceId" : {
+            "type" : "string"
+          },
+          "deviceName" : {
+            "type" : "string",
+            "nullable" : true
+          },
+          "direction" : {
+            "type" : "string",
+            "enum" : [ "ABOVE", "BELOW" ]
+          },
+          "firstValue" : {
+            "type" : "number"
+          },
+          "id" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "lastBreachAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "lastValue" : {
+            "type" : "number"
+          },
+          "metric" : {
+            "type" : "string"
+          },
+          "notifications" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/AlertNotification"
+            }
+          },
+          "openedAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "siteId" : {
+            "type" : "string"
+          },
+          "status" : {
+            "type" : "string",
+            "enum" : [ "OPEN", "CLOSED", "CANCELLED" ]
+          },
+          "thresholdId" : {
+            "type" : "string",
+            "description" : "Null once the threshold is deleted",
+            "format" : "uuid",
+            "nullable" : true
+          },
+          "thresholdMax" : {
+            "type" : "number",
+            "nullable" : true
+          },
+          "thresholdMin" : {
+            "type" : "number",
+            "nullable" : true
+          },
+          "unit" : {
+            "type" : "string",
+            "nullable" : true
+          },
+          "worstValue" : {
+            "type" : "number"
+          }
+        }
+      },
+      "AlertNotification" : {
+        "type" : "object",
+        "properties" : {
+          "attempts" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "createdAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "kind" : {
+            "type" : "string",
+            "enum" : [ "ALERT", "REMINDER", "RESOLVED" ]
+          },
+          "lastError" : {
+            "type" : "string",
+            "nullable" : true
+          },
+          "recipients" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "sentAt" : {
+            "type" : "string",
+            "format" : "date-time",
+            "nullable" : true
+          },
+          "status" : {
+            "type" : "string",
+            "enum" : [ "PENDING", "SENT", "FAILED" ]
+          }
+        }
+      },
       "DeviceDetails" : {
         "type" : "object",
         "properties" : {
@@ -748,6 +1144,96 @@
           },
           "siteId" : {
             "type" : "string"
+          }
+        }
+      },
+      "Threshold" : {
+        "type" : "object",
+        "properties" : {
+          "deviceId" : {
+            "type" : "string"
+          },
+          "enabled" : {
+            "type" : "boolean"
+          },
+          "etag" : {
+            "type" : "string",
+            "description" : "Entity tag to send in If-Match when changing the threshold"
+          },
+          "id" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "max" : {
+            "type" : "number",
+            "nullable" : true
+          },
+          "metric" : {
+            "type" : "string"
+          },
+          "min" : {
+            "type" : "number",
+            "nullable" : true
+          },
+          "openAlertId" : {
+            "type" : "integer",
+            "description" : "Id of the threshold's open alert, if any",
+            "format" : "int64",
+            "nullable" : true
+          },
+          "recipients" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+            }
+          },
+          "unit" : {
+            "type" : "string",
+            "nullable" : true
+          },
+          "updatedAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "updatedByName" : {
+            "type" : "string",
+            "nullable" : true
+          }
+        }
+      },
+      "ThresholdInput" : {
+        "required" : [ "metric", "recipients" ],
+        "type" : "object",
+        "properties" : {
+          "enabled" : {
+            "type" : "boolean",
+            "default" : true
+          },
+          "max" : {
+            "type" : "number",
+            "nullable" : true,
+            "example" : 8
+          },
+          "metric" : {
+            "maxLength" : 64,
+            "minLength" : 0,
+            "type" : "string",
+            "example" : "temperature"
+          },
+          "min" : {
+            "type" : "number",
+            "nullable" : true,
+            "example" : 2
+          },
+          "recipients" : {
+            "maxItems" : 10,
+            "minItems" : 1,
+            "type" : "array",
+            "example" : [ "cold-room@example.com" ],
+            "items" : {
+              "type" : "string",
+              "example" : "[\"cold-room@example.com\"]"
+            }
           }
         }
       }
