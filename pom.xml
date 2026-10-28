@@ -27,6 +27,7 @@
         <module>services/device-simulator</module>
         <module>services/db-migrator</module>
         <module>services/device-api</module>
+        <module>services/provisioning-api</module>
     </modules>
 
     <properties>

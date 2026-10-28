@@ -1,0 +1,426 @@
+{
+  "openapi" : "3.0.1",
+  "info" : {
+    "description" : "Site trust of the Smart Device Platform (provisioning API). Requires a Microsoft Entra ID access token for the platform API; operations declare the app role they need in x-sdp-required-role.",
+    "title" : "Smart Device Platform API",
+    "version" : "v1"
+  },
+  "security" : [ {
+    "entra" : [ ]
+  } ],
+  "paths" : {
+    "/api/v1/site-certificates" : {
+      "get" : {
+        "description" : "Used for the site list's trust summary.",
+        "operationId" : "listAllSiteCertificates",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "type" : "array",
+                  "items" : {
+                    "$ref" : "#/components/schemas/SiteCertificate"
+                  }
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "Certificates trusted by every site",
+        "tags" : [ "Site certificates" ],
+        "x-sdp-required-role" : "read"
+      }
+    },
+    "/api/v1/sites" : {
+      "post" : {
+        "description" : "A new site trusts no certificate, so no device can join it until a certificate is added.",
+        "operationId" : "createSite",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/SiteCreation"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/CreatedSite"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "Create a site",
+        "tags" : [ "Site certificates" ],
+        "x-sdp-required-role" : "write"
+      }
+    },
+    "/api/v1/sites/{siteId}/audit" : {
+      "get" : {
+        "operationId" : "listSiteAudit",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "siteId",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "in" : "query",
+          "name" : "limit",
+          "required" : false,
+          "schema" : {
+            "maximum" : 200,
+            "minimum" : 1,
+            "type" : "integer",
+            "format" : "int32",
+            "default" : 50
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "type" : "array",
+                  "items" : {
+                    "$ref" : "#/components/schemas/AuditEvent"
+                  }
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "Trust changes of a site, most recent first",
+        "tags" : [ "Site certificates" ],
+        "x-sdp-required-role" : "read"
+      }
+    },
+    "/api/v1/sites/{siteId}/certificates" : {
+      "get" : {
+        "description" : "Status is valid, expiring (ends within 30 days) or expired.",
+        "operationId" : "listSiteCertificates",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "siteId",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "type" : "array",
+                  "items" : {
+                    "$ref" : "#/components/schemas/SiteCertificate"
+                  }
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "Certificates trusted by a site",
+        "tags" : [ "Site certificates" ],
+        "x-sdp-required-role" : "read"
+      },
+      "post" : {
+        "description" : "Upload one X.509 CA certificate (PEM or DER, at most 64 KB) as the multipart part `file`. Rejected when it is not a CA, not currently valid, contains a private key, is already trusted, or the site already trusts two certificates. Re-enables devices disabled when the site lost its last certificate.",
+        "operationId" : "addSiteCertificate",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "siteId",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "multipart/form-data" : {
+              "schema" : {
+                "type" : "object",
+                "properties" : {
+                  "file" : {
+                    "type" : "string",
+                    "format" : "binary"
+                  }
+                },
+                "required" : [ "file" ]
+              }
+            }
+          }
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/CertificateChange"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "Trust a CA certificate for a site",
+        "tags" : [ "Site certificates" ],
+        "x-sdp-required-role" : "write"
+      }
+    },
+    "/api/v1/sites/{siteId}/certificates/{fingerprint}" : {
+      "delete" : {
+        "description" : "Devices issued by it can no longer join. When it is the site's last certificate, all devices of the site are disabled. 202 when the device operation continues in the background.",
+        "operationId" : "removeSiteCertificate",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "siteId",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "in" : "path",
+          "name" : "fingerprint",
+          "required" : true,
+          "schema" : {
+            "pattern" : "^[0-9a-fA-F]{64}$",
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/CertificateChange"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "Stop trusting a certificate",
+        "tags" : [ "Site certificates" ],
+        "x-sdp-required-role" : "write"
+      }
+    },
+    "/api/v1/sites/{siteId}/operations/{operationId}" : {
+      "get" : {
+        "operationId" : "getSiteOperation",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "siteId",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "in" : "path",
+          "name" : "operationId",
+          "required" : true,
+          "schema" : {
+            "type" : "string",
+            "format" : "uuid"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/DeviceOperation"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "Progress of a device disable/re-enable operation",
+        "tags" : [ "Site certificates" ],
+        "x-sdp-required-role" : "read"
+      }
+    }
+  },
+  "components" : {
+    "schemas" : {
+      "AuditEvent" : {
+        "type" : "object",
+        "properties" : {
+          "action" : {
+            "type" : "string"
+          },
+          "actorId" : {
+            "type" : "string"
+          },
+          "actorName" : {
+            "type" : "string"
+          },
+          "details" : {
+            "type" : "object",
+            "additionalProperties" : {
+              "type" : "object"
+            }
+          },
+          "fingerprint" : {
+            "type" : "string"
+          },
+          "id" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "occurredAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "siteId" : {
+            "type" : "string"
+          }
+        }
+      },
+      "CertificateChange" : {
+        "type" : "object",
+        "properties" : {
+          "certificate" : {
+            "$ref" : "#/components/schemas/SiteCertificate"
+          },
+          "deviceOperation" : {
+            "$ref" : "#/components/schemas/DeviceOperation"
+          }
+        }
+      },
+      "CreatedSite" : {
+        "type" : "object",
+        "properties" : {
+          "certificateCount" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "displayName" : {
+            "type" : "string"
+          },
+          "siteId" : {
+            "type" : "string"
+          }
+        }
+      },
+      "DeviceOperation" : {
+        "type" : "object",
+        "properties" : {
+          "attempts" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "createdAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "deviceCount" : {
+            "type" : "integer",
+            "format" : "int32"
+          },
+          "id" : {
+            "type" : "string",
+            "format" : "uuid"
+          },
+          "kind" : {
+            "type" : "string"
+          },
+          "lastError" : {
+            "type" : "string"
+          },
+          "siteId" : {
+            "type" : "string"
+          },
+          "status" : {
+            "type" : "string"
+          },
+          "updatedAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          }
+        }
+      },
+      "SiteCertificate" : {
+        "type" : "object",
+        "properties" : {
+          "addedAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "addedBy" : {
+            "type" : "string"
+          },
+          "addedByName" : {
+            "type" : "string"
+          },
+          "fingerprint" : {
+            "type" : "string"
+          },
+          "issuer" : {
+            "type" : "string"
+          },
+          "notAfter" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "notBefore" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "siteId" : {
+            "type" : "string"
+          },
+          "slot" : {
+            "type" : "string"
+          },
+          "status" : {
+            "type" : "string"
+          },
+          "subject" : {
+            "type" : "string"
+          }
+        }
+      },
+      "SiteCreation" : {
+        "required" : [ "displayName", "siteId" ],
+        "type" : "object",
+        "properties" : {
+          "displayName" : {
+            "maxLength" : 100,
+            "minLength" : 0,
+            "type" : "string",
+            "example" : "Nice warehouse"
+          },
+          "siteId" : {
+            "maxLength" : 40,
+            "minLength" : 3,
+            "pattern" : "^[a-z0-9]+(-[a-z0-9]+)*$",
+            "type" : "string",
+            "example" : "nice-01"
+          }
+        }
+      }
+    },
+    "securitySchemes" : {
+      "entra" : {
+        "bearerFormat" : "JWT",
+        "scheme" : "bearer",
+        "type" : "http"
+      }
+    }
+  }
+}

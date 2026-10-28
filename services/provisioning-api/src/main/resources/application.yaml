@@ -1,0 +1,60 @@
+spring:
+  application:
+    name: sdp-provisioning-api
+  main:
+    banner-mode: off
+  threads:
+    virtual:
+      enabled: true
+  mvc:
+    problemdetails:
+      enabled: true
+  servlet:
+    multipart:
+      # Certificates are small; anything bigger is refused before parsing.
+      max-file-size: 64KB
+      max-request-size: 80KB
+  datasource:
+    url: ${SDP_DB_URL:jdbc:postgresql://localhost:5432/sdp?sslmode=require}
+    username: ${SDP_DB_USERNAME:}
+    password: ${SDP_DB_PASSWORD:}
+    # Entra ID token authentication with the service's managed identity (AZURE_CLIENT_ID).
+    azure:
+      passwordless-enabled: ${SDP_DB_PASSWORDLESS:true}
+    hikari:
+      maximum-pool-size: ${SDP_DB_POOL_SIZE:6}
+
+server:
+  port: ${PORT:8080}
+  forward-headers-strategy: framework
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      probes:
+        enabled: true
+
+# The OpenAPI document is exported at build time (openapi.json) and imported into API Management; it is not served.
+springdoc:
+  api-docs:
+    enabled: ${SDP_OPENAPI_ENABLED:false}
+    version: openapi_3_0
+  writer-with-order-by-keys: true
+
+sdp:
+  security:
+    tenant-id: ${SDP_ENTRA_TENANT_ID:}
+    audiences: ${SDP_API_AUDIENCES:}
+  provisioning:
+    # DPS resource id (control plane: CA certificates) and service host (data plane: enrollment groups).
+    dps-resource-id: ${SDP_DPS_RESOURCE_ID:}
+    dps-host: ${SDP_DPS_HOST:}
+    iothub-host: ${SDP_IOTHUB_HOST:}
+    sync-device-limit: ${SDP_SYNC_DEVICE_LIMIT:100}
+    reconciliation:
+      enabled: ${SDP_RECONCILIATION_ENABLED:true}
+      interval: ${SDP_RECONCILIATION_INTERVAL:1h}

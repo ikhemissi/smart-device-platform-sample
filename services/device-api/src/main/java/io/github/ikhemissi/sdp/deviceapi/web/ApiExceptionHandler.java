@@ -11,6 +11,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
+import org.slf4j.LoggerFactory;
+import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.WebRequest;
@@ -39,6 +41,23 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
                 .computeIfAbsent(result.getMethodParameter().getParameterName(), name -> new java.util.ArrayList<>())
                 .addAll(result.getResolvableErrors().stream().map(MessageSourceResolvable::getDefaultMessage).toList()));
         return validationProblem(errors, headers);
+    }
+
+    @Override
+    protected ResponseEntity<Object> handleMethodArgumentNotValid(MethodArgumentNotValidException exception,
+            HttpHeaders headers, HttpStatusCode status, WebRequest request) {
+        Map<String, List<String>> errors = new TreeMap<>();
+        exception.getBindingResult().getFieldErrors().forEach(error -> errors
+                .computeIfAbsent(error.getField(), name -> new java.util.ArrayList<>()).add(error.getDefaultMessage()));
+        return validationProblem(errors, headers);
+    }
+
+    /** Anything unexpected: logged with its stack trace, answered without internal details. */
+    @ExceptionHandler(Exception.class)
+    ResponseEntity<ProblemDetail> handleUnexpected(Exception exception) {
+        LoggerFactory.getLogger(ApiExceptionHandler.class).error("Unexpected error", exception);
+        return ResponseEntity.internalServerError().body(ProblemDetail.forStatusAndDetail(HttpStatus.INTERNAL_SERVER_ERROR,
+                "Something went wrong on our side. Try again; if the problem persists, contact your administrator."));
     }
 
     @Override
