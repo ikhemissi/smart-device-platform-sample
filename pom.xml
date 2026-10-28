@@ -28,6 +28,7 @@
         <module>services/db-migrator</module>
         <module>services/device-api</module>
         <module>services/provisioning-api</module>
+        <module>services/alert-service</module>
     </modules>
 
     <properties>

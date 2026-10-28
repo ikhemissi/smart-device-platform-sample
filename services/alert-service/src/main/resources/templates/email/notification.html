@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title th:text="${subject}">Alert</title>
+</head>
+<body style="font-family: Segoe UI, Helvetica, Arial, sans-serif; color: #242424; font-size: 14px;">
+  <p style="font-size: 16px; font-weight: 600;"
+     th:style="${kind == 'RESOLVED'} ? 'font-size: 16px; font-weight: 600; color: #0e700e;' : 'font-size: 16px; font-weight: 600; color: #b10e1c;'"
+     th:text="${headline}">Air temperature of Cold room is above 8 °C.</p>
+  <table style="border-collapse: collapse;" role="presentation">
+    <tr><th style="text-align: left; padding: 4px 16px 4px 0;">Device</th><td th:text="${device}">Cold room</td></tr>
+    <tr><th style="text-align: left; padding: 4px 16px 4px 0;">Site</th><td th:text="${site}">paris-01</td></tr>
+    <tr><th style="text-align: left; padding: 4px 16px 4px 0;">Metric</th><td th:text="${metric}">Air temperature (°C)</td></tr>
+    <tr><th style="text-align: left; padding: 4px 16px 4px 0;">Value</th>
+        <td><strong th:text="${currentValue}">12 °C</strong> (measured <span th:text="${measuredAt}">time</span>)</td></tr>
+    <tr><th style="text-align: left; padding: 4px 16px 4px 0;">Worst value</th><td th:text="${worstValue}">12 °C</td></tr>
+    <tr><th style="text-align: left; padding: 4px 16px 4px 0;">Threshold</th><td th:text="${threshold}">between 2 °C and 8 °C</td></tr>
+    <tr><th style="text-align: left; padding: 4px 16px 4px 0;">Alert opened</th><td th:text="${openedAt}">time</td></tr>
+    <tr th:if="${closedAt}"><th style="text-align: left; padding: 4px 16px 4px 0;">Back to normal</th><td th:text="${closedAt}">time</td></tr>
+  </table>
+  <p th:if="${kind == 'REMINDER'}">You receive a reminder every hour while the reading stays out of range.</p>
+  <p th:if="${kind != 'RESOLVED'}">You will receive one more email when the reading is back within range.</p>
+  <p><a th:href="${link}" href="#">Open the device page</a></p>
+  <p style="color: #616161; font-size: 12px;">Smart Device Platform alerting. You receive this email because your address
+    is a recipient of this device's threshold.</p>
+</body>
+</html>

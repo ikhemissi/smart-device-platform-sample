@@ -1,0 +1,18 @@
+Subject: Alert: Cold room – Air temperature above 8 °C
+
+Air temperature of Cold room is above 8 °C.
+
+Device:         Cold room (paris-01-ruuvi5-001)
+Site:           Paris warehouse (paris-01)
+Metric:         Air temperature (°C)
+Value:          12 °C (measured 28 Oct 2026, 14:05:00 CET)
+Worst value:    12.4 °C
+Threshold:      between 2 °C and 8 °C
+Alert opened:   28 Oct 2026, 14:05:00 CET
+
+You will receive one more email when the reading is back within range.
+
+Device page: https://portal.example.com/devices/paris-01-ruuvi5-001
+
+--
+Smart Device Platform alerting. You receive this email because your address is a recipient of this device's threshold.

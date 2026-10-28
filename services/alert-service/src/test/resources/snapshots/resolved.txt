@@ -1,0 +1,17 @@
+Subject: Back to normal: Cold room – Air temperature within 2–8 °C
+
+Air temperature of Cold room is back within 2–8 °C.
+
+Device:         Cold room (paris-01-ruuvi5-001)
+Site:           Paris warehouse (paris-01)
+Metric:         Air temperature (°C)
+Value:          5.5 °C (measured 28 Oct 2026, 14:12:00 CET)
+Worst value:    12.4 °C
+Threshold:      between 2 °C and 8 °C
+Alert opened:   28 Oct 2026, 14:05:00 CET
+Back to normal: 28 Oct 2026, 14:12:00 CET
+
+Device page: https://portal.example.com/devices/paris-01-ruuvi5-001
+
+--
+Smart Device Platform alerting. You receive this email because your address is a recipient of this device's threshold.

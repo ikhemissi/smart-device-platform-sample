@@ -1,0 +1,18 @@
+[(${headline})]
+
+Device:         [(${device})]
+Site:           [(${site})]
+Metric:         [(${metric})]
+Value:          [(${currentValue})] (measured [(${measuredAt})])
+Worst value:    [(${worstValue})]
+Threshold:      [(${threshold})]
+Alert opened:   [(${openedAt})]
+[# th:if="${closedAt}"]Back to normal: [(${closedAt})]
+[/][# th:if="${kind == 'REMINDER'}"]
+You receive a reminder every hour while the reading stays out of range.[/][# th:if="${kind != 'RESOLVED'}"]
+You will receive one more email when the reading is back within range.
+[/]
+Device page: [(${link})]
+
+--
+Smart Device Platform alerting. You receive this email because your address is a recipient of this device's threshold.
