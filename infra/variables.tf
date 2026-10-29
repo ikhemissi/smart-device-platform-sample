@@ -168,3 +168,41 @@ variable "agent_capture_content" {
   type        = string
   default     = ""
 }
+
+# Anomaly detection (M7). Set with `azd env set ANOMALY_*` / DECISION_MODEL_CAPACITY; empty values fall back to the
+# defaults in main.tf, which scripts/check-model-quota.sh (pre-provision) mirrors.
+variable "anomaly_detection_enabled" {
+  description = "Deploy Microsoft-Decision-1 and the anomaly detector job (ANOMALY_DETECTION_ENABLED, \"false\" to switch off). Empty: true."
+  type        = string
+  default     = ""
+}
+
+variable "anomaly_sites" {
+  description = "Comma-separated sites analysed by the anomaly detector (ANOMALY_SITES). Empty: paris-01."
+  type        = string
+  default     = ""
+}
+
+variable "anomaly_metrics" {
+  description = "Comma-separated metrics analysed by the anomaly detector (ANOMALY_METRICS). Empty: temperature,humidity,pressure,co2,illuminance."
+  type        = string
+  default     = ""
+}
+
+variable "anomaly_deviation" {
+  description = "Deviation score (in spreads from the usual value) that makes a reading a candidate (ANOMALY_DEVIATION). Empty: see main.tf."
+  type        = string
+  default     = ""
+}
+
+variable "anomaly_confidence" {
+  description = "Probability from which Microsoft-Decision-1's classification is applied without review (ANOMALY_CONFIDENCE). Empty: see main.tf."
+  type        = string
+  default     = ""
+}
+
+variable "decision_model_capacity" {
+  description = "Microsoft-Decision-1 capacity units, each 1 request and 1,000 tokens per minute (DECISION_MODEL_CAPACITY). Empty: 30."
+  type        = string
+  default     = ""
+}

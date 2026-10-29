@@ -42,3 +42,6 @@ sdp:
       - name: ${SDP_ALERT_SERVICE_PRINCIPAL_NAME:}
         object-id: ${SDP_ALERT_SERVICE_PRINCIPAL_OBJECT_ID:}
         group-role: sdp_alerting
+      - name: ${SDP_ANOMALY_DETECTOR_PRINCIPAL_NAME:}
+        object-id: ${SDP_ANOMALY_DETECTOR_PRINCIPAL_OBJECT_ID:}
+        group-role: sdp_insights

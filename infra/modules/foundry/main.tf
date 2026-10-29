@@ -20,6 +20,11 @@ variable "model" {
     capacity = number
   })
 }
+variable "decision_model" {
+  description = "Microsoft-Decision-1 deployment of the anomaly detector (M7 design D6); null when the feature is off."
+  type        = object({ capacity = number })
+  default     = null
+}
 variable "application_insights" {
   type = object({
     id                = string
@@ -102,6 +107,33 @@ resource "azapi_resource" "model" {
   depends_on = [azapi_resource.project]
 }
 
+# Classifies anomaly candidates (ADR-0011). Preview model; Entra-only like the rest of the account.
+resource "azapi_resource" "decision_model" {
+  count = var.decision_model == null ? 0 : 1
+  type  = "Microsoft.CognitiveServices/accounts/deployments@${local.api_version}"
+  # Deployment names must not contain the reserved word "Microsoft"; requests name the deployment, not the model.
+  name      = "decision-1"
+  parent_id = azapi_resource.account.id
+
+  body = {
+    sku = {
+      name     = "DataZoneStandard"
+      capacity = var.decision_model.capacity
+    }
+    properties = {
+      model = {
+        format  = "Microsoft"
+        name    = "Microsoft-Decision-1"
+        version = "1"
+      }
+      versionUpgradeOption = "NoAutoUpgrade"
+    }
+  }
+
+  # Concurrent operations on the same account fail with a conflict.
+  depends_on = [azapi_resource.appinsights_connection]
+}
+
 # Documented Foundry form (foundry-samples connection-application-insights.bicep): the "key" is the ingestion
 # connection string, an endpoint identifier rather than a credential; local authentication is disabled on
 # Application Insights, so ingestion still requires an Entra token.
@@ -144,3 +176,5 @@ output "project_name" { value = azapi_resource.project.name }
 output "openai_endpoint" { value = "https://${local.account_name}.openai.azure.com/" }
 output "project_endpoint" { value = "https://${local.account_name}.services.ai.azure.com/api/projects/${azapi_resource.project.name}" }
 output "model_deployment_name" { value = azapi_resource.model.name }
+output "account_endpoint" { value = "https://${local.account_name}.cognitiveservices.azure.com/" }
+output "decision_model_deployment_name" { value = join("", azapi_resource.decision_model[*].name) }

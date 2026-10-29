@@ -21,6 +21,8 @@ locals {
     "SecurityControl" = "Ignore"
     "CostControl"     = "Ignore"
   }
+  anomaly_detection_enabled = lower(coalesce(var.anomaly_detection_enabled, "true")) != "false"
+  anomaly_sites             = coalesce(var.anomaly_sites, "paris-01")
 }
 
 resource "azurerm_resource_group" "main" {
@@ -161,6 +163,8 @@ module "apps" {
   }
   postgres = {
     jdbc_url = "jdbc:postgresql://${module.data.postgres_fqdn}:5432/${module.data.database_name}?sslmode=require"
+    host     = module.data.postgres_fqdn
+    database = module.data.database_name
   }
   eventhubs = {
     namespace_name           = module.ingestion.eventhubs_namespace_name
@@ -212,6 +216,15 @@ module "apps" {
     api_client_id      = module.entra.api_client_id
     api_identifier_uri = module.entra.api_identifier_uri
   }
+  anomaly_detection = {
+    enabled             = local.anomaly_detection_enabled
+    sites               = local.anomaly_sites
+    metrics             = coalesce(var.anomaly_metrics, "temperature,humidity,pressure,co2,illuminance")
+    deviation           = coalesce(var.anomaly_deviation, "4")
+    confidence          = coalesce(var.anomaly_confidence, "0.7")
+    decision_endpoint   = module.foundry.account_endpoint
+    decision_deployment = module.foundry.decision_model_deployment_name
+  }
   tags = local.tags
 
   # Workload identities must hold their roles before the apps start.
@@ -247,6 +260,9 @@ module "foundry" {
     sku      = coalesce(var.agent_model_sku, "DataZoneStandard")
     capacity = tonumber(coalesce(var.agent_model_capacity, "50"))
   }
+  decision_model = local.anomaly_detection_enabled ? {
+    capacity = tonumber(coalesce(var.decision_model_capacity, "30"))
+  } : null
   application_insights = {
     id                = module.core.application_insights_id
     connection_string = module.core.application_insights_connection_string

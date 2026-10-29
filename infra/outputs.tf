@@ -211,3 +211,20 @@ output "DEVICE_ANALYST_URL" {
 output "DEVICE_ANALYST_IDENTITY_NAME" {
   value = module.identity.device_analyst.name
 }
+
+output "ANOMALY_DETECTOR_JOB_NAME" {
+  description = "Anomaly detector job; empty when ANOMALY_DETECTION_ENABLED is false."
+  value       = module.apps.anomaly_detector_job_name
+}
+
+output "ANOMALY_DETECTOR_IDENTITY_NAME" {
+  value = module.identity.anomaly_detector.name
+}
+
+output "DECISION_MODEL_DEPLOYMENT_NAME" {
+  value = module.foundry.decision_model_deployment_name
+}
+
+output "FOUNDRY_ACCOUNT_ENDPOINT" {
+  value = module.foundry.account_endpoint
+}

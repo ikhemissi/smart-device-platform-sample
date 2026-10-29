@@ -9,6 +9,7 @@ locals {
     provisioning_api = module.identity.provisioning_api.principal_id
     alert_service    = module.identity.alert_service.principal_id
     device_analyst   = module.identity.device_analyst.principal_id
+    anomaly_detector = module.identity.anomaly_detector.principal_id
   }
 }
 
@@ -131,6 +132,16 @@ resource "azurerm_role_assignment" "device_analyst_openai" {
   principal_type       = "ServicePrincipal"
 }
 
+# Anomaly detector (M7 design D6): explanations by the chat model and classifications by Microsoft-Decision-1, whose
+# decision API needs a data action outside "Cognitive Services OpenAI User". "Foundry User" (formerly "Azure AI User",
+# referenced by id because built-in role names change) covers both models.
+resource "azurerm_role_assignment" "anomaly_detector_foundry" {
+  scope              = module.foundry.account_id
+  role_definition_id = "/subscriptions/${var.subscription_id}/providers/Microsoft.Authorization/roleDefinitions/53ca6127-db72-4b80-b1b0-d745d6d5456d"
+  principal_id       = module.identity.anomaly_detector.principal_id
+  principal_type     = "ServicePrincipal"
+}
+
 # Deployer: needed by the post-provision bootstrap (site CAs, enrollment groups) and for troubleshooting.
 resource "azurerm_role_assignment" "deployer_key_vault" {
   scope                = module.core.key_vault_id
@@ -195,5 +206,6 @@ resource "time_sleep" "rbac_propagation" {
     azurerm_role_assignment.alert_service_servicebus_receiver,
     azurerm_role_assignment.alert_service_email,
     azurerm_role_assignment.device_analyst_openai,
+    azurerm_role_assignment.anomaly_detector_foundry,
   ]
 }

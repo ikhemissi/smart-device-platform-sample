@@ -17,13 +17,14 @@ variable "identities" {
     provisioning_api = object({ id = string, client_id = string, principal_id = string, name = string })
     alert_service    = object({ id = string, client_id = string, principal_id = string, name = string })
     device_analyst   = object({ id = string, client_id = string, principal_id = string, name = string })
+    anomaly_detector = object({ id = string, client_id = string, principal_id = string, name = string })
   })
 }
 variable "application_insights" {
   type      = object({ connection_string = string })
   sensitive = true
 }
-variable "postgres" { type = object({ jdbc_url = string }) }
+variable "postgres" { type = object({ jdbc_url = string, host = string, database = string }) }
 variable "eventhubs" {
   type = object({
     namespace_name           = string
@@ -74,6 +75,18 @@ variable "entra" {
   description = "Token validation settings of the platform API (ADR-0007)."
   type        = object({ tenant_id = string, api_client_id = string, api_identifier_uri = string })
 }
+variable "anomaly_detection" {
+  description = "Anomaly detector job settings (M7 design D6/D11); the job exists only when enabled."
+  type = object({
+    enabled             = bool
+    sites               = string
+    metrics             = string
+    deviation           = string
+    confidence          = string
+    decision_endpoint   = string
+    decision_deployment = string
+  })
+}
 variable "tags" { type = map(string) }
 
 locals {
@@ -123,6 +136,8 @@ locals {
     SDP_PROVISIONING_API_PRINCIPAL_OBJECT_ID  = var.identities.provisioning_api.principal_id
     SDP_ALERT_SERVICE_PRINCIPAL_NAME          = var.identities.alert_service.name
     SDP_ALERT_SERVICE_PRINCIPAL_OBJECT_ID     = var.identities.alert_service.principal_id
+    SDP_ANOMALY_DETECTOR_PRINCIPAL_NAME       = var.identities.anomaly_detector.name
+    SDP_ANOMALY_DETECTOR_PRINCIPAL_OBJECT_ID  = var.identities.anomaly_detector.principal_id
   })
 
   device_api_env = merge(local.observability_env, {
@@ -180,6 +195,25 @@ locals {
     SDP_REDIS_HOST                        = var.redis.host
     SDP_REDIS_PORT                        = tostring(var.redis.port)
     SDP_AGENT_CAPTURE_CONTENT             = tostring(var.foundry.capture_content)
+  }
+
+  # Python job (M7 design D1/D10): PostgreSQL with an Entra token as password, models with the workload identity.
+  anomaly_detector_env = {
+    APPLICATIONINSIGHTS_CONNECTION_STRING = var.application_insights.connection_string
+    OTEL_RESOURCE_ATTRIBUTES              = "deployment.environment=${var.environment_name}"
+    OTEL_SERVICE_NAME                     = "sdp-anomaly-detector"
+    AZURE_CLIENT_ID                       = var.identities.anomaly_detector.client_id
+    SDP_DB_HOST                           = var.postgres.host
+    SDP_DB_NAME                           = var.postgres.database
+    SDP_DB_USER                           = var.identities.anomaly_detector.name
+    AZURE_OPENAI_ENDPOINT                 = var.foundry.openai_endpoint
+    FOUNDRY_MODEL_DEPLOYMENT_NAME         = var.foundry.model_deployment_name
+    SDP_DECISION_ENDPOINT                 = var.anomaly_detection.decision_endpoint
+    SDP_DECISION_DEPLOYMENT               = var.anomaly_detection.decision_deployment
+    SDP_ANOMALY_SITES                     = var.anomaly_detection.sites
+    SDP_ANOMALY_METRICS                   = var.anomaly_detection.metrics
+    SDP_ANOMALY_DEVIATION                 = var.anomaly_detection.deviation
+    SDP_ANOMALY_CONFIDENCE                = var.anomaly_detection.confidence
   }
 }
 
@@ -752,6 +786,59 @@ resource "azurerm_container_app_job" "maintain" {
   }
 }
 
+# --- Anomaly detector job (M7) ----------------------------------------------------------------------------------
+
+resource "azurerm_container_app_job" "anomaly_detector" {
+  count                        = var.anomaly_detection.enabled ? 1 : 0
+  name                         = "caj-anomaly-${var.token}"
+  resource_group_name          = var.resource_group_name
+  location                     = var.location
+  container_app_environment_id = var.container_app_environment_id
+  workload_profile_name        = "Consumption"
+  # One cycle per run; a failed or late cycle is retried by the next one (design D1).
+  replica_timeout_in_seconds = 240
+  replica_retry_limit        = 0
+  tags                       = var.tags
+
+  schedule_trigger_config {
+    cron_expression          = "*/5 * * * *"
+    parallelism              = 1
+    replica_completion_count = 1
+  }
+
+  identity {
+    type         = "UserAssigned"
+    identity_ids = [var.identities.anomaly_detector.id, var.identities.acr_pull.id]
+  }
+
+  registry {
+    server   = var.registry_server
+    identity = var.identities.acr_pull.id
+  }
+
+  template {
+    container {
+      name   = "anomaly-detector"
+      image  = local.placeholder_image
+      cpu    = 0.5
+      memory = "1Gi"
+
+      dynamic "env" {
+        for_each = local.anomaly_detector_env
+        content {
+          name  = env.key
+          value = env.value
+        }
+      }
+    }
+  }
+
+  lifecycle {
+    # Set by the post-provision hook (image built in ACR).
+    ignore_changes = [template[0].container[0].image]
+  }
+}
+
 output "decoder_app_name" { value = azurerm_container_app.decoder.name }
 output "simulator_app_name" { value = azurerm_container_app.simulator.name }
 output "migrator_job_name" { value = azurerm_container_app_job.migrate.name }
@@ -762,4 +849,5 @@ output "provisioning_api_url" { value = "https://${azurerm_container_app.provisi
 output "maintenance_job_name" { value = azurerm_container_app_job.maintain.name }
 output "alert_service_app_name" { value = azurerm_container_app.alert_service.name }
 output "device_analyst_app_name" { value = azurerm_container_app.device_analyst.name }
+output "anomaly_detector_job_name" { value = join("", azurerm_container_app_job.anomaly_detector[*].name) }
 output "device_analyst_url" { value = "https://${azurerm_container_app.device_analyst.ingress[0].fqdn}" }
