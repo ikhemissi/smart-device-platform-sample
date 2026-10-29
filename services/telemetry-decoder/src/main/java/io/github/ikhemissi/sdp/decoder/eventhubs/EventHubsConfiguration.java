@@ -4,6 +4,7 @@ import com.azure.core.credential.TokenCredential;
 import com.azure.messaging.eventhubs.EventProcessorClient;
 import com.azure.messaging.eventhubs.EventProcessorClientBuilder;
 import com.azure.messaging.eventhubs.checkpointstore.blob.BlobCheckpointStore;
+import com.azure.messaging.eventhubs.models.EventPosition;
 import com.azure.storage.blob.BlobContainerAsyncClient;
 import com.azure.storage.blob.BlobContainerClientBuilder;
 import io.github.ikhemissi.sdp.decoder.DecoderProperties;
@@ -62,6 +63,9 @@ public class EventHubsConfiguration {
                 .processEventBatch(handler::onBatch, properties.batch().maxSize(), properties.batch().maxWait())
                 .processPartitionInitialization(handler::onInitialization)
                 .processError(handler::onError)
+                // Without a checkpoint (first start, new consumer group or partition), read from the oldest retained event:
+                // the SDK default (latest) would skip messages sent before the partition was first claimed.
+                .initialPartitionEventPosition(partitionId -> EventPosition.earliest())
                 // Tells whether a batch ends at the partition's last enqueued event (ingestion watermark).
                 .trackLastEnqueuedEventProperties(true);
         if (StringUtils.hasText(eh.connectionString())) {
