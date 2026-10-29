@@ -15,7 +15,8 @@
 - [x] 2.5 Cycle orchestration, persistence and OpenTelemetry (design D10), plus a dry-run mode (no write, no model call) over a past period; verify a local dry run against `sdp-dev` and unit tests of the cycle with fakes
 - [x] 2.6 Tune `ANOMALY_DEVIATION` and `ANOMALY_CONFIDENCE` with dry runs over the last 7 days of `sdp-dev` (design D11); record the values and counts in the design and the README; verify the chosen defaults give a few confirmed anomalies per day on `paris-01`
 - [x] 2.7 Simulator: pressure drift computed from the time and the device seed, continuous across restarts (an anomaly injection restarts the simulator; the random walk restarted at 0 and the detector flagged the jumps); verify device-fleet tests (restart continuity, slow drift) and the simulator tests
-- [ ] 2.8 Deploy the job and inject 35 °C anomalies with the simulator: on one `paris-01` device (expected: confirmed sensor fault) and on three `paris-01` devices at once (expected: confirmed real events); verify both appear with explanations within 10 minutes, and their cycle traces in Application Insights
+- [x] 2.8 Simulator: gradual anomalies (`<value>~<ramp>`: ramp with the usual noise, hold, ramp back) next to the instant ones; verify device-fleet tests and the dependent modules build
+- [ ] 2.9 Deploy the job and inject 35 °C anomalies with the simulator: on one `paris-01` device (expected: confirmed sensor fault) and on three `paris-01` devices at once with a ramp (expected: confirmed real events); verify both appear with explanations within 10 minutes, and their cycle traces in Application Insights
 
 ## 3. Platform API
 

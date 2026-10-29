@@ -132,6 +132,30 @@ class ReadingModelTest {
         assertThat(anomaly.isActive("paris-01-ruuvi5-001", START, START.plusSeconds(721))).isFalse();
         assertThat(anomaly.isActive("paris-01-ruuvi5-002", START, START.plusSeconds(180))).isFalse();
         assertThatThrownBy(() -> Anomaly.parse("paris-01-ruuvi5-001:temperature")).isInstanceOf(IllegalArgumentException.class);
+        assertThat(anomaly.ramp()).isZero();
+    }
+
+    @Test
+    void rampedAnomalyWarmsUpGraduallyWithNoiseThenReturns() {
+        SimulatedDevice device = device(PayloadFormat.RUUVI_DF5);
+        Anomaly anomaly = Anomaly.parse(device.deviceId() + ":temperature=35~5m:10m:1m");
+        assertThat(anomaly.ramp()).isEqualTo(Duration.ofMinutes(5));
+        ReadingModel model = new ReadingModel(device, List.of(anomaly), START);
+
+        double before = model.next(START.plusSeconds(30)).metrics().get("temperature").doubleValue();
+        double previous = before;
+        List<Double> held = new java.util.ArrayList<>();
+        for (int s = 60; s <= 22 * 60; s += 30) {
+            double t = model.next(START.plusSeconds(s)).metrics().get("temperature").doubleValue();
+            assertThat(Math.abs(t - previous)).as("second %d", s).isLessThan(3.0);
+            if (s >= 6 * 60 && s < 11 * 60) {
+                held.add(t);
+            }
+            previous = t;
+        }
+        assertThat(held).allSatisfy(t -> assertThat(t).isCloseTo(35.0, within(0.6)));
+        assertThat(held.stream().distinct().count()).as("noisy, not constant").isGreaterThan(5);
+        assertThat(previous).as("back to normal after the ramp down").isCloseTo(before, within(2.0));
     }
 
     @ParameterizedTest

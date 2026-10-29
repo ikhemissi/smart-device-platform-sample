@@ -139,9 +139,16 @@ public final class ReadingModel {
 
     private double override(String metric, Instant now, double value) {
         for (Anomaly a : anomalies) {
-            if (a.metric().equals(metric) && a.isActive(device.deviceId(), start, now)) {
+            if (!a.metric().equals(metric) || !a.isActive(device.deviceId(), start, now)) {
+                continue;
+            }
+            if (a.ramp().isZero()) {
                 return a.value() + random.nextGaussian() * 0.05;
             }
+            // Gradual and noisy, like a real change: blend the usual reading into the forced value.
+            double weight = a.weight(start, now);
+            double noise = random.nextGaussian() * Math.max(0.05, Math.abs(a.value()) * 0.004);
+            return value + (a.value() - value) * weight + noise * weight;
         }
         return value;
     }

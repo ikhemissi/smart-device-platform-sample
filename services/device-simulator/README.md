@@ -22,7 +22,7 @@ Simulates a fleet of sensors spread over several sites, sending **real device fo
 | `SDP_SIM_INTERVAL` / `SDP_SIM_JITTER` | `30s` / `5s` | Reporting interval and random jitter (±) |
 | `SDP_SIM_DURATION` | — | Optional run duration (e.g. `15m`); runs until stopped otherwise |
 | `SDP_SIM_CORRUPTION_RATE` | `0` | Share of corrupted messages, e.g. `0.01` |
-| `SDP_SIM_ANOMALIES` | — | Comma-separated `<deviceId>:<metric>=<value>:<duration>[:<delay>]` |
+| `SDP_SIM_ANOMALIES` | — | Comma-separated `<deviceId>:<metric>=<value>[~<ramp>]:<duration>[:<delay>]` |
 | `SDP_SIM_TRANSPORT` | `iothub` | `iothub` (DPS + IoT Hub) or `console` (dry run, logs payloads) |
 | `SDP_DPS_ID_SCOPE` | — | DPS ID scope (required for `iothub`) |
 | `SDP_DPS_GLOBAL_ENDPOINT` | `global.azure-devices-provisioning.net` | DPS global endpoint |
@@ -62,6 +62,14 @@ az containerapp update -g <resource-group> -n <simulator-app> \
 # back to normal
 az containerapp update -g <resource-group> -n <simulator-app> --remove-env-vars SDP_SIM_ANOMALIES
 ```
+
+| Form | Readings | Looks like |
+|---|---|---|
+| `temperature=35:10m` | jump to 35 at once, held almost constant | a faulty sensor |
+| `temperature=35~5m:10m` | rise to 35 over 5 minutes with the usual noise, held 10 minutes, back over 5 minutes | a room really warming up |
+
+The anomaly detector (M7) classifies the first form on one device as a sensor fault, and the second form on several
+devices of a site at once as a real event.
 
 ## Tests
 
