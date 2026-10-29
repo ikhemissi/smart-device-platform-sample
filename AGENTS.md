@@ -1,0 +1,68 @@
+# AGENTS.md — directives for coding agents
+
+How to work on this repository. These rules come from how the demonstrator was built; follow them unless the user says otherwise in the current request. Product and architecture facts live in the documents linked below — read them instead of guessing.
+
+## Where things are
+
+| Topic | Source of truth |
+|---|---|
+| Business requirements (no technical choices) | `docs/prd/` |
+| Architecture decisions that are **hard to reverse** | `docs/adr/` |
+| Reversible, cross-cutting conventions (stack, naming, security, observability, testing) | `docs/architecture/implementation-guidelines.md` |
+| Specifications (baseline) | `openspec/specs/` |
+| Work in progress: proposal, design, specs delta, tasks | `openspec/changes/<change>/` |
+| Demo guides (one per milestone) | `docs/demo/` |
+
+## Workflow
+
+- **Spec-driven with OpenSpec.** Every functional change is an OpenSpec change: propose → apply (task by task) → archive (which syncs the delta specs into `openspec/specs/`). Use the skills in `.github/skills/` (`openspec-propose`, `openspec-apply-change`, `openspec-archive-change`, …). Documentation-only work does not need a change.
+- **Ask before deciding** when a choice changes the design, the scope or the behaviour; propose a default.
+- **ADRs only for hard-to-reverse decisions.** Easily reversible choices go to the implementation guidelines. If a design would contradict an ADR, propose a new ADR instead of diverging silently.
+- **Keep documents in sync** with the code in the same commit: the design of the change, the implementation guidelines, the README (status, milestone table, settings), the service READMEs and the demo guides.
+- **Verify every task** before ticking it, with the check the task names (tests, a measurement, a query against the environment). Ask the user for manual checks that need the portal (interactive Entra sign-in).
+- **Commits:** conventional commits (`feat(scope):`, `fix:`, `docs(openspec):`, `test:` …), one per coherent step, ending with the trailer `Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>`. Do not push unless asked.
+
+## Azure environment
+
+- **One long-lived environment, `sdp-dev`** (azd), updated incrementally — never create or tear down environments unless explicitly asked. It also holds the telemetry shown to the customer.
+- **Always preview before applying:** `azd provision --preview`, read the plan (only expected adds/changes, no unexpected destroy), then `azd provision`. Deploy services with `azd deploy <service>`.
+- **Terraform owns the infrastructure** (`infra/`, deployed by azd). Manual changes (e.g. container app environment variables) are reverted by the next provision; make them in Terraform.
+- azd does not pass `TF_VAR_*` to Terraform: expose settings as azd environment values mapped in `infra/main.tfvars.json` (empty value → default through `coalesce`).
+- Region `francecentral` for everything except Static Web Apps (`eastus2`). Every resource carries the tags `SecurityControl=Ignore` and `CostControl=Ignore`.
+- API Management: Basic v2 by default (Standard v2 only for VNet integration or private endpoints).
+- AI model: `gpt-6-luna` (DataZoneStandard, EU) on the environment's Foundry account; check quota before changing it.
+
+## Security (non-negotiable)
+
+- **Passwordless:** managed identities and Entra ID for every data and control plane; local/key authentication disabled wherever the service allows it. No secrets, keys or connection strings in code, configuration, IaC outputs or CI. Exceptions only as documented in ADR-0005.
+- Users authenticate with Entra ID; app roles `DeviceData.Read` (query) and `DeviceData.Write` (edit, implies read). Services validate tokens themselves even behind API Management.
+- The AI agent is read-only and acts with the caller's token; it can never see more than the user.
+
+## Stack and local tooling
+
+| Area | Stack | Commands |
+|---|---|---|
+| Platform services | Java 25, Spring Boot 4, Maven wrapper | `export JAVA_HOME=~/.local/jdks/jdk-25.0.5.0.2+1 PATH=$JAVA_HOME/bin:$PATH`, then `./mvnw -pl services/<svc> -am verify` |
+| Integration tests | Testcontainers on **Podman** (no Docker) | `DOCKER_HOST=unix:///run/user/$(id -u)/podman/podman.sock TESTCONTAINERS_RYUK_DISABLED=true` |
+| Portal | React, TypeScript, Vite, Fluent UI v9 | `npm run lint`, `npx tsc -b`, `npm test`, `bash scripts/e2e-podman.sh` (offline Playwright), `bash scripts/e2e-environment.sh` (against sdp-dev) |
+| AI agent | Python 3.13, uv, FastAPI, Microsoft Agent Framework | `uv run pytest`, `uv run ruff check src tests`, `uv run --group eval python evals/run_eval.py` |
+| Infrastructure | Terraform via azd | `terraform -chdir=infra fmt -recursive`, `terraform -chdir=infra validate` |
+
+- OpenAPI documents are generated from code and committed (`services/*/openapi.json`, `agents/device-analyst/openapi.json`); a test fails when they drift. API Management imports them.
+- Images are built remotely in Azure Container Registry by azd (`remoteBuild: true`).
+
+## Coding conventions
+
+- Precise, complete changes; no unrelated refactoring. Comment only what needs clarification.
+- Validation errors as "field + message" problem details (RFC 9457), e.g. `errors.min = ["must be lower than max"]`.
+- Telemetry through OpenTelemetry to Application Insights (Entra-authenticated); custom metrics are pre-aggregated (no percentiles).
+
+## Known pitfalls
+
+- `az monitor app-insights query` defaults to the last hour: pass `--offset 7d` (or the range you need).
+- The Azure CLI caches tokens per scope: after an app-role change, request `"<api-client-id>/.default"` to get a fresh token.
+- `az containerapp update` may time out although it applied: check before retrying.
+- An ARM-created Service Bus subscription has no `$Default` rule; the Service Bus emulator caps duplicate detection at 5 minutes.
+- Testcontainers on Podman: one container start per JVM in Failsafe (`reuseForks=false`).
+- On a busy machine `az` calls can exceed azd's timeout (`AzureCLICredential: signal: killed`); retry, or deploy the portal with the Static Web Apps CLI.
+- Application Insights counts 4xx responses as failed requests.
