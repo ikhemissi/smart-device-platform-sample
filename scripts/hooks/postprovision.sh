@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# azd postprovision hook (M1 design D5/D8): migrate the database with the migrator job, then prepare demo sites.
+# azd postprovision hook (M1 design D5/D8): migrate the database with the migrator job, build the anomaly detector
+# image (M7), then prepare demo sites.
 # Runs with the deployer's Entra identity; azd exports the Terraform outputs as environment variables.
 set -euo pipefail
 
@@ -26,5 +27,8 @@ for _ in $(seq 1 120); do
 done
 [[ "${STATUS:-}" == "Succeeded" ]] || { echo "Database migration timed out ($STATUS)" >&2; exit 1; }
 
-# 3. Demo sites: CAs in Key Vault and DPS enrollment groups.
+# 3. Anomaly detector image (M7), after the migration: its schema and database principal must exist first.
+"$ROOT/scripts/build-anomaly-detector-image.sh" >/dev/null
+
+# 4. Demo sites: CAs in Key Vault and DPS enrollment groups.
 "$ROOT/scripts/bootstrap-demo-sites.sh"
