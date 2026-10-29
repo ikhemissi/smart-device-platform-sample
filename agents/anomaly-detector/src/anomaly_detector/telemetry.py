@@ -26,6 +26,11 @@ def configure(settings: Settings, credential: TokenCredential) -> None:
             connection_string=settings.applicationinsights_connection_string,
             credential=credential,
             logger_name="anomaly_detector",
+            # Only the spans of this job and its httpx model calls: no Azure SDK or requests spans (token requests).
+            instrumentation_options={
+                name: {"enabled": False}
+                for name in ("azure_sdk", "requests", "urllib", "urllib3", "django", "fastapi", "flask", "psycopg2")
+            },
         )
     HTTPXClientInstrumentor().instrument()
 
