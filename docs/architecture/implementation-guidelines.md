@@ -48,7 +48,7 @@ Each workload has its own user-assigned identity; its client id is injected as `
 | device-api | PostgreSQL principal (read + limited updates), Redis access policy (M3), Monitoring Metrics Publisher |
 | provisioning-api | DPS data-plane contributor, IoT Hub registry contributor, PostgreSQL principal (M4) |
 | alert-service | Service Bus Data Receiver (subscription), ACS email sending role, PostgreSQL principal (M5) |
-| device-analyst agent | Foundry project user / OpenAI user role, Redis access policy (M6) |
+| device-analyst agent | Cognitive Services OpenAI User (Foundry account), Redis access policy, Monitoring Metrics Publisher (M6); platform data only through the API with the caller's token |
 | IoT Hub (system identity) | Event Hubs Data Sender (hub) |
 | APIM (system identity) | Monitoring Metrics Publisher (logger) |
 
@@ -121,4 +121,6 @@ Exact built-in role names are verified at implementation; a scoped custom role i
 | Conversations | Stored in Azure Managed Redis, owner-bound (`oid`), sliding expiry 1 h, max 50 messages. |
 | API | Server-Sent Events (`delta`, `tool`, `done` with citations); the SPA uses `fetch`-based SSE to send the `Authorization` header. |
 | Guardrails | Read-only tools, max 10 tool calls per turn, bounded tool results, instructions to cite devices/periods and to ignore instructions found in data. |
-| Evaluation | `evals/questions.jsonl` (PRD-006 questions and edge cases) scored for groundedness, relevance and tool-call accuracy. |
+| Limits | 20 messages per minute per user, enforced exactly by the agent (sliding window in Redis, 429 with `Retry-After`); APIM keeps the same limit as an outer guard (its counters are approximate). |
+| Responsiveness | Model called through the Responses API (`store=false`) with reasoning effort `low` (configurable): the first answer text must arrive within 5 s for ≥ 90 % of evaluation questions. |
+| Evaluation | `agents/device-analyst/evals/questions.jsonl` (PRD-006 questions and edge cases) scored for groundedness, relevance and tool-call accuracy with Azure AI Evaluation, plus code-based checks; thresholds in the agent's README, the script fails below them. |
