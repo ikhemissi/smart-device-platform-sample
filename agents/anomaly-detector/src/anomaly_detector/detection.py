@@ -173,6 +173,21 @@ def within_usual_range(assessment: Assessment) -> bool:
     return lo is not None and hi is not None and lo <= assessment.observed_min and assessment.observed_max <= hi
 
 
+def _unusual_part(kind: str, readings: Sequence[Reading], baseline: Baseline, deviation: float) -> Assessment | None:
+    """A deviation or jump starts at the first reading beyond the deviation (or the first big step), not at the start
+    of the window: the period and observed values then describe the unusual readings only."""
+    if kind == "flat":
+        return None
+    readings = sorted(readings, key=lambda r: r.measured_at)
+    limit = deviation * baseline.spread
+    for i, r in enumerate(readings):
+        usual = baseline.usual(r.measured_at)
+        stepped = i > 0 and abs(r.value - readings[i - 1].value) >= limit
+        if (usual is not None and abs(r.value - usual) >= limit) or stepped:
+            return assess(readings[i:], baseline) if i > 0 else None
+    return None
+
+
 def detect(
     readings: Iterable[Reading], baselines: dict[tuple[str, str], Baseline], deviation: float
 ) -> tuple[list[Assessment], list[Candidate]]:
@@ -188,7 +203,7 @@ def detect(
             continue
         assessments.append(assessment)
         if kind := classify_kind(assessment, deviation):
-            candidates.append(Candidate(kind, assessment))
+            candidates.append(Candidate(kind, _unusual_part(kind, by_series[key], baseline, deviation) or assessment))
     return assessments, candidates
 
 

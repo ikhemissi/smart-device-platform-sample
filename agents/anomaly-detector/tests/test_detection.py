@@ -80,7 +80,10 @@ def test_ten_degree_rise_is_flagged():
     a = candidates[0].assessment
     assert a.observed_max > a.usual_value + 9
     assert a.score > 10
-    assert a.started_at == window[0].measured_at and a.ended_at == window[-1].measured_at
+    # The period and the observed values cover the unusual readings only.
+    assert a.started_at == min(r.measured_at for r in warm if r.measured_at >= NOW - timedelta(minutes=5))
+    assert a.ended_at == window[-1].measured_at
+    assert a.observed_min > a.usual_value + 9
 
 
 def test_flat_line_is_flagged():
