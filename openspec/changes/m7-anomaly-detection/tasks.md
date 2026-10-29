@@ -9,7 +9,7 @@
 ## 2. Detector
 
 - [x] 2.1 Scaffold `agents/anomaly-detector` (uv, ruff, pytest, Dockerfile, settings, PostgreSQL access with an Entra token); verify tests and a local connection to `sdp-dev`
-- [ ] 2.2 Baseline and candidate detection (deviation, flat, jump, episodes; design D2); verify unit tests on synthetic series (daily cycle not flagged, a 10 °C rise flagged, a flat line flagged, an episode extended)
+- [x] 2.2 Baseline and candidate detection (deviation, flat, jump, episodes; design D2); verify unit tests on synthetic series (daily cycle not flagged, a 10 °C rise flagged, a flat line flagged, an episode extended)
 - [ ] 2.3 Decision-1 client, classification and status (design D3), pending retry on failure; verify unit tests with a mocked decision API (confirmed, dismissed, to review, failure → pending then classified) and a live call on a real candidate state
 - [ ] 2.4 Explanations with gpt-6-luna (design D4); verify unit tests (prompt contains only the state, failure leaves no explanation) and a live explanation of a real candidate
 - [ ] 2.5 Cycle orchestration, persistence and OpenTelemetry (design D10), plus a dry-run mode (no write, no model call) over a past period; verify a local dry run against `sdp-dev` and unit tests of the cycle with fakes

@@ -25,10 +25,10 @@ Python 3.13, uv, ruff, pytest (same conventions as the agent). Container Apps **
 ### D2. Candidate detection
 For each device of the analysed sites (`ANOMALY_SITES`) and each analysed metric (`ANOMALY_METRICS`, default `temperature,humidity,pressure,co2,illuminance`):
 
-- **Baseline** from the hourly rollups of the previous 7 days: *usual value* at time *t* = mean of the hourly averages at the same UTC hour over those days; *spread* = 1.4826 × median absolute deviation of all hourly averages from their same-hour usual value, floored per metric (e.g. 0.2 °C, 1 % RH, 0.5 hPa) so that very stable devices are not over-sensitive. A device with less than 3 days of rollups is skipped.
+- **Baseline** from the hourly rollups of the previous 7 days: *usual value* at time *t* = mean of the hourly averages at the same UTC hour over those days, interpolated linearly between the surrounding hours (taken at mid-hour) so that a steep daily slope does not look like a deviation at the end of each hour; *spread* = 1.4826 × median absolute deviation of all hourly averages from their same-hour usual value, floored per metric (e.g. 0.2 °C, 1 % RH, 0.5 hPa) so that very stable devices are not over-sensitive. A device with less than 3 full days of hourly rollups (hours ÷ 24) is skipped.
 - **Window**: the readings of the last 15 minutes (raw measurements).
 - **Deviation**: score *z* = (window mean − usual) / spread; candidate when |z| ≥ `ANOMALY_DEVIATION`.
-- **Flat**: at least 10 readings, all identical, while the baseline's hourly min/max show the metric usually varies → sensor-fault-like candidate.
+- **Flat**: at least 10 readings, all identical, while the baseline's hourly min/max show the metric usually varies **at that hour of day** (median hourly range > 0; illuminance is legitimately 0 all night) → sensor-fault-like candidate.
 - **Jump**: a step between consecutive readings ≥ `ANOMALY_DEVIATION` × spread.
 - **Episodes**: if the device and metric have an anomaly whose period ended less than 15 minutes ago, the candidate extends it (end time, extremes) instead of creating a new one; its classification is kept.
 
