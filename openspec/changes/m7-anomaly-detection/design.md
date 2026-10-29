@@ -77,6 +77,25 @@ Azure Monitor OpenTelemetry distro (workload identity). Span `sdp.anomaly.cycle`
 ### D11. Settings and tuning
 azd settings → Terraform → job environment: `ANOMALY_DETECTION_ENABLED` (default on), `ANOMALY_SITES` (`paris-01`), `ANOMALY_DEVIATION`, `ANOMALY_CONFIDENCE`, `DECISION_MODEL_CAPACITY` (30). The defaults of the deviation and the confidence are chosen during implementation with a **dry run** of the detector over the last 7 days of `sdp-dev` (counts of candidates and confirmed anomalies per day for several values), aiming at a few confirmed anomalies per day on `paris-01`; the chosen values and the measured counts are recorded here and in the detector's README.
 
+**Tuning result** (dry runs over 22–29 Oct 2026 on `sdp-dev`, `paris-01`): defaults **`ANOMALY_DEVIATION=4`** and **`ANOMALY_CONFIDENCE=0.7`**. A first run showed daily candidates at sunrise and sunset on an illuminance sensor (light switching on within an hour makes the hourly average a poor reference; the model called them real events at 0.45–0.86), so deviations and jumps whose readings stay within the device's usual range for the hour (medians of the daily hourly minimum and maximum, also given to the model) are not candidates; flat readings still are.
+
+| Deviation | Episodes / 7 days | Per day | Main metrics |
+|---|---|---|---|
+| 3 | 120 | 17.1 | CO₂ jumps (noise) |
+| 3.5 | 54 | 7.7 | CO₂, pressure |
+| **4** | **20** | **2.9** | pressure, CO₂, the injected temperature anomalies |
+| 4.5 | 17 | 2.4 | pressure |
+
+At deviation 4, classified by `decision-1`:
+
+| Confidence | Confirmed | To review | Confirmed per day |
+|---|---|---|---|
+| 0.6 | 16 | 4 | 2.3 |
+| **0.7** | **12** | **8** | **1.7** |
+| 0.8 | 7 | 13 | 1.0 |
+| 0.9 | 6 | 14 | 0.9 |
+
+
 ## Risks / Trade-offs
 
 - [Smooth simulated data gives few natural anomalies] → tuned thresholds plus `SDP_SIM_ANOMALIES` for demos (documented in the demo guide).

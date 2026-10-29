@@ -1,6 +1,7 @@
 import math
 import random
 from collections import defaultdict
+from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from statistics import fmean
 
@@ -96,6 +97,15 @@ def test_night_without_light_is_not_flat():
     assert candidates == []
 
 
+def test_sunrise_within_the_usual_range_is_not_flagged():
+    """Light switches on a few minutes late: far from the hourly average, but within what the hour usually shows."""
+    baselines, window = scenario(now=NOW.replace(hour=7, minute=10), metric="illuminance", signal=illuminance)
+    late = [replace(r, value=0.0) if r.measured_at.minute < 5 else r for r in window]
+    assessments, candidates = detect(late, baselines, deviation=0.5)
+    assert abs(assessments[0].score) >= 0.5
+    assert candidates == []
+
+
 def test_isolated_jump_is_flagged():
     baselines, window = scenario()
     spike = [Reading(r.device_id, r.metric, r.measured_at, r.value + 2) if i == 10 else r for i, r in enumerate(window)]
@@ -108,6 +118,13 @@ def test_device_with_little_history_is_skipped():
     baselines, window = scenario(days=2)
     assert baselines == {}
     assert detect(window, baselines, deviation=4) == ([], [])
+
+
+def test_usual_range_within_the_hour():
+    baselines, window = scenario()
+    [assessment], _ = detect(window, baselines, deviation=4)
+    assert assessment.usual_min < assessment.usual_value < assessment.usual_max
+    assert assessment.usual_max - assessment.usual_min < 1
 
 
 def test_spread_is_floored():

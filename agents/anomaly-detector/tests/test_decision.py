@@ -105,6 +105,6 @@ def test_network_error_leaves_the_candidate_pending(client):
 def test_state_holds_data_only_and_same_metric_neighbours():
     s = state()
     assert s["metric"] == {"name": "temperature", "unit": "°C"}
-    assert s["usual"] == {"value": 21.2, "spread": 0.2}
+    assert s["usual"] == {"value": 21.2, "spread": 0.2, "range_within_the_hour": None}
     assert s["same_metric_on_other_devices_of_site"] == [{"device": "paris-01-ruuvi5-002", "score": 0.4}]
     assert s["window"]["max"] == 35

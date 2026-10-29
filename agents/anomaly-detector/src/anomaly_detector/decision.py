@@ -156,7 +156,11 @@ def build_state(
             "last": _r(a.observed_last),
             "largest_step": _r(a.max_step),
         },
-        "usual": {"value": _r(a.usual_value), "spread": _r(a.spread)},
+        "usual": {
+            "value": _r(a.usual_value),
+            "spread": _r(a.spread),
+            "range_within_the_hour": [_r(a.usual_min), _r(a.usual_max)] if a.usual_min is not None else None,
+        },
         "score": round(candidate.score, 2),
         "same_metric_on_other_devices_of_site": [
             {"device": n.device_id, "score": round(n.score, 2)}

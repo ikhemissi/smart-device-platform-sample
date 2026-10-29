@@ -9,7 +9,7 @@ between consecutive readings much larger than the spread (jump).
 
 from collections import defaultdict
 from collections.abc import Iterable, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from itertools import pairwise
 from statistics import fmean, median
@@ -47,6 +47,8 @@ class Baseline:
     varies_by_hour: dict[int, bool]
     spread: float
     days: int
+    # Typical range within each UTC hour (medians of the daily hourly minimum and maximum).
+    range_by_hour: dict[int, tuple[float, float]] = field(default_factory=dict)
 
     def usual(self, at: datetime) -> float | None:
         """Interpolated between the averages of the surrounding hours (taken at mid-hour), so that a daily slope does
@@ -79,6 +81,8 @@ class Assessment:
     score: float
     max_step: float
     flat: bool
+    usual_min: float | None = None
+    usual_max: float | None = None
 
 
 @dataclass(frozen=True)
@@ -106,9 +110,13 @@ def build_baselines(rollups: Iterable[HourlyRollup]) -> dict[tuple[str, str], Ba
             by_hour[r.hour.hour].append(r)
         usual = {h: fmean(r.average for r in hour_rows) for h, hour_rows in by_hour.items()}
         varies = {h: median(r.max_value - r.min_value for r in hour_rows) > 0 for h, hour_rows in by_hour.items()}
+        ranges = {
+            h: (median(r.min_value for r in hour_rows), median(r.max_value for r in hour_rows))
+            for h, hour_rows in by_hour.items()
+        }
         mad = median(abs(r.average - usual[r.hour.hour]) for r in rows)
         floor = SPREAD_FLOORS.get(key[1], DEFAULT_SPREAD_FLOOR)
-        baselines[key] = Baseline(usual, varies, max(MAD_SCALE * mad, floor), days)
+        baselines[key] = Baseline(usual, varies, max(MAD_SCALE * mad, floor), days, ranges)
     return baselines
 
 
@@ -122,6 +130,7 @@ def assess(readings: Sequence[Reading], baseline: Baseline) -> Assessment | None
     residual = fmean(v - u for v, u in zip(values, usual, strict=True))
     steps = [abs(b - a) for a, b in pairwise(values)]
     first, last = readings[0], readings[-1]
+    ranges = [baseline.range_by_hour[h] for h in {r.measured_at.hour for r in readings} if h in baseline.range_by_hour]
     return Assessment(
         device_id=first.device_id,
         metric=first.metric,
@@ -139,18 +148,29 @@ def assess(readings: Sequence[Reading], baseline: Baseline) -> Assessment | None
         flat=len(values) >= MIN_FLAT_READINGS
         and min(values) == max(values)
         and all(baseline.varies_by_hour.get(r.measured_at.hour, False) for r in readings),
+        usual_min=min((lo for lo, _ in ranges), default=None),
+        usual_max=max((hi for _, hi in ranges), default=None),
     )
 
 
 def classify_kind(assessment: Assessment, deviation: float) -> str | None:
-    """The kind of candidate, if any: a stuck sensor first, then a sustained deviation, then an isolated jump."""
+    """The kind of candidate, if any: a stuck sensor first, then a sustained deviation, then an isolated jump.
+    Readings that all stay within the device's usual range for the hour are not unusual, whatever the score: sharp
+    daily transitions (light switching on at sunrise) make the hourly average a poor reference there."""
     if assessment.flat:
         return "flat"
+    if within_usual_range(assessment):
+        return None
     if abs(assessment.score) >= deviation:
         return "deviation"
     if assessment.max_step >= deviation * assessment.spread:
         return "jump"
     return None
+
+
+def within_usual_range(assessment: Assessment) -> bool:
+    lo, hi = assessment.usual_min, assessment.usual_max
+    return lo is not None and hi is not None and lo <= assessment.observed_min and assessment.observed_max <= hi
 
 
 def detect(

@@ -24,6 +24,36 @@ them in `sdp.anomalies` ([PRD-007](../../docs/prd/PRD-007-m7-anomaly-detection.m
 
 The database, endpoint and identity variables are set by Terraform (`infra/modules/apps`).
 
+### Tuning
+
+The defaults come from dry runs over 7 days of `sdp-dev` (`paris-01`, 22–29 Oct 2026):
+
+| Deviation | Episodes / 7 days | Per day | Main metrics |
+|---|---|---|---|
+| 3 | 120 | 17.1 | CO₂ jumps (noise) |
+| 3.5 | 54 | 7.7 | CO₂, pressure |
+| **4** | **20** | **2.9** | pressure, CO₂, the injected temperature anomalies |
+| 4.5 | 17 | 2.4 | pressure |
+
+At deviation 4, classified by `decision-1`:
+
+| Confidence | Confirmed | To review | Confirmed per day |
+|---|---|---|---|
+| 0.6 | 16 | 4 | 2.3 |
+| **0.7** | **12** | **8** | **1.7** |
+| 0.8 | 7 | 13 | 1.0 |
+| 0.9 | 6 | 14 | 0.9 |
+
+Re-run them after changing the detection or the data:
+
+```bash
+uv run anomaly-detector --dry-run --days 7 --deviation 4 --output /tmp/episodes.jsonl            # no model call
+uv run anomaly-detector --dry-run --days 7 --deviation 4 --classify --output /tmp/episodes.jsonl # decision model, no write
+```
+
+The episodes file holds every episode with its state and, with `--classify`, its probabilities: the confidence can be
+chosen from it without calling the model again.
+
 ## Local development
 
 ```bash
