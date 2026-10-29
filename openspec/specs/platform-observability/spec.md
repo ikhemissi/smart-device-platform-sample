@@ -35,11 +35,11 @@ Workload logs SHALL be structured and include the active trace and span identifi
 - **THEN** the log entry in Application Insights carries the trace id of the batch processing span
 
 ### Requirement: Operations workbook
-Each environment SHALL include, deployed with its infrastructure, an Azure Monitor workbook that shows the environment's key indicators, latest errors and critical components on one page, for a selectable time range (default: last 24 hours). It SHALL show the environment it was deployed with without manual configuration, and SHALL be readable by anyone allowed to read the environment's monitoring data.
+Each environment SHALL include, deployed with its infrastructure, an Azure Monitor workbook that shows the environment's key indicators, latest errors, critical components and AI assistant activity on one page, for a selectable time range (default: last 24 hours). It SHALL show the environment it was deployed with without manual configuration, and SHALL be readable by anyone allowed to read the environment's monitoring data.
 
 #### Scenario: Open the workbook
 - **WHEN** an operator opens the operations workbook of an environment in the Azure portal
-- **THEN** the key indicators, latest errors and critical component charts of that environment are shown for the last 24 hours, with no parameter to fill in
+- **THEN** the key indicators, latest errors, critical component charts and AI assistant section of that environment are shown for the last 24 hours, with no parameter to fill in
 
 #### Scenario: Time range
 - **WHEN** the operator selects the last 7 days
@@ -54,7 +54,7 @@ The workbook SHALL offer, next to the time range, multi-select filters on site, 
 
 #### Scenario: Platform-wide figures
 - **WHEN** a site is selected
-- **THEN** API, cache, alerting, errors and Azure resource charts are unchanged and labelled as platform-wide, and the ingestion latency only follows the device type filter
+- **THEN** API, cache, alerting, errors, AI assistant and Azure resource charts are unchanged and labelled as platform-wide, and the ingestion latency only follows the device type filter
 
 #### Scenario: One device
 - **WHEN** the operator selects one device
@@ -84,3 +84,25 @@ The workbook SHALL chart the Azure Monitor metrics of the PostgreSQL server (CPU
 #### Scenario: Ingestion is visible end to end
 - **WHEN** the simulator is running
 - **THEN** the IoT Hub telemetry, Event Hubs incoming messages and PostgreSQL charts all show activity for the same period
+
+### Requirement: AI assistant indicators
+The workbook SHALL show, in a section labelled as platform-wide, the AI assistant's questions, distinct users, time to first answer text (median, 95th percentile and share within 5 seconds), input and output tokens, tool calls, failed turns and rejected requests (including rate limiting).
+
+#### Scenario: Questions asked
+- **WHEN** users asked questions during the period
+- **THEN** the questions, users, tokens and tool calls indicators count them, and the time to first text shows their median and 95th percentile and the share answered within 5 seconds
+
+#### Scenario: No assistant activity
+- **WHEN** nobody used the assistant during the period
+- **THEN** the indicators show zero questions and the charts are empty instead of failing
+
+### Requirement: AI assistant trends and failures
+The AI assistant section SHALL chart questions and failures, time to first text, and tokens per hour, tool calls by tool and tool errors by kind, and SHALL list the latest failed turns and requests with the operation id that opens the end-to-end transaction.
+
+#### Scenario: Tool usage
+- **WHEN** questions caused tool calls, one of which failed because a device was not found
+- **THEN** the tool usage chart counts the calls per tool and the tool errors chart shows one "not found" error
+
+#### Scenario: Rate limiting
+- **WHEN** a user's message was rejected for exceeding the message rate limit
+- **THEN** the rejected requests indicator counts it and the latest failures list shows it with its operation id

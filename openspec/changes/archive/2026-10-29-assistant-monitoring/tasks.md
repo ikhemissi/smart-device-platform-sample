@@ -9,7 +9,7 @@
 ## 2. Workbook section
 
 - [x] 2.1 Add the six queries of design D3 as `.kql` files and the section of design D4 to the workbook; verify `terraform validate` (including the workbook preconditions) and `scripts/check-workbook-queries.sh` against `sdp-dev`, after generating activity (a few questions, an unknown device, a rate-limited message), showing non-zero questions, tokens, tool calls, a `not_found` error and a 429
-- [ ] 2.2 Run `azd provision --preview` (only the workbook changes), then `azd provision`; verify the section in the Azure portal with the user (indicators, charts, failures table, platform-wide label)
+- [x] 2.2 Run `azd provision --preview` (only the workbook changes), then `azd provision`; verify the section in the Azure portal with the user (indicators, charts, failures table, platform-wide label)
 - [x] 2.3 Update the README (Operate), the M6 demo guide (Behind the scenes) and the implementation guidelines §5 (workbook contents); verify the links and that the guide's steps match the workbook
 
 ## Workflow follow-up
