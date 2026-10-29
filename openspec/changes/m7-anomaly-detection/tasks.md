@@ -2,7 +2,7 @@
 
 ## 1. Data and infrastructure
 
-- [ ] 1.1 Migration V8 (`sdp.anomalies`, `sdp_insights` role, `sdp_catalog` grants) and anomaly retention in the maintenance task; verify with db-migrator integration tests (privileges of both roles, retention)
+- [x] 1.1 Migration V8 (`sdp.anomalies`, `sdp_insights` role, `sdp_catalog` grants) and anomaly retention in the maintenance task; verify with db-migrator integration tests (privileges of both roles, retention)
 - [ ] 1.2 Terraform: Decision-1 deployment, `id-anomaly-detector` identity and roles, PostgreSQL principal, job (placeholder image), settings (`ANOMALY_*`, `DECISION_MODEL_CAPACITY`) with the feature switch; quota preflight for the decision model; verify `azd provision --preview`, `azd provision`, then a decision API call with an Entra token (and that key access is refused), and with the feature switched off a plan without the deployment and the job
 - [ ] 1.3 `scripts/build-anomaly-detector-image.sh` and the post-provision hook step; verify the job runs with the built image (a cycle with no candidate exits successfully)
 

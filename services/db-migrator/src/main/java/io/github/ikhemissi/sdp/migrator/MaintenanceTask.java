@@ -10,7 +10,7 @@ import org.springframework.stereotype.Component;
  * Database housekeeping, safe to run repeatedly: applies the configured retention to partitioned tables,
  * runs pg_partman maintenance (pre-creates future partitions, drops expired ones), purges old deduplication keys
  * in bounded batches, forgets metrics a device has not reported within the retention period and rolls up the hours
- * that became complete for fleet summaries ({@link MetricRollups}).
+ * that became complete for fleet summaries ({@link MetricRollups}), and deletes anomalies older than the retention period.
  */
 @Component
 public class MaintenanceTask {
@@ -34,8 +34,10 @@ public class MaintenanceTask {
         int metrics = jdbc.update("DELETE FROM sdp.device_metrics WHERE last_seen_at < now() - ?::interval",
                 interval(properties.retention()));
         rollups.run(properties.retention());
-        log.info("Database maintenance completed: retention={}, ledgerRetention={}, ledgerKeysPurged={}, deviceMetricsPurged={}",
-                properties.retention(), properties.ledgerRetention(), purged, metrics);
+        int anomalies = jdbc.update("DELETE FROM sdp.anomalies WHERE ended_at < now() - ?::interval", interval(properties.retention()));
+        log.info("Database maintenance completed: retention={}, ledgerRetention={}, ledgerKeysPurged={}, deviceMetricsPurged={}, "
+                        + "anomaliesPurged={}",
+                properties.retention(), properties.ledgerRetention(), purged, metrics, anomalies);
     }
 
     private void applyRetention() {
