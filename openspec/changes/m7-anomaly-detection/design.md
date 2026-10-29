@@ -48,6 +48,8 @@ The response gives the selected option, a `confidence` and a probability per opt
 
 Status: highest option `real_event`/`sensor_fault` with p ≥ `ANOMALY_CONFIDENCE` → **confirmed**; `expected_pattern` with p ≥ confidence → **dismissed**; otherwise **to review**. The decision client is a small interface (`classify(state) -> probabilities`) so another scorer can replace the preview model (ADR-0011).
 
+Observed on `sdp-dev` (live calls on real states): the neighbours drive the call. One device deviating alone (step or gradual +10 °C, z ≈ 25) → `sensor_fault` 0.975–0.989; the same rise on three devices of the site → `real_event` 0.964; a stuck value → `sensor_fault` 0.97; the largest natural deviation of the day (pressure, z = −2.9) → `real_event` 0.665 (to review at 0.7).
+
 Failure handling: a candidate whose classification failed is stored as **pending** and re-submitted by the next cycle (still within the 10-minute target when the failure is transient); the cycle span records the error.
 
 ### D4. Explanation by gpt-6-luna
