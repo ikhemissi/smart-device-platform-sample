@@ -1,0 +1,7 @@
+# Accepted vulnerability findings (spec continuous-integration). The CI fails on High and Critical findings that have
+# a fixed version; a finding listed here no longer fails it until its expiry date. Every entry needs a justification:
+#   - id: CVE-2026-12345
+#     paths: ["web/portal/package-lock.json"]   # optional: limit to where it applies
+#     statement: "Dev-only dependency, not shipped; upgrade blocked by <reason>."
+#     expired_at: 2026-12-31
+vulnerabilities: []

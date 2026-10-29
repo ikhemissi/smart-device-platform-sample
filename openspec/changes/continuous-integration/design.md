@@ -31,7 +31,7 @@ See proposal.md for the motivation and `specs/continuous-integration/spec.md` fo
 Alternative: one workflow per component with path filters — rejected: a single status per commit is simpler to read, and the whole run fits the time budget.
 
 ### D2. Vulnerability scanning with Trivy
-Trivy scans the repository (`pom.xml` with transitive resolution, `package-lock.json`, `uv.lock`) and the container base images found in the Dockerfiles, in two passes:
+Trivy scans the repository (`pom.xml` with transitive resolution, `package-lock.json`, `uv.lock`), the Java services' runtime base image (the services only add jars, already covered) and the AI agent's image as built from its Dockerfile (base-image findings in unused tools, such as the libraries vendored by `pip`, are removed at build time rather than accepted), in two passes, through `scripts/scan-vulnerabilities.sh` (same command locally):
 
 1. **Gate**: severities HIGH and CRITICAL, `--ignore-unfixed`, exit code 1, honouring `.trivyignore.yaml` (each entry: id, path, statement, `expired_at`).
 2. **Report**: all severities and unfixed findings to SARIF, uploaded to code scanning (`github/codeql-action/upload-sarif`), even when the gate failed.
@@ -53,7 +53,7 @@ Maven (`~/.m2/repository`), npm and uv caches keyed on their lock files; Trivy d
 
 - [Emulator images are large and the Service Bus emulator needs an x86 SQL Edge container] → GitHub's x86 runners support them; Failsafe already uses one container start per JVM where needed.
 - [Pixel snapshots of Playwright differ between environments] → the same Playwright image as locally, so snapshots stay valid.
-- [A new CVE turns `main` red without a code change] → intended (fail-high policy); fix by upgrading, or accept in `.trivyignore.yaml` with a justification and an expiry.
+- [A new CVE turns `main` red without a code change] → intended (fail-high policy); fix by upgrading, or accept in `.trivyignore.yaml` with a justification and an expiry. Decided 2026-10-29: CVE-2026-111943 (Go standard library in the `jaz` launcher of `mcr.microsoft.com/openjdk/jdk:25-distroless`, not executed by the services) is **not** accepted; the dependency job stays red until Microsoft republishes the image.
 - [Trivy resolves Maven dependencies from Maven Central at scan time] → network access is available on runners; scan failures fail the gate visibly rather than silently passing.
 - [Pinned SHAs age] → listed by the outdated report.
 

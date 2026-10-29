@@ -50,6 +50,7 @@ How to work on this repository. These rules come from how the demonstrator was b
 
 - OpenAPI documents are generated from code and committed (`services/*/openapi.json`, `agents/device-analyst/openapi.json`); a test fails when they drift. API Management imports them.
 - Images are built remotely in Azure Container Registry by azd (`remoteBuild: true`).
+- **CI** (`.github/workflows/ci.yml`) runs on every push to `main`; keep it green and keep each job reproducible with local commands (README, *Continuous integration*). No secrets or cloud credentials in workflows; pin third-party actions to commit SHAs. Fix vulnerable dependencies rather than accepting them; an acceptance in `.trivyignore.yaml` needs the user's agreement, a justification and an expiry.
 
 ## Coding conventions
 

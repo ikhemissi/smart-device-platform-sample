@@ -1,0 +1,171 @@
+# Continuous integration (spec continuous-integration): build, code quality, tests, infrastructure and specification
+# validation, dependency vulnerability gate and outdated-dependency report on every push to main. No secrets and no
+# Azure access: only the built-in GITHUB_TOKEN, read-only except for code scanning results. Third-party actions are
+# pinned to commit SHAs (version in the comment). Each job's commands can be run locally (see README, "Build and test").
+name: CI
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  java:
+    name: Java services and libraries
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        with:
+          distribution: microsoft
+          java-version: "25"
+          cache: maven
+      - name: Build, unit and integration tests (Testcontainers on the runner's Docker)
+        run: ./mvnw -B -ntp verify
+      - name: Test reports
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: java-test-reports
+          path: |
+            **/target/surefire-reports/
+            **/target/failsafe-reports/
+          retention-days: 7
+
+  portal:
+    name: Web portal
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: web/portal
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: web/portal/package-lock.json
+      - run: npm ci
+      - name: Lint
+        run: npm run lint
+      - name: Type check
+        run: npx tsc -b
+      - name: Unit tests
+        run: npm test
+      - name: Production build
+        run: npm run build
+      - name: End-to-end tests (Playwright image, API faked, no network)
+        run: |
+          version="$(node -p "require('@playwright/test/package.json').version")"
+          docker run --rm --network=none -e CI=1 -v "$PWD:/work" -w /work \
+            "mcr.microsoft.com/playwright:v${version}-noble" npx playwright test
+      - name: Playwright traces
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: playwright-results
+          path: web/portal/test-results/
+          retention-days: 7
+
+  agent:
+    name: AI agent
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: agents/device-analyst
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          version: "0.13.5"
+          enable-cache: true
+          cache-dependency-glob: agents/device-analyst/uv.lock
+      - run: uv sync --locked
+      - name: Lint and format
+        run: |
+          uv run ruff check src tests evals
+          uv run ruff format --check src tests evals
+      - name: Tests
+        run: uv run pytest
+      - name: Image build
+        run: docker build -t device-analyst:ci .
+
+  infra-specs:
+    name: Infrastructure, workflows and specifications
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
+        with:
+          terraform_version: "1.15.8"
+          terraform_wrapper: false
+      - name: Terraform format and validation (no backend, no Azure)
+        run: |
+          terraform -chdir=infra fmt -check -recursive
+          terraform -chdir=infra init -backend=false -input=false
+          terraform -chdir=infra validate
+      - name: Workflow lint
+        run: |
+          go install github.com/rhysd/actionlint/cmd/actionlint@v1.7.12
+          "$(go env GOPATH)/bin/actionlint"
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "24"
+      - name: OpenSpec validation
+        run: npx -y @fission-ai/openspec@1.14.3 validate --all --strict --no-interactive
+
+  dependencies:
+    name: Dependency health
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: aquasecurity/setup-trivy@81e514348e19b6112ce2a7e3ecbafe19c1e1f567 # v0.3.1
+        with:
+          version: v0.76.1
+      - name: Vulnerability database cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/trivy
+          key: trivy-db-${{ github.run_id }}
+          restore-keys: trivy-db-
+      - name: Vulnerability scan (report all, fail on High/Critical with a fix)
+        run: scripts/scan-vulnerabilities.sh --sarif-dir trivy-results
+      - name: Publish findings to code scanning
+        if: always() && hashFiles('trivy-results/*.sarif') != ''
+        uses: github/codeql-action/upload-sarif@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
+        with:
+          sarif_file: trivy-results
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
+        if: always()
+        with:
+          distribution: microsoft
+          java-version: "25"
+          cache: maven
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        if: always()
+        with:
+          version: "0.13.5"
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        if: always()
+        with:
+          node-version: "24"
+      - name: Outdated dependencies (report only, never fails)
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: scripts/report-outdated.sh >> "$GITHUB_STEP_SUMMARY"

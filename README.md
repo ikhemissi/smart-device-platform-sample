@@ -1,10 +1,12 @@
 # Smart Device Platform — demonstrator
 
+[![CI](https://github.com/ikhemissi/smart-device-platform-sample/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/ikhemissi/smart-device-platform-sample/actions/workflows/ci.yml)
+
 An end-to-end Azure sample of a sensor platform. Simulated devices send binary measurements, the platform decodes and stores them, people browse them in a web portal, get email alerts, manage which devices may connect, and ask an AI assistant about the data.
 
 > **Status:** all milestones (M1–M6) and the operations workbook are delivered and archived. Baseline specifications are in [`openspec/specs/`](openspec/specs).
 
-**Contents:** [What it shows](#what-it-shows) · [Architecture](#architecture) · [How it works](#how-it-works) · [Security](#security) · [Repository](#repository) · [Build and test](#build-and-test) · [Deploy to Azure](#deploy-to-azure) · [Operate](#operate) · [Contributing](#contributing)
+**Contents:** [What it shows](#what-it-shows) · [Architecture](#architecture) · [How it works](#how-it-works) · [Security](#security) · [Repository](#repository) · [Build and test](#build-and-test) · [Continuous integration](#continuous-integration) · [Deploy to Azure](#deploy-to-azure) · [Operate](#operate) · [Contributing](#contributing)
 
 ## What it shows
 
@@ -240,6 +242,33 @@ export DOCKER_HOST=unix:///run/user/$(id -u)/podman/podman.sock TESTCONTAINERS_R
 | AI agent | `cd agents/device-analyst && uv sync && uv run ruff check src tests && uv run pytest` |
 | Infrastructure | `terraform -chdir=infra fmt -check -recursive && terraform -chdir=infra validate` |
 | Local database | `scripts/local-postgres.sh start && scripts/run-migrations.sh --local` |
+
+## Continuous integration
+
+Every push to `main` runs [`.github/workflows/ci.yml`](.github/workflows/ci.yml) (also startable by hand from the Actions tab). Jobs run in parallel; the commit gets one overall status.
+
+```mermaid
+flowchart LR
+  P["push to main"] --> J["java<br/>build, unit +<br/>integration tests"]
+  P --> W["portal<br/>lint, types, tests,<br/>build, Playwright"]
+  P --> A["agent<br/>ruff, pytest,<br/>image build"]
+  P --> I["infra-specs<br/>Terraform, actionlint,<br/>OpenSpec"]
+  P --> D["dependencies<br/>vulnerability gate,<br/>outdated report"]
+  D --> CS["Code scanning<br/>(all findings)"]
+  D --> SUM["Run summary<br/>(outdated versions)"]
+```
+
+| Job | Checks | Run it locally |
+|---|---|---|
+| `java` | Build, unit and integration tests (Testcontainers: PostgreSQL, Event Hubs and Service Bus emulators) | `./mvnw verify` |
+| `portal` | Lint, type check, unit tests, production build, end-to-end tests with the API faked | `cd web/portal && npm ci && npm run lint && npx tsc -b && npm test && npm run build && npm run e2e:podman` |
+| `agent` | Ruff lint and format, tests, image build | `cd agents/device-analyst && uv sync --locked && uv run ruff check src tests evals && uv run ruff format --check src tests evals && uv run pytest` |
+| `infra-specs` | Terraform format and validation (no Azure access), workflow lint, OpenSpec strict validation | `terraform -chdir=infra fmt -check -recursive && terraform -chdir=infra init -backend=false && terraform -chdir=infra validate`, `actionlint`, `openspec validate --all --strict` |
+| `dependencies` | Vulnerability gate and outdated report | `scripts/scan-vulnerabilities.sh`, `scripts/report-outdated.sh` |
+
+- **No secrets, no Azure access:** only the built-in `GITHUB_TOKEN`, read-only except for publishing code scanning results. Third-party actions are pinned to commit SHAs.
+- **Vulnerability policy:** the run fails on **High or Critical** findings that have a fixed version, in the Maven, npm and Python lock files and in the shipped images (Java runtime base image, AI agent image). All findings, including lower severities and unfixed ones, are listed in the repository's **Security → Code scanning** tab. To accept a finding temporarily, add it to [`.trivyignore.yaml`](.trivyignore.yaml) with a justification and an expiry date; after that date it fails the run again.
+- **Outdated dependencies:** newer stable versions of direct dependencies (Maven, npm, Python, Terraform providers, actions) are listed in each run's summary. This report never fails the run.
 
 ## Deploy to Azure
 
