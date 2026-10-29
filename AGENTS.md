@@ -37,6 +37,7 @@ How to work on this repository. These rules come from how the demonstrator was b
 - **Passwordless:** managed identities and Entra ID for every data and control plane; local/key authentication disabled wherever the service allows it. No secrets, keys or connection strings in code, configuration, IaC outputs or CI. Exceptions only as documented in ADR-0005.
 - Users authenticate with Entra ID; app roles `DeviceData.Read` (query) and `DeviceData.Write` (edit, implies read). Services validate tokens themselves even behind API Management.
 - The AI agent is read-only and acts with the caller's token; it can never see more than the user.
+- **Roles:** prefer a built-in role when it includes the needed permissions (e.g. *Foundry User*, referenced by id, for any Foundry model call); create a custom role only when no built-in role fits.
 
 ## Stack and local tooling
 
@@ -68,3 +69,5 @@ How to work on this repository. These rules come from how the demonstrator was b
 - Locally, use **Podman** for anything that needs a container engine (`docker` is not functional on the development machine). Scripts pick `podman`, then `docker`; `CONTAINER_CLI` overrides (CI sets `docker`).
 - On a busy machine `az` calls can exceed azd's timeout (`AzureCLICredential: signal: killed`); retry, or deploy the portal with the Static Web Apps CLI.
 - Application Insights counts 4xx responses as failed requests.
+- Foundry deployment names must not contain the reserved word "Microsoft" (e.g. `decision-1` for `Microsoft-Decision-1`).
+- `Cognitive Services OpenAI User` only covers Azure OpenAI models; other Foundry models (e.g. the decision API) need *Foundry User*. A `PermissionDenied` error names the missing data action.
