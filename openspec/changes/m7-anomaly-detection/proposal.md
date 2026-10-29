@@ -24,6 +24,7 @@
 - `telemetry-visualization`: the device page shows the device's anomalies.
 - `web-portal`: an Anomalies page with filters and review.
 - `device-analyst-agent`: the assistant can list and explain anomalies.
+- `device-simulation`: pressure drift stays continuous when the simulator restarts (anomaly injections restart it; the jumps were detected as anomalies).
 
 ## Impact
 

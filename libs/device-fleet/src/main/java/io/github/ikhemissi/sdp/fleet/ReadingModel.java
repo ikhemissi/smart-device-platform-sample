@@ -11,7 +11,7 @@ import java.util.Random;
 /**
  * Plausible, continuous readings for one device (spec device-simulation: "Realistic readings"). A per-device seed
  * gives each device stable baselines; temperature and humidity follow a daily cycle with small noise, pressure drifts
- * slowly, battery discharges slowly and counters increase. Values stay within each format's valid range.
+ * slowly like the weather (computed from the time, so that it stays continuous when the simulator restarts), battery discharges slowly and counters increase. Values stay within each format's valid range.
  */
 public final class ReadingModel {
 
@@ -19,6 +19,9 @@ public final class ReadingModel {
     }
 
     private static final double HOURS_PER_DAY = 24.0;
+    // Weather-like pressure drift: three slow waves (at most +/-7.5 hPa, about 1 hPa per hour at the steepest).
+    private static final double[] PRESSURE_PERIODS_HOURS = {31, 53, 97};
+    private static final double[] PRESSURE_AMPLITUDES_HPA = {3.5, 2.5, 1.5};
 
     private final SimulatedDevice device;
     private final List<Anomaly> anomalies;
@@ -34,7 +37,7 @@ public final class ReadingModel {
     private final double co2Base;
     private final double illuminancePeak;
     private final String mac;
-    private double pressureDrift;
+    private final double[] pressurePhases = new double[PRESSURE_PERIODS_HOURS.length];
     private int sequence;
     private int packetId;
     private int movements;
@@ -60,6 +63,10 @@ public final class ReadingModel {
         this.sequence = seed.nextInt(1000);
         this.packetId = seed.nextInt(256);
         this.random = new Random(seed.nextLong());
+        // Drawn last so that the values above (and the device's MAC) are unchanged.
+        for (int i = 0; i < pressurePhases.length; i++) {
+            pressurePhases[i] = seed.nextDouble() * 2 * Math.PI;
+        }
     }
 
     public SimulatedDevice device() {
@@ -72,7 +79,6 @@ public final class ReadingModel {
         double daylight = Math.max(0, Math.sin(2 * Math.PI * (hours % HOURS_PER_DAY - 6) / HOURS_PER_DAY));
         double days = Duration.between(start, now).toSeconds() / 86_400.0;
 
-        pressureDrift = clamp(pressureDrift + random.nextGaussian() * 0.03, -8, 8);
         sequence = (sequence + 1) % 65_535;
         packetId = (packetId + 1) % 256;
         if (random.nextDouble() < 0.05) {
@@ -81,7 +87,7 @@ public final class ReadingModel {
 
         double temperature = override("temperature", now, temperatureBase + temperatureAmplitude * daily + random.nextGaussian() * 0.08);
         double humidity = override("humidity", now, clamp(humidityBase - humidityAmplitude * daily + random.nextGaussian() * 0.3, 5, 95));
-        double pressure = override("pressure", now, pressureBase + pressureDrift + random.nextGaussian() * 0.05);
+        double pressure = override("pressure", now, pressureBase + pressureDrift(hours) + random.nextGaussian() * 0.05);
         double voltage = override("battery_voltage", now, clamp(batteryStartVolts - 0.002 * days + random.nextGaussian() * 0.002, 2.2, 3.6));
         double co2 = override("co2", now, Math.max(400, co2Base + 350 * daylight + random.nextGaussian() * 15));
         double illuminance = override("illuminance", now, Math.max(0, illuminancePeak * daylight + random.nextGaussian() * 5));
@@ -138,6 +144,14 @@ public final class ReadingModel {
             }
         }
         return value;
+    }
+
+    private double pressureDrift(double hours) {
+        double drift = 0;
+        for (int i = 0; i < pressurePhases.length; i++) {
+            drift += PRESSURE_AMPLITUDES_HPA[i] * Math.sin(2 * Math.PI * hours / PRESSURE_PERIODS_HOURS[i] + pressurePhases[i]);
+        }
+        return drift;
     }
 
     private static double clamp(double value, double min, double max) {

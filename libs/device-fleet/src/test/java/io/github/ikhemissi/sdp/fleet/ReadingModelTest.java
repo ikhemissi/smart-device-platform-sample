@@ -40,6 +40,34 @@ class ReadingModelTest {
         }
     }
 
+    @Test
+    void pressureStaysContinuousWhenTheSimulatorRestarts() {
+        SimulatedDevice device = device(PayloadFormat.RUUVI_DF5);
+        Instant now = START.plus(Duration.ofDays(3));
+        // A model started three days ago and one started just now (a restart) agree at the same instant.
+        double running = new ReadingModel(device, List.of(), START).next(now).metrics().get("pressure").doubleValue();
+        double restarted = new ReadingModel(device, List.of(), now).next(now).metrics().get("pressure").doubleValue();
+        assertThat(restarted).isCloseTo(running, within(0.5));
+    }
+
+    @Test
+    void pressureDriftsSlowlyLikeTheWeather() {
+        ReadingModel model = new ReadingModel(device(PayloadFormat.RUUVI_DF5), List.of(), START);
+        double min = Double.MAX_VALUE;
+        double max = -Double.MAX_VALUE;
+        double previous = Double.NaN;
+        for (int i = 0; i < 7 * 24 * 60; i++) {
+            double p = model.next(START.plus(Duration.ofMinutes(i))).metrics().get("pressure").doubleValue();
+            if (!Double.isNaN(previous)) {
+                assertThat(Math.abs(p - previous)).as("minute %d", i).isLessThan(0.5);
+            }
+            previous = p;
+            min = Math.min(min, p);
+            max = Math.max(max, p);
+        }
+        assertThat(max - min).as("range over a week").isBetween(3.0, 16.0);
+    }
+
     @ParameterizedTest
     @EnumSource(PayloadFormat.class)
     void twoDaysOfReadingsEncodeIntoValidPayloads(PayloadFormat format) {
