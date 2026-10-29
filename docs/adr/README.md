@@ -18,3 +18,4 @@ Format: Context, Decision, Why hard to reverse, Consequences, Alternatives consi
 | [ADR-0008](ADR-0008-infrastructure-as-code.md) | Infrastructure as code, regions and network exposure | Proposed |
 | [ADR-0009](ADR-0009-alerting-service-bus.md) | Alerting through a Service Bus topic with filtered subscriptions | Proposed |
 | [ADR-0010](ADR-0010-ai-agent.md) | AI agent framework and data-access model | Proposed |
+| [ADR-0011](ADR-0011-model-based-analysis.md) | Model-based analysis: Python jobs, decision model for triage, LLM for explanations | Proposed |

@@ -54,6 +54,7 @@ A person without either permission cannot see any data.
 | C5 | Manage which devices may join, per site, through site certificates | M4 |
 | C6 | Email alerts when a measurement crosses a threshold, for a selected subset of devices | M5 |
 | C7 | Analyse devices and measurements with an AI assistant | M6 |
+| C8 | Detect unusual readings automatically and classify them (real event, sensor fault, expected) | M7 |
 
 ## 6. Milestones
 
@@ -65,6 +66,7 @@ A person without either permission cannot see any data.
 | **M4 — Site certificate management** | Editors control, per site, which certificates allow devices to join | [PRD-004](PRD-004-m4-site-certificates.md) |
 | **M5 — Threshold alerting** | Selected devices trigger email alerts when out of range | [PRD-005](PRD-005-m5-threshold-alerting.md) |
 | **M6 — AI analyst** | Users ask questions about devices and measurements in natural language | [PRD-006](PRD-006-m6-ai-analyst.md) |
+| **M7 — Anomaly detection** | Unusual readings are detected without thresholds, classified with a confidence and explained | [PRD-007](PRD-007-m7-anomaly-detection.md) |
 
 Each milestone is demonstrable on its own and builds on the previous ones.
 
