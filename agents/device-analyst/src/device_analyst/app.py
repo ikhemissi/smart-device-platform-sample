@@ -133,10 +133,13 @@ def create_app(
         async def events() -> AsyncIterator[dict[str, str]]:
             token = caller_token.set(user.token)
             # One span per question (parent of the Agent Framework spans), for the operations workbook.
-            span = tracer.start_span("sdp.agent.turn", attributes={
-                "sdp.agent.device_context": device_id is not None,
-                "enduser.pseudo.id": pseudonym(user.object_id),
-            })
+            span = tracer.start_span(
+                "sdp.agent.turn",
+                attributes={
+                    "sdp.agent.device_context": device_id is not None,
+                    "enduser.pseudo.id": pseudonym(user.object_id),
+                },
+            )
             started = time.monotonic()
             tool_calls = 0
             first_text = False
