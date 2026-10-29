@@ -150,11 +150,24 @@ jobs:
           restore-keys: trivy-db-
       - name: Vulnerability scan (report all, fail on High/Critical with a fix)
         run: scripts/scan-vulnerabilities.sh --sarif-dir trivy-results
-      - name: Publish findings to code scanning
-        if: always() && hashFiles('trivy-results/*.sarif') != ''
+      - name: Publish findings to code scanning (dependencies)
+        if: always() && hashFiles('trivy-results/dependencies.sarif') != ''
         uses: github/codeql-action/upload-sarif@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
         with:
-          sarif_file: trivy-results
+          sarif_file: trivy-results/dependencies.sarif
+          category: trivy-dependencies
+      - name: Publish findings to code scanning (image-java-runtime)
+        if: always() && hashFiles('trivy-results/image-java-runtime.sarif') != ''
+        uses: github/codeql-action/upload-sarif@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
+        with:
+          sarif_file: trivy-results/image-java-runtime.sarif
+          category: trivy-image-java-runtime
+      - name: Publish findings to code scanning (image-device-analyst)
+        if: always() && hashFiles('trivy-results/image-device-analyst.sarif') != ''
+        uses: github/codeql-action/upload-sarif@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
+        with:
+          sarif_file: trivy-results/image-device-analyst.sarif
+          category: trivy-image-device-analyst
       - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
         if: always()
         with:

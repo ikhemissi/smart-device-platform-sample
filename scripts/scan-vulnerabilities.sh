@@ -19,9 +19,10 @@ fi
 AGENT_IMAGE_TAR="$(mktemp -d)/device-analyst.tar"
 "$ENGINE" build --quiet -t localhost/sdp-device-analyst:scan agents/device-analyst >/dev/null
 "$ENGINE" save -o "$AGENT_IMAGE_TAR" localhost/sdp-device-analyst:scan
+# name=reference (a registry image, or "--input <tar>" for a locally built one); the name keys the SARIF file.
 IMAGES=(
-  "$(sed -n 's/^ARG RUNTIME_IMAGE=//p' services/Dockerfile)"
-  "--input $AGENT_IMAGE_TAR"
+  "java-runtime=$(sed -n 's/^ARG RUNTIME_IMAGE=//p' services/Dockerfile)"
+  "device-analyst=--input $AGENT_IMAGE_TAR"
 )
 # Maven dependencies are resolved by Maven into the local repository first; Trivy then reads them offline (resolving
 # them itself from Maven Central gets rate-limited on shared CI runners).
@@ -32,19 +33,19 @@ status=0
 if [[ -n "$SARIF_DIR" ]]; then
   mkdir -p "$SARIF_DIR"
   trivy fs "${COMMON[@]}" --format sarif --output "$SARIF_DIR/dependencies.sarif" .
-  for image in "${IMAGES[@]}"; do
-    name="$(basename "${image#--input }" | tr '/:.' '---')"
+  for entry in "${IMAGES[@]}"; do
     # shellcheck disable=SC2086 # "--input <tar>" is two words on purpose
-    trivy image --scanners vuln --ignorefile .trivyignore.yaml --quiet --format sarif --output "$SARIF_DIR/image-$name.sarif" $image
+    trivy image --scanners vuln --ignorefile .trivyignore.yaml --quiet --format sarif \
+      --output "$SARIF_DIR/image-${entry%%=*}.sarif" ${entry#*=}
   done
 fi
 
 echo "== Dependencies (Maven, npm, Python): High and Critical findings with a fix"
 trivy fs "${COMMON[@]}" --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 . || status=1
-for image in "${IMAGES[@]}"; do
-  echo "== Image ${image#--input }: High and Critical findings with a fix"
+for entry in "${IMAGES[@]}"; do
+  echo "== Image ${entry%%=*} (${entry#*=}): High and Critical findings with a fix"
   # shellcheck disable=SC2086
   trivy image --scanners vuln --ignorefile .trivyignore.yaml --quiet --severity HIGH,CRITICAL --ignore-unfixed \
-    --exit-code 1 $image || status=1
+    --exit-code 1 ${entry#*=} || status=1
 done
 exit $status
