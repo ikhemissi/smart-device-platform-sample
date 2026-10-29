@@ -296,3 +296,4 @@ flowchart LR
 | [docs/adr](docs/adr/README.md) | Hard-to-reverse architecture decisions |
 | [docs/architecture](docs/architecture/implementation-guidelines.md) | Reversible, cross-cutting conventions |
 | [openspec/specs](openspec/specs) | Current specifications |
+| [docs/ideas](docs/ideas/smart-platform.md) | Brainstorm: LLMs and decision models for anomalies, maintenance, alerting and site insights |
