@@ -1,0 +1,7 @@
+// Failed tool calls by kind (not_found, not_permitted, invalid_request, unavailable, rate_limited, failed).
+dependencies
+| where cloud_RoleName == 'sdp-device-analyst' and name startswith 'execute_tool '
+| extend Kind = tostring(customDimensions['sdp.agent.tool.error'])
+| where isnotempty(Kind)
+| summarize Calls = count() by Kind
+| order by Calls desc

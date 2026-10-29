@@ -1,0 +1,15 @@
+// Latest failed questions and rejected agent requests, newest first, with the operation id of the end-to-end
+// transaction (one row per operation).
+let turns = dependencies
+    | where cloud_RoleName == 'sdp-device-analyst' and name == 'sdp.agent.turn'
+    | extend Outcome = tostring(customDimensions['sdp.agent.outcome'])
+    | where Outcome in ('failed', 'timeout')
+    | project timestamp, Kind = strcat('Question ', Outcome), Detail = strcat(customDimensions['sdp.agent.tool_calls'], ' tool calls'),
+              operation_Id;
+let rejected = requests
+    | where url has '/api/v1/agent/' and toint(resultCode) >= 400
+    | summarize arg_min(timestamp, *) by operation_Id
+    | project timestamp, Kind = iff(resultCode == '429', 'Rate limited (429)', strcat('HTTP ', resultCode)), Detail = name, operation_Id;
+union turns, rejected
+| top 50 by timestamp desc
+| project Time = timestamp, Kind, Detail, ['Operation id'] = operation_Id

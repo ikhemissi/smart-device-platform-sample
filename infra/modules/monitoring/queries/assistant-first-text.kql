@@ -1,0 +1,8 @@
+// Time to first answer text per hour, in seconds (median and 95th percentile; target: within 5 s).
+dependencies
+| where cloud_RoleName == 'sdp-device-analyst' and name == 'sdp.agent.turn'
+| extend FirstText = todouble(customDimensions['sdp.agent.first_text_ms'])
+| where isnotnull(FirstText)
+| summarize Median = round(percentile(FirstText, 50) / 1000, 2), ['95th percentile'] = round(percentile(FirstText, 95) / 1000, 2)
+    by bin(timestamp, 1h)
+| order by timestamp asc

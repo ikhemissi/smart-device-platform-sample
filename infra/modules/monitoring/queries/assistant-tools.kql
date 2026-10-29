@@ -1,0 +1,6 @@
+// Tool calls by tool: succeeded and failed (the platform API refused or failed).
+dependencies
+| where cloud_RoleName == 'sdp-device-analyst' and name startswith 'execute_tool '
+| extend Tool = substring(name, strlen('execute_tool ')), Error = tostring(customDimensions['sdp.agent.tool.error'])
+| summarize Succeeded = countif(isempty(Error)), Failed = countif(isnotempty(Error)) by Tool
+| order by Succeeded + Failed desc

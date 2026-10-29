@@ -15,7 +15,7 @@
 ## 3. First runs on GitHub
 
 - [ ] 3.1 Push to `main` and verify the run: every job green, total duration under 30 minutes, findings visible in code scanning, outdated report in the run summary
-- [ ] 3.2 On a throwaway branch with a deliberately failing unit test, start a manual run (`workflow_dispatch`); verify it runs the same jobs, fails and names the failing test (branch deleted afterwards)
+- [x] 3.2 On a throwaway branch with a deliberately failing unit test, start a manual run (`workflow_dispatch`); verify it runs the same jobs, fails and names the failing test (branch deleted afterwards)
 
 ## Workflow follow-up
 

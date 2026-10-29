@@ -97,6 +97,26 @@ locals {
       }
     }
     rejections = { title = "Device messages rejected per hour, by reason", visualization = "barchart", size = 0, width = "100", extra = {} }
+    assistant-indicators = {
+      title = "", visualization = "tiles", size = 0, width = "100", extra = {
+        tileSettings = {
+          showBorder      = true
+          titleContent    = { columnMatch = "Indicator", formatter = 1 }
+          leftContent     = { columnMatch = "Value", formatter = 1 }
+          subtitleContent = { columnMatch = "Detail", formatter = 1 }
+        }
+      }
+    }
+    assistant-trend       = { title = "Questions and failed questions per hour", visualization = "timechart", size = 0, width = "50", extra = {} }
+    assistant-first-text  = { title = "Time to first answer text per hour (s)", visualization = "timechart", size = 0, width = "50", extra = {} }
+    assistant-tokens      = { title = "Model tokens per hour", visualization = "timechart", size = 0, width = "50", extra = {} }
+    assistant-tools       = { title = "Tool calls by tool", visualization = "barchart", size = 0, width = "50", extra = {} }
+    assistant-tool-errors = { title = "Failed tool calls by kind", visualization = "piechart", size = 0, width = "50", extra = {} }
+    assistant-failures = {
+      title = "Latest failed questions and rejected requests", visualization = "table", size = 0, width = "50", extra = {
+        gridSettings = { rowLimit = 50, filter = true, formatters = [{ columnMatch = "Operation id", formatter = 1 }] }
+      }
+    }
     } : name => {
     type        = 3
     name        = name
@@ -151,6 +171,7 @@ locals {
     indicators = "Every tile, list and chart follows the time range. **Site, Device type and Device ID** filter the device figures: devices reporting, measurements stored and rejected, the messages trend and rejections. Ingestion latency follows the device type only. API (device-api and provisioning-api, health probes excluded), cache, alerting, errors and the Azure resource charts are platform-wide."
     errors     = "## Latest errors\nPlatform-wide, newest first. Copy an operation id into **Transaction search** of Application Insights to follow the whole transaction."
     components = "## Critical components\nPlatform-wide Azure Monitor metrics of the services that carry device data (IoT Hub → Event Hubs → PostgreSQL) and of alerting and the API gateway."
+    assistant  = "## AI assistant\nPlatform-wide: **not affected by the Site, Device type and Device ID filters**. Questions asked in the portal's assistant panel, how fast the first words arrive (target: within 5 s), model tokens, the platform data the assistant read (tool calls) and what failed. Copy an operation id into **Transaction search** to follow a question end to end (agent, model, API Management, device API)."
   } : name => { type = 1, name = "section-${name}", content = { json = text } } }
 
   workbook = {
@@ -161,6 +182,9 @@ locals {
       [local.section.errors, local.kql["latest-errors"]],
       [local.section.components],
       local.metrics,
+      [local.section.assistant, local.kql["assistant-indicators"]],
+      [local.kql["assistant-trend"], local.kql["assistant-first-text"], local.kql["assistant-tokens"], local.kql["assistant-tools"]],
+      [local.kql["assistant-tool-errors"], local.kql["assistant-failures"]],
     )
     fallbackResourceIds = [local.appi]
     "$schema"           = "https://github.com/Microsoft/Application-Insights-Workbooks/blob/master/schema/workbook.json"

@@ -1,0 +1,6 @@
+// Questions and failed questions per hour (AI assistant, platform-wide).
+dependencies
+| where cloud_RoleName == 'sdp-device-analyst' and name == 'sdp.agent.turn'
+| extend Outcome = tostring(customDimensions['sdp.agent.outcome'])
+| summarize Questions = count(), ['Failed questions'] = countif(Outcome in ('failed', 'timeout')) by bin(timestamp, 1h)
+| order by timestamp asc

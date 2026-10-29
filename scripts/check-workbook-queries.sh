@@ -20,8 +20,9 @@ done
 eval "$(azd env get-values)"
 export AZURE_EXTENSION_USE_DYNAMIC_INSTALL=yes_without_prompt
 APP="$(az resource list -g "$AZURE_RESOURCE_GROUP" --resource-type microsoft.insights/components --query '[0].name' -o tsv)"
-# Queries that may legitimately be empty (no error or rejection in the period, or a filter matching nothing).
-OPTIONAL="latest-errors rejections"
+# Queries that may legitimately be empty (no error or rejection in the period, no assistant activity, or a filter
+# matching nothing).
+OPTIONAL="latest-errors rejections assistant-trend assistant-first-text assistant-tokens assistant-tools assistant-tool-errors assistant-failures"
 
 # A filter value as the workbook substitutes it: a quoted, comma-separated list.
 quoted() {

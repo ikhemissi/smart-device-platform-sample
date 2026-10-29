@@ -303,7 +303,7 @@ flowchart LR
 
 ## Operate
 
-- **Operations workbook** *Smart Device Platform — operations*: devices reporting, measurements, ingestion latency, API traffic and errors, cache, alerts, latest errors, and the metrics of PostgreSQL, IoT Hub, Event Hubs, Service Bus and API Management. Filters: time range, site, device type, device. Open it with `azd env get-value OPERATIONS_WORKBOOK_URL`.
+- **Operations workbook** *Smart Device Platform — operations*: devices reporting, measurements, ingestion latency, API traffic and errors, cache, alerts, latest errors, the metrics of PostgreSQL, IoT Hub, Event Hubs, Service Bus and API Management, and an **AI assistant** section (questions, users, time to first text, tokens, tool usage, failures and rate limiting). Filters: time range, site, device type, device. Open it with `azd env get-value OPERATIONS_WORKBOOK_URL`.
 
 | Script | Purpose |
 |---|---|

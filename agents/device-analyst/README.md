@@ -135,6 +135,6 @@ API requests they cause. The operations workbook's *AI assistant* section is bui
 | | `sdp.agent.outcome` | `answered`, `failed`, `timeout` (110 s) or `cancelled` (client disconnected) |
 | | `sdp.agent.tool_calls` | Tool calls of the turn |
 | | `sdp.agent.device_context` | Whether the question came from a device page |
-| | `enduser.pseudo.id` | Truncated SHA-256 of the user's object id (counts distinct users without identifying them) |
+| | `enduser.pseudo.id` | Truncated SHA-256 of the user's object id, stored as `user_Id` (counts distinct users without identifying them) |
 | `execute_tool <name>` | `sdp.agent.tool.error` | When the platform API refused or failed: `not_found`, `not_permitted`, `invalid_request`, `unavailable`, `rate_limited` or `failed` |
 | `invoke_agent device-analyst` | `gen_ai.usage.input_tokens`, `gen_ai.usage.output_tokens` | Tokens of the turn (Agent Framework) |

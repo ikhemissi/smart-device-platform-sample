@@ -80,6 +80,7 @@ Ask in French: *Quels capteurs de Lyon sont silencieux ?* The answer is in Frenc
 
 ## 6. Behind the scenes
 
+- **Operations workbook** (`azd env get-value OPERATIONS_WORKBOOK_URL`), section *AI assistant*: the questions you just asked, the users, the time to first text (median, 95th percentile and share within 5 s), model tokens, the platform data each tool read, the `not_found` error of the unknown device and the 429s of the rate-limit step, each with the operation id to open in **Transaction search**.
 - **One trace per question** (Application Insights, Logs): the agent run, each model call with its token usage, each tool call, and the platform API requests they caused (gateway, device API, database):
 
   ```kusto

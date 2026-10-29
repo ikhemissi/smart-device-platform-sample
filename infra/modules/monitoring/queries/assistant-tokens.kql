@@ -1,0 +1,6 @@
+// Model tokens per hour (input and output), from the Agent Framework's invoke_agent spans.
+dependencies
+| where cloud_RoleName == 'sdp-device-analyst' and name startswith 'invoke_agent'
+| summarize Input = sum(toint(customDimensions['gen_ai.usage.input_tokens'])), Output = sum(toint(customDimensions['gen_ai.usage.output_tokens']))
+    by bin(timestamp, 1h)
+| order by timestamp asc
