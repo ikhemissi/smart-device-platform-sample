@@ -23,7 +23,7 @@ End-to-end Azure demonstrator of a sensor platform: devices of several real-worl
 | M4 | Site certificate management | `m4-site-certificate-management` | Archived | [m4-site-certificates](docs/demo/m4-site-certificates.md) |
 | M5 | Threshold alerting | `m5-threshold-alerting` | Archived | [m5-threshold-alerting](docs/demo/m5-threshold-alerting.md) |
 | — | Operations workbook (Azure Monitor: KPIs, latest errors, critical components) | `operations-workbook` | Archived | [README: Monitoring](#deploy-to-azure) |
-| M6 | AI analyst (model `gpt-6-luna`) | `m6-ai-device-analyst` | Planned | — |
+| M6 | AI analyst (model `gpt-6-luna`) | `m6-ai-device-analyst` | Implemented, dry run pending | [m6-ai-analyst](docs/demo/m6-ai-analyst.md) |
 
 ## Architecture at a glance
 
@@ -54,6 +54,7 @@ services/db-migrator/       Applies migrations and DB maintenance (Container App
 services/device-api/        Devices, telemetry history, thresholds and alerts API behind API Management (see its README)
 services/provisioning-api/  Site trust: CA certificates per site in DPS, device enable/disable (see its README)
 services/alert-service/     Threshold evaluation and alert emails (Service Bus → ACS Email, see its README)
+agents/device-analyst/      AI device analyst: Python, Agent Framework, gpt-6-luna, evaluation set (see its README)
 web/portal/                 Web portal: React, Fluent UI, MSAL (see its README)
 services/Dockerfile         Shared image definition for Java services
 scripts/                    Developer and deployment scripts
@@ -96,7 +97,7 @@ azd env new sdp-dev --location francecentral --subscription <subscription-id>
 azd up                                  # state backend, infrastructure, database migration, demo sites, services
 ```
 
-`azd up` first checks that the AI analyst's model can be deployed in the region with the available quota (`scripts/check-model-quota.sh`), makes sure the Terraform state store exists (`scripts/bootstrap-tfstate.sh`, Entra-only storage shared by all environments of the subscription), provisions everything with Terraform (`infra/`), then the post-provision hook builds the migrator image, migrates the database and prepares the demo sites (CA per site in Key Vault, verified in DPS, enrollment groups). Finally azd deploys the services (telemetry-decoder, device-simulator, device-api, provisioning-api, alert-service) and the portal (`web`). The simulator starts sending immediately (3 sites × 10 devices every 30 s). Re-running `azd up` is idempotent; `azd deploy <service>` redeploys one service. Remove everything with `azd down --purge` (deletes the resource group and purges the Key Vault).
+`azd up` first checks that the AI analyst's model can be deployed in the region with the available quota (`scripts/check-model-quota.sh`), makes sure the Terraform state store exists (`scripts/bootstrap-tfstate.sh`, Entra-only storage shared by all environments of the subscription), provisions everything with Terraform (`infra/`), then the post-provision hook builds the migrator image, migrates the database and prepares the demo sites (CA per site in Key Vault, verified in DPS, enrollment groups). Finally azd deploys the services (telemetry-decoder, device-simulator, device-api, provisioning-api, alert-service, device-analyst) and the portal (`web`). The simulator starts sending immediately (3 sites × 10 devices every 30 s). Re-running `azd up` is idempotent; `azd deploy <service>` redeploys one service. Remove everything with `azd down --purge` (deletes the resource group and purges the Key Vault).
 
 Environment settings (`azd env set <name> <value>`, then `azd provision`):
 
@@ -105,6 +106,8 @@ Environment settings (`azd env set <name> <value>`, then `azd provision`):
 | `ALERTING_SUBSCRIPTION_FILTER` | `siteId = 'paris-01'` (when empty) | Service Bus SQL filter selecting the devices monitored for alerts, e.g. `siteId IN ('paris-01','lyon-01')` |
 | `AGENT_MODEL_NAME` / `AGENT_MODEL_VERSION` | `gpt-6-luna` / `2026-09-22` | Foundry chat model of the AI device analyst |
 | `AGENT_MODEL_SKU` / `AGENT_MODEL_CAPACITY` | `DataZoneStandard` / `50` | Deployment SKU (DataZoneStandard keeps processing in the EU data zone) and capacity in thousands of tokens per minute |
+| `AGENT_CAPTURE_CONTENT` | `false` (when empty) | `true` records the AI analyst's prompts, answers and tool results in traces (demos only) |
+| `PORTAL_ASSISTANT` | on when the agent is deployed | `false` hides the portal's Assistant button |
 
 **Monitoring.** Each environment has an Azure Monitor workbook, *Smart Device Platform — operations*: key indicators (devices reporting, measurements, ingestion latency, API traffic and errors, cache, alerts), the latest errors, and metrics of PostgreSQL, IoT Hub, Event Hubs, Service Bus and API Management, with filters on time range, site, device type and device. Open it with `azd env get-value OPERATIONS_WORKBOOK_URL` (or Application Insights → Workbooks); `scripts/check-workbook-queries.sh` checks its queries against the environment.
 
