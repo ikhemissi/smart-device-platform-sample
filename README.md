@@ -23,7 +23,7 @@ End-to-end Azure demonstrator of a sensor platform: devices of several real-worl
 | M4 | Site certificate management | `m4-site-certificate-management` | Archived | [m4-site-certificates](docs/demo/m4-site-certificates.md) |
 | M5 | Threshold alerting | `m5-threshold-alerting` | Archived | [m5-threshold-alerting](docs/demo/m5-threshold-alerting.md) |
 | — | Operations workbook (Azure Monitor: KPIs, latest errors, critical components) | `operations-workbook` | Archived | [README: Monitoring](#deploy-to-azure) |
-| M6 | AI analyst (model `gpt-6-luna`) | `m6-ai-device-analyst` | Implemented, dry run pending | [m6-ai-analyst](docs/demo/m6-ai-analyst.md) |
+| M6 | AI analyst (model `gpt-6-luna`) | `m6-ai-device-analyst` | Implemented | [m6-ai-analyst](docs/demo/m6-ai-analyst.md) |
 
 ## Architecture at a glance
 

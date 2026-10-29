@@ -35,7 +35,7 @@
 
 - [x] 6.1 Create `evals/questions.jsonl` covering PRD-006 example questions, the modification-refusal, unknown-device and French-language cases; verify the evaluation script runs and reports groundedness, relevance and tool-call accuracy
 - [x] 6.2 Run the evaluation on a seeded environment; verify ≥ 90% of questions stream first text within 5 s and record scores and thresholds in the README
-- [ ] 6.3 Write the M6 demo guide `docs/demo/m6-ai-analyst.md`; verify a dry run follows it as written
+- [x] 6.3 Write the M6 demo guide `docs/demo/m6-ai-analyst.md`; verify a dry run follows it as written
 
 ## Workflow follow-up
 
