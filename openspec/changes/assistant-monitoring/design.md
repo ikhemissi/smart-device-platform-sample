@@ -44,13 +44,14 @@ All from Application Insights, filtered on `cloud_RoleName == "sdp-device-analys
 | `assistant-trend` | questions and failed turns per hour |
 | `assistant-first-text` | median and 95th percentile per hour |
 | `assistant-tokens` | input and output tokens per hour |
-| `assistant-tools` | tool calls by tool, and errors by kind |
+| `assistant-tools` | tool calls by tool (succeeded and failed) |
+| `assistant-tool-errors` | failed tool calls by kind |
 | `assistant-failures` | latest failed turns and requests, with `operation_Id` |
 
 Every query returns rows (zeros) when there is no activity, so the tiles show 0 rather than "no data".
 
 ### D4. Workbook layout
-A new section after *Critical components*: a header "AI assistant (platform-wide: not affected by the site and device filters)", the indicator tiles, then two charts per row (questions/failures and first text; tokens and tool usage) and the failures table. The existing preconditions cover the new queries unchanged.
+A new section after *Critical components*: a header "AI assistant" stating it is platform-wide (not affected by the site and device filters), the indicator tiles, then two items per row (questions/failures and first text; tokens and tool usage; tool errors by kind and the failures table). The existing preconditions cover the new queries unchanged.
 
 ## Risks / Trade-offs
 
