@@ -43,7 +43,7 @@ How to work on this repository. These rules come from how the demonstrator was b
 | Area | Stack | Commands |
 |---|---|---|
 | Platform services | Java 25, Spring Boot 4, Maven wrapper | `export JAVA_HOME=~/.local/jdks/jdk-25.0.5.0.2+1 PATH=$JAVA_HOME/bin:$PATH`, then `./mvnw -pl services/<svc> -am verify` |
-| Integration tests | Testcontainers on **Podman** (no Docker) | `DOCKER_HOST=unix:///run/user/$(id -u)/podman/podman.sock TESTCONTAINERS_RYUK_DISABLED=true` |
+| Integration tests | Testcontainers on **Podman** (no Docker locally; CI uses the runner's Docker) | `DOCKER_HOST=unix:///run/user/$(id -u)/podman/podman.sock TESTCONTAINERS_RYUK_DISABLED=true` |
 | Portal | React, TypeScript, Vite, Fluent UI v9 | `npm run lint`, `npx tsc -b`, `npm test`, `bash scripts/e2e-podman.sh` (offline Playwright), `bash scripts/e2e-environment.sh` (against sdp-dev) |
 | AI agent | Python 3.13, uv, FastAPI, Microsoft Agent Framework | `uv run pytest`, `uv run ruff check src tests`, `uv run --group eval python evals/run_eval.py` |
 | Infrastructure | Terraform via azd | `terraform -chdir=infra fmt -recursive`, `terraform -chdir=infra validate` |
@@ -65,5 +65,6 @@ How to work on this repository. These rules come from how the demonstrator was b
 - `az containerapp update` may time out although it applied: check before retrying.
 - An ARM-created Service Bus subscription has no `$Default` rule; the Service Bus emulator caps duplicate detection at 5 minutes.
 - Testcontainers on Podman: one container start per JVM in Failsafe (`reuseForks=false`).
+- Locally, use **Podman** for anything that needs a container engine (`docker` is not functional on the development machine). Scripts pick `podman`, then `docker`; `CONTAINER_CLI` overrides (CI sets `docker`).
 - On a busy machine `az` calls can exceed azd's timeout (`AzureCLICredential: signal: killed`); retry, or deploy the portal with the Static Web Apps CLI.
 - Application Insights counts 4xx responses as failed requests.

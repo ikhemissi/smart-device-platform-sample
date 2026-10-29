@@ -11,11 +11,9 @@ SARIF_DIR=""
 [[ "${1:-}" == "--sarif-dir" ]] && SARIF_DIR="$2"
 
 # Shipped images: the Java services' runtime base image (the services add only their jars, scanned through Maven),
-# and the AI agent's image as built from its Dockerfile (Docker, or Podman when Docker is absent).
-ENGINE="${CONTAINER_ENGINE:-}"
-if [[ -z "$ENGINE" ]]; then
-  if docker info >/dev/null 2>&1; then ENGINE=docker; else ENGINE=podman; fi
-fi
+# and the AI agent's image as built from its Dockerfile (Podman, or Docker when Podman is absent; CONTAINER_CLI overrides).
+ENGINE="${CONTAINER_CLI:-$(command -v podman || command -v docker || true)}"
+[[ -n "$ENGINE" ]] || { echo "podman or docker is required" >&2; exit 1; }
 AGENT_IMAGE_TAR="$(mktemp -d)/device-analyst.tar"
 "$ENGINE" build --quiet -t localhost/sdp-device-analyst:scan agents/device-analyst >/dev/null
 "$ENGINE" save -o "$AGENT_IMAGE_TAR" localhost/sdp-device-analyst:scan
