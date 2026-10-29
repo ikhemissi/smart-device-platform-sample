@@ -12,7 +12,12 @@ caller_token: ContextVar[str | None] = ContextVar("caller_token", default=None)
 
 
 class ApiError(Exception):
-    """A platform API failure, phrased for the model."""
+    """A platform API failure, phrased for the model, with its kind for telemetry: not_found, not_permitted,
+    invalid_request, unavailable, rate_limited or failed."""
+
+    def __init__(self, message: str, kind: str = "failed"):
+        super().__init__(message)
+        self.kind = kind
 
 
 class PlatformApi:
@@ -22,22 +27,22 @@ class PlatformApi:
     async def get(self, path: str, params: dict[str, Any] | None = None) -> Any:
         token = caller_token.get()
         if token is None:
-            raise ApiError("not permitted: no signed-in user")
+            raise ApiError("not permitted: no signed-in user", "not_permitted")
         query = {k: v for k, v in (params or {}).items() if v is not None}
         try:
             response = await self._client.get(path, params=query, headers={"Authorization": f"Bearer {token}"})
         except httpx.HTTPError as e:
-            raise ApiError(f"the platform API is unavailable ({type(e).__name__})") from e
+            raise ApiError(f"the platform API is unavailable ({type(e).__name__})", "unavailable") from e
         if response.status_code == 200:
             return response.json()
-        raise ApiError(_describe(response))
+        raise ApiError(*_describe(response))
 
 
 def segment(value: str) -> str:
     return quote(value, safe="")
 
 
-def _describe(response: httpx.Response) -> str:
+def _describe(response: httpx.Response) -> tuple[str, str]:
     detail = ""
     try:
         body = response.json()
@@ -49,12 +54,14 @@ def _describe(response: httpx.Response) -> str:
         pass
     match response.status_code:
         case 400:
-            return f"invalid request: {detail or 'rejected by the API'}"
+            return f"invalid request: {detail or 'rejected by the API'}", "invalid_request"
         case 401 | 403:
-            return "not permitted: the user may not read this data"
+            return "not permitted: the user may not read this data", "not_permitted"
         case 404:
-            return f"not found: {detail or 'no such resource'}"
+            return f"not found: {detail or 'no such resource'}", "not_found"
         case 429:
-            return "rate limited: too many requests, try again in a minute"
+            return "rate limited: too many requests, try again in a minute", "rate_limited"
+        case 502 | 503 | 504:
+            return f"the platform API is unavailable (HTTP {response.status_code})", "unavailable"
         case _:
-            return f"the platform API failed (HTTP {response.status_code})"
+            return f"the platform API failed (HTTP {response.status_code})", "failed"

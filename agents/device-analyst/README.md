@@ -125,5 +125,16 @@ questions took 6–12 s), hence `SDP_AGENT_REASONING_EFFORT=low`.
 ## Deploy
 
 `azd deploy device-analyst` builds the image in Azure Container Registry and updates the `ca-analyst-*` container app.
-In Application Insights, each message is one trace (cloud role `sdp-device-analyst`): `invoke_agent device-analyst`,
-`chat gpt-6-luna` model calls with token usage, `execute_tool …` spans and the platform API requests they cause.
+In Application Insights, each message is one trace (cloud role `sdp-device-analyst`): `sdp.agent.turn`, then
+`invoke_agent device-analyst`, `chat gpt-6-luna` model calls with token usage, `execute_tool …` spans and the platform
+API requests they cause. The operations workbook's *AI assistant* section is built from these spans:
+
+| Span | Attribute | Meaning |
+|---|---|---|
+| `sdp.agent.turn` | `sdp.agent.first_text_ms` | Time from the start of the turn in the agent to the first answer text (absent if none) |
+| | `sdp.agent.outcome` | `answered`, `failed`, `timeout` (110 s) or `cancelled` (client disconnected) |
+| | `sdp.agent.tool_calls` | Tool calls of the turn |
+| | `sdp.agent.device_context` | Whether the question came from a device page |
+| | `enduser.pseudo.id` | Truncated SHA-256 of the user's object id (counts distinct users without identifying them) |
+| `execute_tool <name>` | `sdp.agent.tool.error` | When the platform API refused or failed: `not_found`, `not_permitted`, `invalid_request`, `unavailable`, `rate_limited` or `failed` |
+| `invoke_agent device-analyst` | `gen_ai.usage.input_tokens`, `gen_ai.usage.output_tokens` | Tokens of the turn (Agent Framework) |

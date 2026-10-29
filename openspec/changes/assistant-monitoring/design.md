@@ -18,13 +18,13 @@ See proposal.md for the motivation and the delta specs for the required behaviou
 ## Decisions
 
 ### D1. One `sdp.agent.turn` span per question
-`Analyst.run` opens an internal span `sdp.agent.turn` around the agent run (it becomes the parent of `invoke_agent`). Attributes:
+The API layer (the SSE stream of a message) opens an internal span `sdp.agent.turn` around the agent run; it becomes the parent of `invoke_agent`. It lives there rather than in `Analyst.run` because only the API knows how a turn ended (its 110 s `asyncio.timeout`, an exception, or the client disconnecting). Attributes:
 
 | Attribute | Value |
 |---|---|
 | `sdp.agent.first_text_ms` | milliseconds from the start of the turn in the agent to the first text delta (absent when no text was produced) |
-| `sdp.agent.outcome` | `answered`, `failed` (exception) or `timeout` (turn cancelled by the 110 s limit) |
-| `sdp.agent.tool_calls` | number of platform API look-ups of the turn |
+| `sdp.agent.outcome` | `answered`, `failed` (exception), `timeout` (110 s limit) or `cancelled` (client disconnected before the end) |
+| `sdp.agent.tool_calls` | number of tool calls of the turn (as announced in the stream) |
 | `sdp.agent.device_context` | whether the question carried a device context |
 | `enduser.pseudo.id` | SHA-256 of the user's object id, truncated: counts distinct users without storing who they are |
 

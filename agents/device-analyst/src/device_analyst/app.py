@@ -1,8 +1,10 @@
 """Conversation API of the device analyst (spec device-analyst-agent), streamed with Server-Sent Events."""
 
 import asyncio
+import hashlib
 import json
 import logging
+import time
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from typing import Annotated, Any
@@ -10,6 +12,8 @@ from typing import Annotated, Any
 from fastapi import Depends, FastAPI, Request, Response
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+from opentelemetry import trace
+from opentelemetry.trace import StatusCode
 from pydantic import BaseModel, Field
 from sse_starlette import EventSourceResponse
 
@@ -20,6 +24,7 @@ from .platform_api import caller_token
 from .problems import ProblemError, not_found, problem_response
 
 log = logging.getLogger(__name__)
+tracer = trace.get_tracer("device_analyst")
 PREFIX = "/api/v1/agent"
 CurrentUser = Annotated[User, Depends(reader)]
 
@@ -127,10 +132,26 @@ def create_app(
 
         async def events() -> AsyncIterator[dict[str, str]]:
             token = caller_token.set(user.token)
+            # One span per question (parent of the Agent Framework spans), for the operations workbook.
+            span = tracer.start_span("sdp.agent.turn", attributes={
+                "sdp.agent.device_context": device_id is not None,
+                "enduser.pseudo.id": pseudonym(user.object_id),
+            })
+            started = time.monotonic()
+            tool_calls = 0
+            first_text = False
+            outcome = "cancelled"  # client disconnected before the end, unless set below
+            span_context = trace.use_span(span, end_on_exit=False)
+            span_context.__enter__()
             try:
                 result: TurnResult | None = None
                 async with asyncio.timeout(request.app.state.turn_timeout_seconds):
                     async for event in request.app.state.analyst.run(conversation.history(), body.content, device_id):
+                        if event.type == "delta" and not first_text:
+                            first_text = True
+                            span.set_attribute("sdp.agent.first_text_ms", round((time.monotonic() - started) * 1000))
+                        elif event.type == "tool":
+                            tool_calls += 1
                         if event.result is not None:
                             result = event.result
                             await store.append(
@@ -144,15 +165,25 @@ def create_app(
                                     messages=[m.to_dict() for m in result.messages],
                                 ),
                             )
+                            outcome = "answered"
                             yield sse("done", {"conversationId": conversation_id, **event.data})
                         else:
                             yield sse(event.type, event.data)
             except TimeoutError:
+                outcome = "timeout"
+                span.set_status(StatusCode.ERROR, "turn timed out")
                 yield sse("error", {"title": "Timeout", "detail": "The answer took too long. Try a narrower question."})
-            except Exception:
+            except Exception as e:
+                outcome = "failed"
+                span.record_exception(e)
+                span.set_status(StatusCode.ERROR, type(e).__name__)
                 log.exception("Agent turn failed")
                 yield sse("error", {"title": "Error", "detail": "The assistant could not answer. Try again later."})
             finally:
+                span.set_attribute("sdp.agent.outcome", outcome)
+                span.set_attribute("sdp.agent.tool_calls", tool_calls)
+                span_context.__exit__(None, None, None)
+                span.end()
                 caller_token.reset(token)
                 await store.unlock(conversation_id)
 
@@ -160,6 +191,11 @@ def create_app(
         return EventSourceResponse(events(), ping=15, headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
 
     return app
+
+
+def pseudonym(object_id: str) -> str:
+    """Stable, non-reversible user key for counting distinct users without recording who they are."""
+    return hashlib.sha256(object_id.encode()).hexdigest()[:16]
 
 
 def sse(event: str, data: dict[str, Any]) -> dict[str, str]:

@@ -10,6 +10,7 @@ from datetime import UTC, datetime, timedelta
 from typing import Annotated, Any, Literal
 
 from agent_framework import FunctionTool, tool
+from opentelemetry import trace
 from pydantic import Field
 
 from .platform_api import ApiError, PlatformApi, segment
@@ -69,6 +70,8 @@ def as_data(value: Any) -> str:
 
 
 def error(e: ApiError) -> str:
+    # The current span is the Agent Framework's execute_tool span: the failure kind makes tool errors countable.
+    trace.get_current_span().set_attribute("sdp.agent.tool.error", e.kind)
     return json.dumps({"error": str(e)})
 
 
@@ -113,7 +116,9 @@ def build_tools(api: PlatformApi, now: Callable[[], datetime] = lambda: datetime
                 raise
             if len(matches) > 1:
                 names = ", ".join(f"{m['deviceId']} ({m.get('displayName') or 'no name'})" for m in matches)
-                raise ApiError(f"ambiguous: '{ref}' matches several devices: {names}; use an exact device id") from e
+                raise ApiError(
+                    f"ambiguous: '{ref}' matches several devices: {names}; use an exact device id", "invalid_request"
+                ) from e
             device_id = matches[0]["deviceId"]
             return device_id, await call(f"/devices/{segment(device_id)}{suffix}", params)
 
