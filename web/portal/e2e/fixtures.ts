@@ -418,3 +418,11 @@ export async function expectAppAccessible(page: Page) {
 }
 
 export { expect }
+
+/**
+ * Waits until no CSS or Web Animations animation is running: Fluent dialogs fade in, and axe measures colour contrast
+ * against the (partly transparent) intermediate frame otherwise.
+ */
+export async function animationsSettled(page: Page) {
+  await page.waitForFunction(() => document.getAnimations().every((a) => a.playState !== 'running'))
+}

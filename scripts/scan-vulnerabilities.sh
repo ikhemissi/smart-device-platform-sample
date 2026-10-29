@@ -3,7 +3,7 @@
 # container images. All findings are written as SARIF (for code scanning) when --sarif-dir is given; the scan
 # fails when a High or Critical finding with a fixed version is not accepted in .trivyignore.yaml (each acceptance has
 # a statement and an expiry date). Requires Trivy (https://trivy.dev).
-#   scripts/scan-vulnerabilities.sh [--sarif-dir <dir>]
+#   scripts/scan-vulnerabilities.sh [--sarif-dir <dir>]        (needs JDK 25 for ./mvnw, and Docker or Podman)
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -23,7 +23,10 @@ IMAGES=(
   "$(sed -n 's/^ARG RUNTIME_IMAGE=//p' services/Dockerfile)"
   "--input $AGENT_IMAGE_TAR"
 )
-COMMON=(--scanners vuln --ignorefile .trivyignore.yaml --skip-dirs "**/node_modules,**/.venv,**/target,**/dist" --quiet)
+# Maven dependencies are resolved by Maven into the local repository first; Trivy then reads them offline (resolving
+# them itself from Maven Central gets rate-limited on shared CI runners).
+./mvnw -B -ntp -q dependency:go-offline
+COMMON=(--scanners vuln --offline-scan --ignorefile .trivyignore.yaml --skip-dirs "**/node_modules,**/.venv,**/target,**/dist" --quiet)
 
 status=0
 if [[ -n "$SARIF_DIR" ]]; then

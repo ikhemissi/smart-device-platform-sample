@@ -1,5 +1,5 @@
 import AxeBuilder from '@axe-core/playwright'
-import { EDITOR, READER, expect, expectAppAccessible, test } from './fixtures'
+import { EDITOR, READER, animationsSettled, expect, expectAppAccessible, test } from './fixtures'
 
 /** Stand-in CA file for the faked API (the real API validates real certificates: see e2e-env/sites.env.ts). */
 const CA_FILE = { name: 'nice-01-ca.pem', mimeType: 'application/x-pem-file', buffer: Buffer.from('-----BEGIN CERTIFICATE-----\nMIIB\n-----END CERTIFICATE-----\n') }
@@ -64,6 +64,7 @@ test('the sites pages have no serious accessibility violations', async ({ page, 
   }
   await page.getByRole('button', { name: 'Add certificate' }).click()
   await expect(page.getByRole('dialog')).toBeVisible()
+  await animationsSettled(page)
   const dialog = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa']).exclude('[data-tabster-dummy]').analyze()
   expect(dialog.violations.filter((v) => v.impact === 'serious' || v.impact === 'critical').map((v) => v.id)).toEqual([])
 })

@@ -1,6 +1,6 @@
 import AxeBuilder from '@axe-core/playwright'
 import type { Page } from '@playwright/test'
-import { EDITOR, NO_ROLE, READER, expect, expectAppAccessible, test } from './fixtures'
+import { EDITOR, NO_ROLE, READER, animationsSettled, expect, expectAppAccessible, test } from './fixtures'
 
 async function axe(page: Page) {
   // Fluent UI's focus manager (Tabster) inserts aria-hidden focus sentinels as soon as a dialog is mounted.
@@ -114,5 +114,6 @@ test('pages have no serious accessibility violations', async ({ page, platform }
 
   await page.getByRole('button', { name: /^Edit / }).first().click()
   await expect(page.getByRole('dialog').getByRole('textbox', { name: /Display name/ })).toBeVisible()
+  await animationsSettled(page)
   expect(await axe(page)).toEqual([])
 })
