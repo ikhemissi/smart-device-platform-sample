@@ -9,7 +9,7 @@ between consecutive readings much larger than the spread (jump).
 
 from collections import defaultdict
 from collections.abc import Iterable, Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import datetime, timedelta
 from itertools import pairwise
 from statistics import fmean, median
@@ -174,18 +174,26 @@ def within_usual_range(assessment: Assessment) -> bool:
 
 
 def _unusual_part(kind: str, readings: Sequence[Reading], baseline: Baseline, deviation: float) -> Assessment | None:
-    """A deviation or jump starts at the first reading beyond the deviation (or the first big step), not at the start
-    of the window: the period and observed values then describe the unusual readings only."""
+    """A deviation or jump covers the readings from the first to the last unusual one (beyond the deviation, or a big
+    step), not the whole window: the period and observed values then describe the unusual readings only, and an
+    episode stops being extended once the readings are back to normal."""
     if kind == "flat":
         return None
     readings = sorted(readings, key=lambda r: r.measured_at)
     limit = deviation * baseline.spread
+    unusual = []
     for i, r in enumerate(readings):
         usual = baseline.usual(r.measured_at)
-        stepped = i > 0 and abs(r.value - readings[i - 1].value) >= limit
-        if (usual is not None and abs(r.value - usual) >= limit) or stepped:
-            return assess(readings[i:], baseline) if i > 0 else None
-    return None
+        if usual is None:
+            continue
+        previous = readings[i - 1].value if i > 0 else r.value
+        # A big step counts when it moves away from the usual value (not the step back to normal).
+        stepped = abs(r.value - previous) >= limit and abs(r.value - usual) > abs(previous - usual)
+        if abs(r.value - usual) >= limit or stepped:
+            unusual.append(i)
+    if not unusual or (unusual[0] == 0 and unusual[-1] == len(readings) - 1):
+        return None
+    return assess(readings[unusual[0] : unusual[-1] + 1], baseline)
 
 
 def detect(
@@ -203,7 +211,9 @@ def detect(
             continue
         assessments.append(assessment)
         if kind := classify_kind(assessment, deviation):
-            candidates.append(Candidate(kind, _unusual_part(kind, by_series[key], baseline, deviation) or assessment))
+            part = _unusual_part(kind, by_series[key], baseline, deviation)
+            # The largest step is the window's (an isolated spike trimmed to one reading has no step of its own).
+            candidates.append(Candidate(kind, replace(part, max_step=assessment.max_step) if part else assessment))
     return assessments, candidates
 
 

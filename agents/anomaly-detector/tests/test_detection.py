@@ -86,6 +86,17 @@ def test_ten_degree_rise_is_flagged():
     assert a.observed_min > a.usual_value + 9
 
 
+def test_episode_ends_at_the_last_unusual_reading():
+    baselines, window = scenario()
+    back = NOW - timedelta(minutes=4)
+    warm = [
+        replace(r, value=r.value + 10) if NOW - timedelta(minutes=12) <= r.measured_at < back else r for r in window
+    ]
+    _, [candidate] = detect(warm, baselines, deviation=4)
+    assert candidate.assessment.ended_at == max(r.measured_at for r in warm if r.measured_at < back)
+    assert candidate.assessment.observed_min > candidate.assessment.usual_value + 9
+
+
 def test_flat_line_is_flagged():
     baselines, window = scenario()
     stuck = [Reading(r.device_id, r.metric, r.measured_at, 23.7) for r in window]
