@@ -80,6 +80,7 @@ azd settings → Terraform → job environment: `ANOMALY_DETECTION_ENABLED` (def
 ## Risks / Trade-offs
 
 - [Smooth simulated data gives few natural anomalies] → tuned thresholds plus `SDP_SIM_ANOMALIES` for demos (documented in the demo guide).
+- [Devices carry no context (room, purpose), so a single device deviating alone is read as a sensor fault] → accepted: the demo shows both stories, one device (sensor fault) and several devices of the site at once (real event); device descriptions could be added to the state later.
 - [Decision-1 is in Preview; calibration unknown on our data] → thresholds are settings; decisions keep all probabilities; reviews give labelled data; the scorer is behind an interface.
 - [A rollup gap (watermark lag) makes the baseline slightly stale] → 7-day baseline is insensitive to the last hour missing.
 - [Cost of model calls] → one decision call per new candidate, one LLM call per confirmed anomaly; capacity bounded by `DECISION_MODEL_CAPACITY`.
