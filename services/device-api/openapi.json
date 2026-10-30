@@ -79,6 +79,128 @@
         "x-sdp-required-role" : "read"
       }
     },
+    "/api/v1/anomalies" : {
+      "get" : {
+        "description" : "Anomalies overlapping the period between from (default: 7 days before to) and to (default: now), most recent first, filtered by site, device and status (default: confirmed and to_review, the anomalies to act on).",
+        "operationId" : "listAnomalies",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "siteId",
+          "required" : false,
+          "schema" : {
+            "maxLength" : 40,
+            "minLength" : 1,
+            "type" : "string"
+          }
+        }, {
+          "in" : "query",
+          "name" : "deviceId",
+          "required" : false,
+          "schema" : {
+            "maxLength" : 128,
+            "minLength" : 1,
+            "type" : "string"
+          }
+        }, {
+          "description" : "Statuses to list, repeated or comma-separated: confirmed, to_review, dismissed, reviewed, pending.",
+          "in" : "query",
+          "name" : "status",
+          "required" : false,
+          "schema" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string",
+              "enum" : [ "confirmed", "to_review", "dismissed", "reviewed", "pending" ]
+            }
+          }
+        }, {
+          "in" : "query",
+          "name" : "from",
+          "required" : false,
+          "schema" : {
+            "type" : "string",
+            "format" : "date-time"
+          }
+        }, {
+          "in" : "query",
+          "name" : "to",
+          "required" : false,
+          "schema" : {
+            "type" : "string",
+            "format" : "date-time"
+          }
+        }, {
+          "in" : "query",
+          "name" : "limit",
+          "required" : false,
+          "schema" : {
+            "maximum" : 200,
+            "minimum" : 1,
+            "type" : "integer",
+            "format" : "int32",
+            "default" : 100
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "type" : "array",
+                  "items" : {
+                    "$ref" : "#/components/schemas/Anomaly"
+                  }
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "Anomalies of the analysed sites",
+        "tags" : [ "Anomalies" ],
+        "x-sdp-required-role" : "read"
+      }
+    },
+    "/api/v1/anomalies/{anomalyId}/review" : {
+      "post" : {
+        "description" : "Records whether the automated classification is correct, with an optional comment (at most 1,000 characters). The reviewer is the signed-in Editor; a new review replaces the previous one. The anomaly's status becomes reviewed.",
+        "operationId" : "reviewAnomaly",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "anomalyId",
+          "required" : true,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/AnomalyReviewInput"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Anomaly"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "Review an anomaly",
+        "tags" : [ "Anomalies" ],
+        "x-sdp-required-role" : "write"
+      }
+    },
     "/api/v1/devices" : {
       "get" : {
         "description" : "Filter by site and status, search id and display name (case-insensitive), sort and page.",
@@ -301,6 +423,77 @@
         },
         "summary" : "Alerts of a device",
         "tags" : [ "Alerting" ],
+        "x-sdp-required-role" : "read"
+      }
+    },
+    "/api/v1/devices/{deviceId}/anomalies" : {
+      "get" : {
+        "description" : "The device's anomalies overlapping the period (default: the last 7 days), most recent first. Default statuses: confirmed, to_review and reviewed.",
+        "operationId" : "listDeviceAnomalies",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "deviceId",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "description" : "Statuses to list, repeated or comma-separated: confirmed, to_review, dismissed, reviewed, pending.",
+          "in" : "query",
+          "name" : "status",
+          "required" : false,
+          "schema" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string",
+              "enum" : [ "confirmed", "to_review", "dismissed", "reviewed", "pending" ]
+            }
+          }
+        }, {
+          "in" : "query",
+          "name" : "from",
+          "required" : false,
+          "schema" : {
+            "type" : "string",
+            "format" : "date-time"
+          }
+        }, {
+          "in" : "query",
+          "name" : "to",
+          "required" : false,
+          "schema" : {
+            "type" : "string",
+            "format" : "date-time"
+          }
+        }, {
+          "in" : "query",
+          "name" : "limit",
+          "required" : false,
+          "schema" : {
+            "maximum" : 200,
+            "minimum" : 1,
+            "type" : "integer",
+            "format" : "int32",
+            "default" : 100
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "type" : "array",
+                  "items" : {
+                    "$ref" : "#/components/schemas/Anomaly"
+                  }
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "Anomalies of a device",
+        "tags" : [ "Anomalies" ],
         "x-sdp-required-role" : "read"
       }
     },
@@ -911,6 +1104,175 @@
           "status" : {
             "type" : "string",
             "enum" : [ "PENDING", "SENT", "FAILED" ]
+          }
+        }
+      },
+      "Anomaly" : {
+        "type" : "object",
+        "properties" : {
+          "classification" : {
+            "type" : "string",
+            "nullable" : true,
+            "enum" : [ "real_event", "sensor_fault", "expected_pattern", "cannot_tell" ]
+          },
+          "confidence" : {
+            "type" : "number",
+            "description" : "Probability of the classification",
+            "format" : "double",
+            "nullable" : true
+          },
+          "confidenceThreshold" : {
+            "type" : "number",
+            "description" : "Confidence threshold applied to the decision",
+            "format" : "double",
+            "nullable" : true
+          },
+          "decision" : {
+            "type" : "string",
+            "enum" : [ "pending", "confirmed", "to_review", "dismissed" ]
+          },
+          "decisionModel" : {
+            "type" : "string",
+            "nullable" : true
+          },
+          "decisionModelVersion" : {
+            "type" : "string",
+            "nullable" : true
+          },
+          "detectedAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "deviceId" : {
+            "type" : "string"
+          },
+          "deviceName" : {
+            "type" : "string",
+            "nullable" : true
+          },
+          "endedAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "explanation" : {
+            "type" : "string",
+            "nullable" : true
+          },
+          "explanationModel" : {
+            "type" : "string",
+            "nullable" : true
+          },
+          "id" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "kind" : {
+            "type" : "string",
+            "enum" : [ "deviation", "flat", "jump" ]
+          },
+          "metric" : {
+            "type" : "string"
+          },
+          "observedLast" : {
+            "type" : "number",
+            "format" : "double"
+          },
+          "observedMax" : {
+            "type" : "number",
+            "format" : "double"
+          },
+          "observedMean" : {
+            "type" : "number",
+            "format" : "double"
+          },
+          "observedMin" : {
+            "type" : "number",
+            "format" : "double"
+          },
+          "probabilities" : {
+            "type" : "object",
+            "additionalProperties" : {
+              "type" : "number",
+              "description" : "Probability of each class (empty while pending)",
+              "format" : "double"
+            },
+            "description" : "Probability of each class (empty while pending)"
+          },
+          "review" : {
+            "$ref" : "#/components/schemas/AnomalyReview"
+          },
+          "score" : {
+            "type" : "number",
+            "description" : "Distance from the usual value, in spreads (signed)",
+            "format" : "double"
+          },
+          "siteId" : {
+            "type" : "string"
+          },
+          "spread" : {
+            "type" : "number",
+            "description" : "Typical spread of the device's values around the usual value",
+            "format" : "double"
+          },
+          "startedAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "status" : {
+            "type" : "string",
+            "enum" : [ "pending", "confirmed", "to_review", "dismissed", "reviewed" ]
+          },
+          "unit" : {
+            "type" : "string",
+            "nullable" : true
+          },
+          "updatedAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "usualValue" : {
+            "type" : "number",
+            "description" : "The device's usual value at that time of day",
+            "format" : "double"
+          }
+        }
+      },
+      "AnomalyReview" : {
+        "type" : "object",
+        "properties" : {
+          "comment" : {
+            "type" : "string",
+            "nullable" : true
+          },
+          "reviewedAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "reviewedBy" : {
+            "type" : "string"
+          },
+          "verdict" : {
+            "type" : "string",
+            "enum" : [ "correct", "incorrect" ]
+          }
+        },
+        "nullable" : true
+      },
+      "AnomalyReviewInput" : {
+        "required" : [ "verdict" ],
+        "type" : "object",
+        "properties" : {
+          "comment" : {
+            "maxLength" : 1000,
+            "minLength" : 0,
+            "type" : "string",
+            "nullable" : true,
+            "example" : "Door left open during a delivery"
+          },
+          "verdict" : {
+            "pattern" : "correct|incorrect",
+            "type" : "string",
+            "enum" : [ "correct", "incorrect" ]
           }
         }
       },
