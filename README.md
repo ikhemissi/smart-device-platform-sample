@@ -285,7 +285,7 @@ export DOCKER_HOST=unix:///run/user/$(id -u)/podman/podman.sock TESTCONTAINERS_R
 
 ## Continuous integration
 
-Every push to `main` runs [`.github/workflows/ci.yml`](.github/workflows/ci.yml) (also startable by hand from the Actions tab). Jobs run in parallel; the commit gets one overall status.
+Every push to `main` and every pull request targeting it runs [`.github/workflows/ci.yml`](.github/workflows/ci.yml) (also startable by hand from the Actions tab). Jobs run in parallel; the commit gets one overall status.
 
 ```mermaid
 flowchart LR

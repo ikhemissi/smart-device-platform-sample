@@ -1,11 +1,14 @@
 # Continuous integration (spec continuous-integration): build, code quality, tests, infrastructure and specification
-# validation, dependency vulnerability gate and outdated-dependency report on every push to main. No secrets and no
+# validation, dependency vulnerability gate and outdated-dependency report on every push to main and every pull request
+# targeting main (e.g. the GitHub Copilot cloud agent's). No secrets and no
 # Azure access: only the built-in GITHUB_TOKEN, read-only except for code scanning results. Third-party actions are
 # pinned to commit SHAs (version in the comment). Each job's commands can be run locally (see README, "Build and test").
 name: CI
 
 on:
   push:
+    branches: [main]
+  pull_request:
     branches: [main]
   workflow_dispatch:
 
