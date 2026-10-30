@@ -20,7 +20,7 @@
 
 ## 3. Platform API
 
-- [ ] 3.1 device-api: list, device and review endpoints (design D7), OpenAPI regenerated; verify integration tests (filters, default status, 403 for Readers reviewing, validation errors) and the operations through API Management after provisioning
+- [x] 3.1 device-api: list, device and review endpoints (design D7), OpenAPI regenerated; verify integration tests (filters, default status, 403 for Readers reviewing, validation errors) and the operations through API Management after provisioning
 
 ## 4. Portal
 
