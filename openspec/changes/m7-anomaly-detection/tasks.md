@@ -30,7 +30,7 @@
 
 ## 5. Assistant
 
-- [ ] 5.1 `list_anomalies` tool (design D9); verify unit tests and, after deployment, the question "Anything unusual at paris-01 today?" answered with the recorded anomalies
+- [x] 5.1 `list_anomalies` tool (design D9); verify unit tests and, after deployment, the question "Anything unusual at paris-01 today?" answered with the recorded anomalies
 
 ## 6. CI, documentation and demo
 
