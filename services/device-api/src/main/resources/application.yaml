@@ -51,6 +51,10 @@ sdp:
   history:
     retention: ${SDP_RETENTION:30d}
     partitions: ${SDP_EVENTHUB_PARTITIONS:4}
+  # Site digests (M8): the job generates them; empty sites: every site.
+  digest:
+    enabled: ${SDP_DIGEST_ENABLED:false}
+    sites: ${SDP_DIGEST_SITES:}
   cache:
     # Azure Managed Redis (Entra ID authentication); the history cache is disabled when empty.
     host: ${SDP_REDIS_HOST:}

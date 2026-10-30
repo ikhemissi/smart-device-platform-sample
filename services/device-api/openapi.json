@@ -993,6 +993,64 @@
         "tags" : [ "Sites" ],
         "x-sdp-required-role" : "read"
       }
+    },
+    "/api/v1/sites/{siteId}/digest" : {
+      "get" : {
+        "description" : "Whether the site gets digests, its latest digest (brief written from the figures, the figures, period and generation time) and the regeneration request not served yet, if any.",
+        "operationId" : "getSiteDigest",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "siteId",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/SiteDigest"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "Latest digest of a site",
+        "tags" : [ "Site digests" ],
+        "x-sdp-required-role" : "read"
+      }
+    },
+    "/api/v1/sites/{siteId}/digest/requests" : {
+      "post" : {
+        "description" : "The digest job generates it within minutes, covering the 24 hours before its generation. A request while another is pending returns the pending one. 409 when the site has no digests.",
+        "operationId" : "requestSiteDigest",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "siteId",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "202" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/DigestRequest"
+                }
+              }
+            },
+            "description" : "Accepted"
+          }
+        },
+        "summary" : "Request a new digest of a site",
+        "tags" : [ "Site digests" ],
+        "x-sdp-required-role" : "write"
+      }
     }
   },
   "components" : {
@@ -1389,6 +1447,67 @@
           }
         }
       },
+      "Digest" : {
+        "type" : "object",
+        "properties" : {
+          "brief" : {
+            "type" : "string",
+            "description" : "Null when the language model failed; a later run adds it",
+            "nullable" : true
+          },
+          "briefModel" : {
+            "type" : "string",
+            "nullable" : true
+          },
+          "comparisonFrom" : {
+            "type" : "string",
+            "description" : "Start of the comparison period (it ends at periodFrom)",
+            "format" : "date-time"
+          },
+          "figures" : {
+            "type" : "string",
+            "description" : "Devices, metrics, alerts, anomalies, rejected messages and certificates of the period, as computed by the platform"
+          },
+          "generatedAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "id" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "periodFrom" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "periodTo" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "requestedBy" : {
+            "type" : "string",
+            "nullable" : true
+          },
+          "trigger" : {
+            "type" : "string",
+            "enum" : [ "scheduled", "requested" ]
+          }
+        },
+        "description" : "The latest digest; null when there is none yet",
+        "nullable" : true
+      },
+      "DigestRequest" : {
+        "type" : "object",
+        "properties" : {
+          "requestedAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "requestedBy" : {
+            "type" : "string"
+          }
+        }
+      },
       "Editor" : {
         "type" : "object",
         "properties" : {
@@ -1699,6 +1818,24 @@
           },
           "displayName" : {
             "type" : "string"
+          },
+          "siteId" : {
+            "type" : "string"
+          }
+        }
+      },
+      "SiteDigest" : {
+        "type" : "object",
+        "properties" : {
+          "digest" : {
+            "$ref" : "#/components/schemas/Digest"
+          },
+          "enabled" : {
+            "type" : "boolean",
+            "description" : "Whether the site gets digests in this environment"
+          },
+          "pendingRequest" : {
+            "$ref" : "#/components/schemas/DigestRequest"
           },
           "siteId" : {
             "type" : "string"
