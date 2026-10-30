@@ -1,5 +1,8 @@
 from datetime import UTC, datetime, timedelta
 
+import pytest
+
+from anomaly_detector.digest.config import DigestSettings
 from anomaly_detector.digest.figures import DeviceRow, MetricRow, SiteData, Window, compute
 
 AT = datetime(2026, 10, 30, 6, 0, tzinfo=UTC)
@@ -126,3 +129,37 @@ def test_a_quiet_site():
     assert figures["alerts"] == {"openNow": 0, "total": 0, "items": []}
     assert figures["anomalies"] == {"byStatus": {}, "byClassification": {}, "total": 0, "items": []}
     assert figures["rejectedMessages"] == {"total": 0, "byReason": {}}
+
+
+def test_maintenance_figures_only_where_maintenance_assesses_the_site():
+    assert "maintenance" not in compute(site(), Window(AT))
+
+    queue = [
+        {"deviceId": f"paris-01-d{i}", "status": "planned" if i == 2 else "open", "probability": p, "daysLeft": d}
+        for i, (p, d) in enumerate([(0.55, None), (0.91, 4.62), (0.72, 12.0), (0.6, 30.0), (0.58, None), (0.51, 2.0)])
+    ]
+    maintenance = compute(site(maintenance=queue), Window(AT))["maintenance"]
+    assert (maintenance["open"], maintenance["planned"]) == (5, 1)
+    assert maintenance["mostLikely"] == [
+        {"deviceId": "paris-01-d1", "status": "open", "probabilityPercent": 91, "daysLeft": 4.6},
+        {"deviceId": "paris-01-d2", "status": "planned", "probabilityPercent": 72, "daysLeft": 12.0},
+        {"deviceId": "paris-01-d3", "status": "open", "probabilityPercent": 60, "daysLeft": 30.0},
+        {"deviceId": "paris-01-d4", "status": "open", "probabilityPercent": 58, "daysLeft": None},
+        {"deviceId": "paris-01-d0", "status": "open", "probabilityPercent": 55, "daysLeft": None},
+    ]
+
+    assert compute(site(maintenance=[]), Window(AT))["maintenance"] == {"open": 0, "planned": 0, "mostLikely": []}
+
+
+@pytest.mark.parametrize(
+    ("enabled", "sites", "assessed"),
+    [("false", "", []), ("true", "", ["paris-01", "lyon-01"]), ("true", " paris-01 , nice-01", ["paris-01"])],
+)
+def test_maintenance_figures_follow_the_maintenance_settings(monkeypatch, enabled, sites, assessed):
+    monkeypatch.setenv("SDP_DB_HOST", "localhost")
+    monkeypatch.setenv("SDP_DB_USER", "sdp_insights")
+    monkeypatch.setenv("AZURE_OPENAI_ENDPOINT", "https://ais.openai.example/")
+    monkeypatch.setenv("SDP_MAINTENANCE_ENABLED", enabled)
+    monkeypatch.setenv("SDP_MAINTENANCE_SITES", sites)
+    settings = DigestSettings()
+    assert [s for s in ["paris-01", "lyon-01"] if settings.assesses(s)] == assessed

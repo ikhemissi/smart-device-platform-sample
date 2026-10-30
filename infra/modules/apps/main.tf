@@ -251,6 +251,7 @@ locals {
     SDP_DIGEST_SITES                      = var.site_digest.sites
     SDP_DIGEST_METRICS                    = var.site_digest.metrics
     SDP_MAINTENANCE_ENABLED               = tostring(var.maintenance.enabled)
+    SDP_MAINTENANCE_SITES                 = var.maintenance.sites
   }
 
   # Same image and identity, a third entry point (M9 design D1).

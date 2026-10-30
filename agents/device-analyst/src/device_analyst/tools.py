@@ -350,8 +350,8 @@ def build_tools(
     @tool(
         description="The latest daily digest of a site: a short brief written by the platform from computed "
         "figures (devices reporting and silent, metric averages over the last 24 hours compared with the 7 days "
-        "before, alerts, anomalies, rejected messages, certificates expiring soon), with its period and generation "
-        "time. Use it for 'what happened at <site>' questions."
+        "before, alerts, anomalies, rejected messages, certificates expiring soon and, where assessed, the "
+        "maintenance queue), with its period and generation time. Use it for 'what happened at <site>' questions."
     )
     async def get_site_digest(site_id: Annotated[str, Field(description="Site id, e.g. lyon-01")]) -> str:
         try:

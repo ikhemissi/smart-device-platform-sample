@@ -23,6 +23,10 @@ class DigestSettings(BaseSettings):
     # Empty: every site.
     sites_csv: str = Field(default="", validation_alias="SDP_DIGEST_SITES")
     metrics_csv: str = Field(default=DEFAULT_METRICS, validation_alias="SDP_DIGEST_METRICS")
+    # Predictive maintenance (M9) runs: the figures of the sites it assesses include their maintenance queue.
+    maintenance_enabled: bool = Field(default=False, validation_alias="SDP_MAINTENANCE_ENABLED")
+    # Empty: every site (like the maintenance job).
+    maintenance_sites_csv: str = Field(default="", validation_alias="SDP_MAINTENANCE_SITES")
     applicationinsights_connection_string: str | None = Field(
         default=None, validation_alias="APPLICATIONINSIGHTS_CONNECTION_STRING"
     )
@@ -34,3 +38,8 @@ class DigestSettings(BaseSettings):
     @cached_property
     def metrics(self) -> list[str]:
         return _csv(self.metrics_csv) or _csv(DEFAULT_METRICS)
+
+    def assesses(self, site_id: str) -> bool:
+        """Whether the maintenance job assesses the site (its queue is part of the figures)."""
+        sites = _csv(self.maintenance_sites_csv)
+        return self.maintenance_enabled and (not sites or site_id in sites)
