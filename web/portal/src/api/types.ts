@@ -286,3 +286,93 @@ export interface AnomalyQuery {
   to?: string
   limit?: number
 }
+
+// --- Site digests (M8) -------------------------------------------------------------------------------------------
+
+/** A list of the figures: its size, and at most 20 items. */
+export interface BoundedList<T> {
+  total: number
+  items: T[]
+}
+
+/** The figures of a digest, computed by the platform (the brief is written from them only). */
+export interface DigestFigures {
+  site?: { id: string; name: string | null }
+  period?: { from: string; to: string }
+  comparison?: { from: string; to: string }
+  devices?: {
+    total: number
+    reporting: number
+    silent: BoundedList<{ deviceId: string; name: string | null; lastSeenAt: string | null }>
+  }
+  metrics?: {
+    metric: string
+    unit: string
+    devices: number
+    average: number
+    min: number
+    max: number
+    /** Absent when the comparison period has no data. */
+    comparisonAverage?: number
+    change?: number
+    changePercent?: number
+  }[]
+  alerts?: {
+    openNow: number
+  } & BoundedList<{
+    deviceId: string
+    metric: string
+    direction: 'above' | 'below'
+    status: 'open' | 'closed'
+    openedAt: string
+    closedAt: string | null
+    worstValue: number
+  }>
+  anomalies?: {
+    byStatus: Partial<Record<AnomalyStatus, number>>
+    byClassification: Partial<Record<AnomalyClassification, number>>
+  } & BoundedList<{
+    deviceId: string
+    metric: string
+    kind: Anomaly['kind']
+    status: AnomalyStatus
+    classification: AnomalyClassification | null
+    confidencePercent: number | null
+    startedAt: string
+    endedAt: string
+  }>
+  rejectedMessages?: { total: number; byReason: Record<string, number> }
+  certificates?: { expiringWithin30Days: { slot: 'primary' | 'secondary'; subject: string; notAfter: string; daysLeft: number }[] }
+}
+
+export interface Digest {
+  id: number
+  trigger: 'scheduled' | 'requested'
+  periodFrom: string
+  periodTo: string
+  /** Start of the comparison period (it ends at periodFrom). */
+  comparisonFrom: string
+  generatedAt: string
+  /** Null when the language model failed; a later run adds it. */
+  brief: string | null
+  briefModel: string | null
+  /** Display name of the Editor who requested it. */
+  requestedBy: string | null
+  figures: DigestFigures
+}
+
+/** A regeneration request not served yet. */
+export interface DigestRequest {
+  requestedAt: string
+  /** Display name of the Editor. */
+  requestedBy: string
+}
+
+export interface SiteDigest {
+  siteId: string
+  /** Whether the site gets digests in this environment. */
+  enabled: boolean
+  /** The latest digest; null when there is none yet. */
+  digest: Digest | null
+  pendingRequest: DigestRequest | null
+}

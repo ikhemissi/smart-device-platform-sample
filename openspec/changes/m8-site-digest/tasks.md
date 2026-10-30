@@ -18,12 +18,12 @@
 
 ## 4. Portal
 
-- [ ] 4.1 `digestsEnabled` in `config.json`; *Digest* card on the site page with figures, linked device ids, *Regenerate* for Editors and the pending state (design D7); verify component tests and the offline Playwright suite (including accessibility)
+- [x] 4.1 `digestsEnabled` in `config.json`; *Digest* card on the site page with figures, linked device ids, *Regenerate* for Editors and the pending state (design D7); verify component tests and the offline Playwright suite (including accessibility)
 - [ ] 4.2 Deploy the portal; verify with the user in the environment (digest of `paris-01`, regenerate it)
 
 ## 5. Assistant
 
-- [ ] 5.1 `get_site_digest` tool (design D8); verify unit tests and, after deployment, the question "What happened at lyon-01 in the last day?" answered from the digest
+- [x] 5.1 `get_site_digest` tool (design D8); verify unit tests and, after deployment, the question "What happened at lyon-01 in the last day?" answered from the digest
 
 ## 6. CI, documentation and demo
 

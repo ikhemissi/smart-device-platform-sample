@@ -162,6 +162,56 @@ function seedAnomalies(): FakeAnomaly[] {
   ]
 }
 
+interface FakeDigest {
+  id: number
+  trigger: 'scheduled' | 'requested'
+  periodFrom: string
+  periodTo: string
+  comparisonFrom: string
+  generatedAt: string
+  brief: string | null
+  briefModel: string | null
+  requestedBy: string | null
+  figures: Record<string, unknown>
+}
+
+/** A digest of the 24 hours before `at`, like the digest job's (figures of the fake devices of the site). */
+function fakeDigest(id: number, siteId: string, at: number, changes: Partial<FakeDigest> = {}): FakeDigest {
+  const iso = (t: number) => new Date(t).toISOString()
+  const from = at - 86_400_000
+  const comparisonFrom = from - 7 * 86_400_000
+  const silent = `${siteId}-cayenne-006`
+  const anomalous = `${siteId}-ruuvi-001`
+  return {
+    id, trigger: 'scheduled', periodFrom: iso(from), periodTo: iso(at), comparisonFrom: iso(comparisonFrom), generatedAt: iso(at),
+    brief: `Over the last 24 hours, 11 of the 12 devices of ${siteId} reported; ${silent} went silent. The temperature averaged 20.7 °C, 0.2 °C above the previous 7 days. ${anomalous} had 2 anomalies, one confirmed as a real event. No message was rejected.`,
+    briefModel: 'gpt-6-luna', requestedBy: null,
+    figures: {
+      site: { id: siteId, name: siteId },
+      period: { from: iso(from), to: iso(at) },
+      comparison: { from: iso(comparisonFrom), to: iso(from) },
+      devices: { total: 12, reporting: 11, silent: { total: 1, items: [{ deviceId: silent, name: null, lastSeenAt: iso(at - 40 * 60_000) }] } },
+      metrics: [
+        { metric: 'humidity', unit: '%', devices: 4, average: 48.1, min: 40.2, max: 55.9 },
+        { metric: 'temperature', unit: '°C', devices: 12, average: 20.7, min: 12.99, max: 35.37, comparisonAverage: 20.5, change: 0.2, changePercent: 1 },
+      ],
+      alerts: { openNow: 0, total: 0, items: [] },
+      anomalies: {
+        byStatus: { confirmed: 1, to_review: 1 },
+        byClassification: { real_event: 1, sensor_fault: 1 },
+        total: 2,
+        items: [
+          { deviceId: anomalous, metric: 'humidity', kind: 'jump', status: 'to_review', classification: 'sensor_fault', confidencePercent: 55, startedAt: iso(at - 3 * 3_600_000), endedAt: iso(at - 3 * 3_600_000 + 25 * 60_000) },
+          { deviceId: anomalous, metric: 'temperature', kind: 'deviation', status: 'confirmed', classification: 'real_event', confidencePercent: 91, startedAt: iso(at - 6 * 3_600_000), endedAt: iso(at - 6 * 3_600_000 + 25 * 60_000) },
+        ],
+      },
+      rejectedMessages: { total: 0, byReason: {} },
+      certificates: { expiringWithin30Days: [] },
+    },
+    ...changes,
+  }
+}
+
 /** Minimal multipart reader: content of the first part (the uploaded file). */
 function firstPart(body: Buffer, contentType: string): string {
   const boundary = /boundary=([^;]+)/.exec(contentType)?.[1]
@@ -184,6 +234,13 @@ export class FakePlatform {
   readonly anomalies = seedAnomalies()
   /** Reviews sent through the portal. */
   readonly reviews: { id: number; verdict: string; comment: string | null }[] = []
+  /** Site digests (M8): sites that get them, their latest digest (lyon-01's without brief) and pending requests. */
+  readonly digestSites = ['paris-01', 'lyon-01']
+  readonly digests = new Map<string, FakeDigest>([
+    ['paris-01', fakeDigest(1, 'paris-01', Date.now() - 2 * 3_600_000)],
+    ['lyon-01', fakeDigest(2, 'lyon-01', Date.now() - 2 * 3_600_000, { brief: null, briefModel: null })],
+  ])
+  readonly digestRequests = new Map<string, { requestedAt: string; requestedBy: string }>()
   private readonly latest = new Map<string, { measuredAt: string; payloadFormat: string; metrics: Record<string, number>; attributes: Record<string, string> }[]>()
   /** Access tokens presented to the API. */
   readonly tokens: string[] = []
@@ -296,6 +353,23 @@ export class FakePlatform {
     }
     if (path === '/site-certificates') {
       return route.fulfill({ headers: cors, json: this.certificates })
+    }
+    const digest = path.match(/^\/sites\/([^/]+)\/digest(\/requests)?$/)
+    if (digest) {
+      const siteId = decodeURIComponent(digest[1])
+      if (!this.sites.has(siteId) && !this.devices.some((d) => d.siteId === siteId)) return problem(404, 'Not Found')
+      const enabled = this.digestSites.includes(siteId)
+      if (!digest[2] && request.method() === 'GET') {
+        return route.fulfill({
+          headers: cors,
+          json: { siteId, enabled, digest: this.digests.get(siteId) ?? null, pendingRequest: this.digestRequests.get(siteId) ?? null },
+        })
+      }
+      if (!digest[2] || request.method() !== 'POST') return problem(405, 'Method Not Allowed')
+      if (!canWrite) return problem(403, 'Forbidden')
+      if (!enabled) return problem(409, 'Conflict')
+      if (!this.digestRequests.has(siteId)) this.digestRequests.set(siteId, { requestedAt: new Date().toISOString(), requestedBy: this.user.name })
+      return route.fulfill({ status: 202, headers: cors, json: this.digestRequests.get(siteId) })
     }
     const trust = path.match(/^\/sites\/([^/]+)\/(certificates|audit)(?:\/([0-9a-f]{64}))?$/)
     if (trust) {
@@ -430,6 +504,15 @@ export class FakePlatform {
       })
     }
     return route.fulfill({ headers: { ...cors, ETag: `"v${device.version}"` }, json: { ...this.summary(device), description: device.description, location: device.location, updatedAt: device.updatedAt, updatedBy: device.updatedBy } })
+  }
+
+  /** The digest job serves the pending requests: a new digest of each site, covering the 24 hours before now. */
+  serveDigestRequests(brief?: string) {
+    for (const [siteId, request] of this.digestRequests) {
+      const id = Math.max(...[...this.digests.values()].map((d) => d.id), 0) + 1
+      this.digests.set(siteId, fakeDigest(id, siteId, Date.now(), { trigger: 'requested', requestedBy: request.requestedBy, ...(brief ? { brief } : {}) }))
+    }
+    this.digestRequests.clear()
   }
 
   private latestOf(deviceId: string) {

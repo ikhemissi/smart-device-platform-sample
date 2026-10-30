@@ -1,6 +1,6 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useApi } from './context'
-import type { AnomalyQuery, AnomalyStatus, DeviceEdit, DeviceQuery, ReviewVerdict, Threshold, ThresholdInput } from './types'
+import type { AnomalyQuery, AnomalyStatus, DeviceEdit, DeviceQuery, ReviewVerdict, SiteDigest, Threshold, ThresholdInput } from './types'
 
 export const queryKeys = {
   me: ['me'] as const,
@@ -19,6 +19,7 @@ export const queryKeys = {
   anomalies: (query: AnomalyQuery) => ['anomalies', 'list', query] as const,
   deviceAnomalies: (deviceId: string, status: AnomalyStatus[], period: string, from?: string, to?: string) =>
     ['anomalies', 'device', deviceId, status, period, from, to] as const,
+  siteDigest: (siteId: string) => ['site-digest', siteId] as const,
 }
 
 export function useCurrentUser() {
@@ -256,5 +257,32 @@ export function useReviewAnomaly() {
   return useMutation({
     mutationFn: ({ id, verdict, comment }: { id: number; verdict: ReviewVerdict; comment: string | null }) => api.reviewAnomaly(id, verdict, comment),
     onSuccess: () => client.invalidateQueries({ queryKey: ['anomalies'] }),
+  })
+}
+
+// --- Site digests (M8) -------------------------------------------------------------------------------------------
+
+/** While a regeneration request is pending, the digest is refetched at this interval until the job serves it. */
+export const DIGEST_PENDING_REFRESH_MS = 20_000
+
+export function useSiteDigest(siteId: string, enabled = true) {
+  const api = useApi()
+  return useQuery({
+    queryKey: queryKeys.siteDigest(siteId),
+    queryFn: () => api.siteDigest(siteId),
+    enabled,
+    refetchInterval: (query) => (query.state.data?.pendingRequest ? DIGEST_PENDING_REFRESH_MS : false),
+    refetchIntervalInBackground: false,
+  })
+}
+
+export function useRequestSiteDigest(siteId: string) {
+  const api = useApi()
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: () => api.requestSiteDigest(siteId),
+    onSuccess: (pendingRequest) => {
+      client.setQueryData<SiteDigest>(queryKeys.siteDigest(siteId), (current) => current && { ...current, pendingRequest })
+    },
   })
 }

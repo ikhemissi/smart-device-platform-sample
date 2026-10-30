@@ -11,12 +11,18 @@ describe('runtime configuration', () => {
   it('switches optional features off when absent', async () => {
     serve(BASE)
 
-    expect(await loadConfig()).toEqual({ ...BASE, apiBaseUrl: 'https://api.test/api/v1', assistantEnabled: false, anomaliesEnabled: false, anomalySites: [] })
+    expect(await loadConfig()).toEqual({ ...BASE, apiBaseUrl: 'https://api.test/api/v1', assistantEnabled: false, anomaliesEnabled: false, anomalySites: [], digestsEnabled: false })
   })
 
   it('reads anomaly detection and its sites', async () => {
     serve({ ...BASE, anomaliesEnabled: true, anomalySites: ['paris-01', 'lyon-01'] })
 
     expect(await loadConfig()).toMatchObject({ anomaliesEnabled: true, anomalySites: ['paris-01', 'lyon-01'] })
+  })
+
+  it('reads site digests', async () => {
+    serve({ ...BASE, digestsEnabled: true })
+
+    expect(await loadConfig()).toMatchObject({ digestsEnabled: true })
   })
 })

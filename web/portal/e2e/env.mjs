@@ -8,4 +8,6 @@ export const FAKE_ENV = {
   // Anomaly detection (M7) on, for paris-01 only.
   ANOMALY_DETECTOR_JOB_NAME: 'caj-anomaly-detector-e2e',
   ANOMALY_SITES: 'paris-01',
+  // Site digests (M8) on.
+  DIGEST_JOB_NAME: 'caj-site-digest-e2e',
 }

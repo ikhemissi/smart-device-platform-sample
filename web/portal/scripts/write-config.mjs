@@ -31,6 +31,9 @@ export function portalFiles(env) {
     // PORTAL_ANOMALIES=false hides them), for the sites it analyses.
     anomaliesEnabled: env.PORTAL_ANOMALIES ? env.PORTAL_ANOMALIES === 'true' : Boolean(env.ANOMALY_DETECTOR_JOB_NAME),
     anomalySites: anomalySites(env.ANOMALY_SITES),
+    // Site digests appear once the digest job is deployed (its name is empty when DIGEST_ENABLED=false;
+    // PORTAL_DIGESTS=false hides them).
+    digestsEnabled: env.PORTAL_DIGESTS ? env.PORTAL_DIGESTS === 'true' : Boolean(env.DIGEST_JOB_NAME),
   }
   const csp = [
     "default-src 'self'",

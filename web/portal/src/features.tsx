@@ -7,9 +7,11 @@ export interface Features {
   anomalies: boolean
   /** Sites analysed by the anomaly detector. */
   anomalySites: string[]
+  /** Site digests (M8): the site page's Digest card. */
+  digests: boolean
 }
 
-export const NO_FEATURES: Features = { assistant: false, anomalies: false, anomalySites: [] }
+export const NO_FEATURES: Features = { assistant: false, anomalies: false, anomalySites: [], digests: false }
 
 export const FeaturesContext = createContext<Features>(NO_FEATURES)
 

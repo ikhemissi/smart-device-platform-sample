@@ -11,6 +11,7 @@ import type {
   CertificateChange,
   CurrentUser,
   DeviceDetails,
+  DigestRequest,
   DeviceEdit,
   DevicePage,
   DeviceQuery,
@@ -21,6 +22,7 @@ import type {
   Series,
   Site,
   SiteCertificate,
+  SiteDigest,
   Threshold,
   ThresholdInput,
 } from './types'
@@ -131,6 +133,16 @@ export class ApiClient {
   async removeSiteCertificate(siteId: string, fingerprint: string): Promise<CertificateChange> {
     const response = await this.request(`/sites/${encodeURIComponent(siteId)}/certificates/${fingerprint}`, { method: 'DELETE' })
     return (await response.json()) as CertificateChange
+  }
+
+  siteDigest(siteId: string): Promise<SiteDigest> {
+    return this.json(`/sites/${encodeURIComponent(siteId)}/digest`)
+  }
+
+  /** Asks the digest job for a new digest; an existing pending request is returned. */
+  async requestSiteDigest(siteId: string): Promise<DigestRequest> {
+    const response = await this.request(`/sites/${encodeURIComponent(siteId)}/digest/requests`, { method: 'POST' })
+    return (await response.json()) as DigestRequest
   }
 
   thresholds(deviceId: string): Promise<Threshold[]> {

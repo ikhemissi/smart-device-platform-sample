@@ -10,6 +10,8 @@ export interface RuntimeConfig {
   anomaliesEnabled: boolean
   /** Sites analysed by the anomaly detector. */
   anomalySites: string[]
+  /** The site digest job (M8) is deployed. */
+  digestsEnabled: boolean
 }
 
 export async function loadConfig(): Promise<RuntimeConfig> {
@@ -28,6 +30,7 @@ export async function loadConfig(): Promise<RuntimeConfig> {
     apiBaseUrl: config.apiBaseUrl!.replace(/\/+$/, ''),
     assistantEnabled: config.assistantEnabled === true,
     anomaliesEnabled: config.anomaliesEnabled === true,
+    digestsEnabled: config.digestsEnabled === true,
     anomalySites: Array.isArray(config.anomalySites) ? config.anomalySites.filter((site) => typeof site === 'string') : [],
   }
 }

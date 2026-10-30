@@ -26,7 +26,9 @@ import { useCurrentUser, useSiteAudit, useSiteCertificates, useSites } from '../
 import type { CertificateChange, SiteCertificate } from '../../api/types'
 import { ErrorState } from '../../components/ErrorState'
 import { Timestamp } from '../../components/Timestamp'
+import { useFeatures } from '../../features'
 import { formatAbsolute, formatRelative } from '../../format'
+import { DigestCard } from './DigestCard'
 import { RemoveCertificateDialog } from './RemoveCertificateDialog'
 import { TrustBadge } from './TrustBadge'
 import { UploadCertificateDialog } from './UploadCertificateDialog'
@@ -54,6 +56,7 @@ export function SitePage() {
   const styles = useStyles()
   const { siteId = '' } = useParams()
   const canWrite = useCurrentUser().data?.canWrite === true
+  const digests = useFeatures().digests
   const site = useSites().data?.find((s) => s.siteId === siteId)
   const certificates = useSiteCertificates(siteId)
   const audit = useSiteAudit(siteId)
@@ -115,6 +118,8 @@ export function SitePage() {
           <MessageBarBody>This site trusts no certificate: no device can join it{site?.deviceCount ? ' and its devices are disabled' : ''}.</MessageBarBody>
         </MessageBar>
       )}
+
+      {digests && <DigestCard siteId={siteId} canWrite={canWrite} />}
 
       <Card>
         <div className={styles.cardHeader}>
