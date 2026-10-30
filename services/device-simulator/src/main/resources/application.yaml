@@ -15,6 +15,7 @@ sdp:
     duration: ${SDP_SIM_DURATION:}
     corruption-rate: ${SDP_SIM_CORRUPTION_RATE:0}
     anomalies: ${SDP_SIM_ANOMALIES:}
+    aging-devices: ${SDP_SIM_AGING_DEVICES:}
     transport: ${SDP_SIM_TRANSPORT:iothub}
     dps:
       global-endpoint: ${SDP_DPS_GLOBAL_ENDPOINT:global.azure-devices-provisioning.net}

@@ -13,6 +13,7 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
  * @param duration       optional run duration; runs until stopped when absent
  * @param corruptionRate share of messages sent with a corrupted payload (0..1)
  * @param anomalies      e.g. {@code paris-01-ruuvi5-001:temperature=12:5m[:<delay>]}
+ * @param agingDevices   ids of the devices whose battery drains to its cut-off in about two weeks
  * @param transport      {@code iothub} (DPS + IoT Hub) or {@code console} (dry run)
  */
 @ConfigurationProperties("sdp.simulator")
@@ -25,6 +26,7 @@ public record SimulatorProperties(
         Duration duration,
         @DefaultValue("0") double corruptionRate,
         @DefaultValue List<String> anomalies,
+        @DefaultValue List<String> agingDevices,
         @DefaultValue("iothub") String transport,
         @DefaultValue Dps dps,
         @DefaultValue Ca ca) {
@@ -47,5 +49,6 @@ public record SimulatorProperties(
             throw new IllegalArgumentException("sdp.simulator.jitter must be >= 0 and smaller than the interval");
         }
         anomalies = anomalies == null ? List.of() : anomalies.stream().filter(a -> !a.isBlank()).toList();
+        agingDevices = agingDevices == null ? List.of() : agingDevices.stream().map(String::trim).filter(a -> !a.isBlank()).toList();
     }
 }

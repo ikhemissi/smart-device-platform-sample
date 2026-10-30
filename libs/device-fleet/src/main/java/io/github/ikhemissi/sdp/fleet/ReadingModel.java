@@ -1,6 +1,5 @@
 package io.github.ikhemissi.sdp.fleet;
 
-import java.time.Duration;
 import java.time.Instant;
 import java.util.HexFormat;
 import java.util.LinkedHashMap;
@@ -11,7 +10,9 @@ import java.util.Random;
 /**
  * Plausible, continuous readings for one device (spec device-simulation: "Realistic readings"). A per-device seed
  * gives each device stable baselines; temperature and humidity follow a daily cycle with small noise, pressure drifts
- * slowly like the weather (computed from the time, so that it stays continuous when the simulator restarts), battery discharges slowly and counters increase. Values stay within each format's valid range.
+ * slowly like the weather and the battery follows a sawtooth (both computed from the time, so that they stay continuous
+ * when the simulator restarts), and counters increase. Aging devices drain their battery to the cut-off in about two
+ * weeks, then get a new one. Values stay within each format's valid range.
  */
 public final class ReadingModel {
 
@@ -22,6 +23,15 @@ public final class ReadingModel {
     // Weather-like pressure drift: three slow waves (at most +/-7.5 hPa, about 1 hPa per hour at the steepest).
     private static final double[] PRESSURE_PERIODS_HOURS = {31, 53, 97};
     private static final double[] PRESSURE_AMPLITUDES_HPA = {3.5, 2.5, 1.5};
+    // Battery sawtooth (design D11): a new battery at 3.05 V, then a linear decline until the next replacement.
+    // Reference of the sawtooth, shortly before M9: a normal device is then between 0 and 200 days into its battery.
+    static final Instant BATTERY_EPOCH = Instant.parse("2026-10-01T00:00:00Z");
+    static final double NEW_BATTERY_VOLTS = 3.05;
+    static final double NORMAL_RATE_VOLTS_PER_DAY = 0.0015;
+    static final double NORMAL_PERIOD_DAYS = 400;
+    static final double NORMAL_MAX_PHASE_DAYS = 200;
+    static final double AGING_RATE_VOLTS_PER_DAY = 0.035;
+    static final double AGING_PERIOD_DAYS = 16;
 
     private final SimulatedDevice device;
     private final List<Anomaly> anomalies;
@@ -33,7 +43,9 @@ public final class ReadingModel {
     private final double humidityBase;
     private final double humidityAmplitude;
     private final double pressureBase;
-    private final double batteryStartVolts;
+    private final double batteryRate;
+    private final double batteryPeriodDays;
+    private final double batteryPhaseDays;
     private final double co2Base;
     private final double illuminancePeak;
     private final String mac;
@@ -43,6 +55,11 @@ public final class ReadingModel {
     private int movements;
 
     public ReadingModel(SimulatedDevice device, List<Anomaly> anomalies, Instant start) {
+        this(device, anomalies, start, false);
+    }
+
+    /** @param aging whether the device drains its battery to the cut-off in about two weeks (design D11) */
+    public ReadingModel(SimulatedDevice device, List<Anomaly> anomalies, Instant start, boolean aging) {
         this.device = device;
         this.anomalies = anomalies.stream().filter(a -> a.deviceId().equals(device.deviceId())).toList();
         this.start = start;
@@ -53,7 +70,7 @@ public final class ReadingModel {
         this.humidityBase = 40 + seed.nextDouble() * 20;
         this.humidityAmplitude = 4 + seed.nextDouble() * 6;
         this.pressureBase = 1005 + seed.nextDouble() * 15;
-        this.batteryStartVolts = 2.9 + seed.nextDouble() * 0.2;
+        seed.nextDouble(); // former battery start voltage: still drawn so that the values below are unchanged
         this.co2Base = 420 + seed.nextDouble() * 200;
         this.illuminancePeak = 300 + seed.nextDouble() * 500;
         byte[] macBytes = new byte[6];
@@ -67,6 +84,10 @@ public final class ReadingModel {
         for (int i = 0; i < pressurePhases.length; i++) {
             pressurePhases[i] = seed.nextDouble() * 2 * Math.PI;
         }
+        double batteryPhase = seed.nextDouble();
+        this.batteryRate = aging ? AGING_RATE_VOLTS_PER_DAY : NORMAL_RATE_VOLTS_PER_DAY;
+        this.batteryPeriodDays = aging ? AGING_PERIOD_DAYS : NORMAL_PERIOD_DAYS;
+        this.batteryPhaseDays = batteryPhase * (aging ? AGING_PERIOD_DAYS : NORMAL_MAX_PHASE_DAYS);
     }
 
     public SimulatedDevice device() {
@@ -77,7 +98,6 @@ public final class ReadingModel {
         double hours = now.getEpochSecond() / 3600.0;
         double daily = Math.sin(2 * Math.PI * (hours - 9 - phaseHours) / HOURS_PER_DAY);
         double daylight = Math.max(0, Math.sin(2 * Math.PI * (hours % HOURS_PER_DAY - 6) / HOURS_PER_DAY));
-        double days = Duration.between(start, now).toSeconds() / 86_400.0;
 
         sequence = (sequence + 1) % 65_535;
         packetId = (packetId + 1) % 256;
@@ -88,7 +108,7 @@ public final class ReadingModel {
         double temperature = override("temperature", now, temperatureBase + temperatureAmplitude * daily + random.nextGaussian() * 0.08);
         double humidity = override("humidity", now, clamp(humidityBase - humidityAmplitude * daily + random.nextGaussian() * 0.3, 5, 95));
         double pressure = override("pressure", now, pressureBase + pressureDrift(hours) + random.nextGaussian() * 0.05);
-        double voltage = override("battery_voltage", now, clamp(batteryStartVolts - 0.002 * days + random.nextGaussian() * 0.002, 2.2, 3.6));
+        double voltage = override("battery_voltage", now, clamp(batteryVolts(now) + random.nextGaussian() * 0.002, 2.2, 3.6));
         double co2 = override("co2", now, Math.max(400, co2Base + 350 * daylight + random.nextGaussian() * 15));
         double illuminance = override("illuminance", now, Math.max(0, illuminancePeak * daylight + random.nextGaussian() * 5));
 
@@ -151,6 +171,13 @@ public final class ReadingModel {
             return value + (a.value() - value) * weight + noise * weight;
         }
         return value;
+    }
+
+    /** Noise-free battery voltage at a time: continuous across restarts, a jump up at each new battery. */
+    double batteryVolts(Instant now) {
+        long seconds = now.getEpochSecond() - BATTERY_EPOCH.getEpochSecond() + Math.round(batteryPhaseDays * 86_400);
+        double age = Math.floorMod(seconds, Math.round(batteryPeriodDays * 86_400)) / 86_400.0;
+        return NEW_BATTERY_VOLTS - batteryRate * age;
     }
 
     private double pressureDrift(double hours) {
