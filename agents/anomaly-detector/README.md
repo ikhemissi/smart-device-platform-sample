@@ -1,4 +1,4 @@
-# Anomaly detector (M7)
+# Anomaly detector (M7) and site digest (M8)
 
 Scheduled Container Apps job (every 5 minutes) that finds unusual sensor readings on the monitored sites and records
 them in `sdp.anomalies` ([PRD-007](../../docs/prd/PRD-007-m7-anomaly-detection.md),
@@ -66,5 +66,28 @@ uv run pytest -m live              # checks against the environment
 uv run anomaly-detector            # one cycle
 ```
 
+## Site digests (M8)
+
+The same project has a second entry point, `site-digest`, run by its own scheduled job (every 5 minutes, same image and
+identity) ([PRD-008](../../docs/prd/PRD-008-m8-site-digest.md),
+[design](../../openspec/changes/m8-site-digest/design.md)):
+
+| Step | Who | What |
+|---|---|---|
+| When | the job | each configured site once a day after 06:00 UTC, and any digest an Editor requested (`sdp.site_digest_requests`) |
+| Figures | code | devices reporting and silent, metric averages (last 24 h vs the 7 days before), alerts, anomalies, rejected messages, certificates expiring within 30 days |
+| Brief | `gpt-6-luna` | at most six sentences from the figures only; every number is checked against the figures |
+
+| Variable | azd setting | Default |
+|---|---|---|
+| `SDP_DIGEST_SITES` | `DIGEST_SITES` | every site |
+| `SDP_DIGEST_METRICS` | `DIGEST_METRICS` | `temperature,humidity,pressure,co2,illuminance,battery_voltage,battery_level` |
+| — | `DIGEST_ENABLED` | `true`; `false` removes the job |
+
+```bash
+uv run site-digest --dry-run --site paris-01             # figures and brief for now, nothing written
+uv run site-digest --dry-run --site paris-01 --no-brief  # figures only, no model call
+```
+
 The image is built in Azure Container Registry by `scripts/build-anomaly-detector-image.sh` from the post-provision
-hook (not by `azd deploy`).
+hook (not by `azd deploy`); it points both jobs at it.

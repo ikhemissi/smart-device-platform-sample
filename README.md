@@ -2,9 +2,9 @@
 
 [![CI](https://github.com/ikhemissi/smart-device-platform-sample/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/ikhemissi/smart-device-platform-sample/actions/workflows/ci.yml)
 
-An end-to-end Azure sample of a sensor platform. Simulated devices send binary measurements, the platform decodes and stores them, people browse them in a web portal, get email alerts, manage which devices may connect, ask an AI assistant about the data, and review the anomalies a decision model finds in it.
+An end-to-end Azure sample of a sensor platform. Simulated devices send binary measurements, the platform decodes and stores them, people browse them in a web portal, get email alerts, manage which devices may connect, ask an AI assistant about the data, review the anomalies a decision model finds in it, and read a daily brief of each site.
 
-> **Status:** all milestones (M1–M7) and the operations workbook are delivered and archived. Baseline specifications are in [`openspec/specs/`](openspec/specs).
+> **Status:** milestones M1–M7 and the operations workbook are delivered and archived; M8 (site digest) is delivered and being archived. Baseline specifications are in [`openspec/specs/`](openspec/specs).
 
 **Contents:** [What it shows](#what-it-shows) · [Architecture](#architecture) · [How it works](#how-it-works) · [Security](#security) · [Repository](#repository) · [Build and test](#build-and-test) · [Continuous integration](#continuous-integration) · [Deploy to Azure](#deploy-to-azure) · [Operate](#operate) · [Contributing](#contributing)
 
@@ -20,6 +20,7 @@ An end-to-end Azure sample of a sensor platform. Simulated devices send binary m
 | — | Operations workbook | KPIs, latest errors, PostgreSQL / IoT Hub / Event Hubs metrics | [Operate](#operate) |
 | M6 | AI assistant | Questions in natural language, grounded answers with sources, `gpt-6-luna` | [m6-ai-analyst](docs/demo/m6-ai-analyst.md) |
 | M7 | Anomaly detection | Statistics select, `Microsoft-Decision-1` classifies (real event, sensor fault, …) with a confidence, `gpt-6-luna` explains; reviews in the portal | [m7-anomaly-detection](docs/demo/m7-anomaly-detection.md) |
+| M8 | Site digest | A daily brief per site written by `gpt-6-luna` from figures the platform computes; regenerated on request | [m8-site-digest](docs/demo/m8-site-digest.md) |
 
 ## Architecture
 
@@ -39,7 +40,7 @@ flowchart LR
     PROV[provisioning-api]
     ALERT[alert-service]
     AGENT["device-analyst<br/>(AI agent)"]
-    DET["anomaly-detector<br/>(job, every 5 min)"]
+    DET["anomaly-detector and site-digest<br/>(jobs, every 5 min)"]
   end
   subgraph Data
     PG[(PostgreSQL)]
@@ -184,7 +185,7 @@ sequenceDiagram
   AG-->>S: SSE: tool, delta… done with sources
 ```
 
-- **Grounded and read-only:** read-only tools (ten where anomaly detection runs); the assistant can never see more than the user and declines to change anything.
+- **Grounded and read-only:** read-only tools (plus anomalies and site digests where they run); the assistant can never see more than the user and declines to change anything.
 - **Conversations** live in Redis, belong to their author and expire after an hour.
 - **Quality is measured:** an evaluation set of 17 questions scored for groundedness, relevance and tool use; first text within 5 s for all of them ([agent README](agents/device-analyst/README.md#evaluation)).
 
@@ -205,11 +206,27 @@ flowchart LR
 - **Every decision is recorded:** all probabilities, the threshold, the model and its version; a failed model call is retried by the next cycle.
 - **Tuned on the environment's data** with dry runs (no write): about 3 candidates and 1.7 confirmed anomalies a day on `paris-01` ([detector README](agents/anomaly-detector/README.md#tuning)).
 
-### 7. Observability
+### 7. Site digests (M8)
 
 ```mermaid
 flowchart LR
-  W["All services, the agent<br/>and the detector"] -->|OpenTelemetry, Entra auth| AI[Application Insights]
+  E((Editor)) -->|Regenerate| API[device-api] -->|request| PG[(PostgreSQL)]
+  J["site-digest<br/>(every 5 min)"] -->|"daily after 06:00 UTC,<br/>and requested ones"| PG
+  J -->|"figures only"| L["gpt-6-luna<br/>brief"]
+  J -->|"figures + brief"| PG
+  PG --> API --> UI["Portal: Digest card<br/>on the site page"]
+  API --> AG[AI assistant]
+```
+
+- **Figures computed, text written:** devices reporting and silent, metric averages over the last 24 hours against the 7 days before, alerts, anomalies, rejected messages and expiring certificates are computed in code; the model only writes a few sentences from them, and every number it states is checked against the figures.
+- **Regenerate** records a request; the job serves it within 5 minutes, so the device API keeps data-plane access only.
+- If the model fails, the figures are shown without a brief and a later run adds it.
+
+### 8. Observability
+
+```mermaid
+flowchart LR
+  W["All services, the agent<br/>and the jobs"] -->|OpenTelemetry, Entra auth| AI[Application Insights]
   APIM[API Management] --> AI
   AI --> WB["Operations workbook"]
   AI --> F["Foundry tracing"]
@@ -236,7 +253,7 @@ Details: [docs/security.md](docs/security.md). All resources carry the tenant ta
 |---|---|
 | `services/` | Java services: `telemetry-decoder`, `device-simulator`, `device-api`, `provisioning-api`, `alert-service`, `db-migrator` (each with a README) |
 | `agents/device-analyst/` | AI agent and its evaluation set |
-| `agents/anomaly-detector/` | Anomaly detection job (statistics, decision model, explanations) |
+| `agents/anomaly-detector/` | Model-based analysis jobs: anomaly detection (statistics, decision model, explanations) and site digests |
 | `web/portal/` | Web portal |
 | `libs/` | Shared Java libraries: payload codecs, simulated fleet, security/observability, database schema, test support |
 | `infra/` | Terraform (deployed with azd) |
@@ -262,7 +279,7 @@ export DOCKER_HOST=unix:///run/user/$(id -u)/podman/podman.sock TESTCONTAINERS_R
 | Portal | `cd web/portal && npm ci && npm run lint && npm test && npm run build` |
 | Portal end-to-end (API faked) | `cd web/portal && npm run e2e:podman` |
 | AI agent | `cd agents/device-analyst && uv sync && uv run ruff check src tests && uv run pytest` |
-| Anomaly detector | `cd agents/anomaly-detector && uv sync && uv run ruff check src tests && uv run pytest` (dry run: `uv run anomaly-detector --dry-run --days 7`) |
+| Anomaly detector and site digest | `cd agents/anomaly-detector && uv sync && uv run ruff check src tests && uv run pytest` (dry runs: `uv run anomaly-detector --dry-run --days 7`, `uv run site-digest --dry-run --site paris-01`) |
 | Infrastructure | `terraform -chdir=infra fmt -check -recursive && terraform -chdir=infra validate` |
 | Local database | `scripts/local-postgres.sh start && scripts/run-migrations.sh --local` |
 
@@ -329,6 +346,10 @@ flowchart LR
 | `ANOMALY_DEVIATION` / `ANOMALY_CONFIDENCE` | `4` / `0.7` | Distance from the usual value that makes a candidate; probability from which a classification is applied without review |
 | `DECISION_MODEL_CAPACITY` | `30` | `Microsoft-Decision-1` capacity (1 request and 1,000 tokens per minute per unit) |
 | `PORTAL_ANOMALIES` | on when the detector is deployed | `false` hides the anomaly card and page |
+| `DIGEST_ENABLED` | `true` | `false` removes the site digest job; the portal card and the assistant tool follow |
+| `DIGEST_SITES` | every site | Sites that get a daily digest (comma-separated) |
+| `DIGEST_METRICS` | `temperature,humidity,pressure,co2,illuminance,battery_voltage,battery_level` | Metrics summarised in digests |
+| `PORTAL_DIGESTS` | on when the digest job is deployed | `false` hides the Digest card |
 
 ## Operate
 
@@ -342,8 +363,8 @@ flowchart LR
 | `scripts/check-workbook-queries.sh` | Run the workbook's queries against the environment |
 | `scripts/remove-test-site.sh` | Remove a `test-*` / `e2e-*` site and everything attached |
 | `scripts/agent-env.sh` | Write the AI agent's local `.env` from the azd environment |
-| `scripts/anomaly-env.sh` | Write the anomaly detector's local `.env` (dry runs with your identity) |
-| `scripts/build-anomaly-detector-image.sh` | Build the detector image in ACR and point the job at it (also run by `postprovision`) |
+| `scripts/anomaly-env.sh` | Write the anomaly detector's and site digest's local `.env` (dry runs with your identity) |
+| `scripts/build-anomaly-detector-image.sh` | Build the detector and digest image in ACR and point both jobs at it (also run by `postprovision`) |
 
 ## Contributing
 
