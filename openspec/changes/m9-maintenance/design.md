@@ -58,7 +58,7 @@ Responses API, `store=false`, reasoning `low`; instructions: at most four senten
 - Settings `SDP_MAINTENANCE_ENABLED`, `SDP_MAINTENANCE_SITES`; OpenAPI regenerated.
 
 ### D9. Portal
-`config.json` gains `maintenanceEnabled` (`MAINTENANCE_JOB_NAME` non-empty; `PORTAL_MAINTENANCE` overrides). *Maintenance* page (navigation): site and status filters, table most likely first (device link, site, probability %, days left, reasons, work order, status), *Planned* / *Done* with comment for Editors. Device page: *Battery and maintenance* card (level, trend per day, days left, probability, assessed at, queue item). Patterns: the M7 anomalies page and card.
+`config.json` gains `maintenanceEnabled` (`UPKEEP_JOB_NAME` non-empty; `PORTAL_MAINTENANCE` overrides). The job's output is `UPKEEP_JOB_NAME`, after its resource name: `MAINTENANCE_JOB_NAME` already names the database maintenance job (`caj-maint-<token>`), used by the migrator build script and the post-provision hook. *Maintenance* page (navigation): site and status filters, table most likely first (device link, site, probability %, days left, reasons, work order, status), *Planned* / *Done* with comment for Editors. Device page: *Battery and maintenance* card (level, trend per day, days left, probability, assessed at, queue item). Patterns: the M7 anomalies page and card.
 
 ### D10. Site digest and assistant
 - Digest figures gain `maintenance` (open and planned counts, the 5 most likely items with device, probability %, days left) when `SDP_MAINTENANCE_ENABLED` is true on the digest job; the brief instructions mention the queue.

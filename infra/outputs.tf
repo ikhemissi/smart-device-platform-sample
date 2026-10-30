@@ -229,6 +229,11 @@ output "FOUNDRY_ACCOUNT_ENDPOINT" {
   value = module.foundry.account_endpoint
 }
 
+output "UPKEEP_JOB_NAME" {
+  description = "Maintenance (battery forecast and queue) job; empty when MAINTENANCE_ENABLED is false. MAINTENANCE_JOB_NAME is the database maintenance job."
+  value       = module.apps.upkeep_job_name
+}
+
 output "DIGEST_JOB_NAME" {
   description = "Site digest job; empty when DIGEST_ENABLED is false."
   value       = module.apps.site_digest_job_name

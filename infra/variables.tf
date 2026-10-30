@@ -207,6 +207,31 @@ variable "decision_model_capacity" {
   default     = ""
 }
 
+# Predictive maintenance (M9). Set with `azd env set MAINTENANCE_*`; empty values fall back to the defaults in main.tf.
+variable "maintenance_enabled" {
+  description = "Run the maintenance job (battery forecasts and maintenance queue) (MAINTENANCE_ENABLED, \"false\" to switch off). Empty: true."
+  type        = string
+  default     = ""
+}
+
+variable "maintenance_sites" {
+  description = "Comma-separated sites assessed by the maintenance job (MAINTENANCE_SITES). Empty: every site."
+  type        = string
+  default     = ""
+}
+
+variable "maintenance_confidence" {
+  description = "Intervention probability from which a device is queued (MAINTENANCE_CONFIDENCE). Empty: 0.5."
+  type        = string
+  default     = ""
+}
+
+variable "simulator_aging_devices" {
+  description = "Comma-separated simulated devices whose battery drains in about two weeks (SIMULATOR_AGING_DEVICES). Empty: <site>-ruuvi5-003 for each demo site."
+  type        = string
+  default     = ""
+}
+
 # Site digests (M8). Set with `azd env set DIGEST_*`; empty values fall back to the defaults in main.tf.
 variable "digest_enabled" {
   description = "Generate daily site digests (DIGEST_ENABLED, \"false\" to switch off). Empty: true."

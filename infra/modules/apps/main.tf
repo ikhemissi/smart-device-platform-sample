@@ -91,6 +91,16 @@ variable "site_digest" {
   description = "Site digest job settings (M8 design D1/D9); the job exists only when enabled. Empty sites: every site."
   type        = object({ enabled = bool, sites = string, metrics = string })
 }
+variable "maintenance" {
+  description = "Maintenance job settings (M9 design D1/D5); the job exists only when enabled. Empty sites: every site."
+  type = object({
+    enabled             = bool
+    sites               = string
+    confidence          = string
+    decision_endpoint   = string
+    decision_deployment = string
+  })
+}
 variable "tags" { type = map(string) }
 
 locals {
@@ -157,6 +167,8 @@ locals {
     SDP_REDIS_PORT                            = tostring(var.redis.port)
     SDP_DIGEST_ENABLED                        = tostring(var.site_digest.enabled)
     SDP_DIGEST_SITES                          = var.site_digest.sites
+    SDP_MAINTENANCE_ENABLED                   = tostring(var.maintenance.enabled)
+    SDP_MAINTENANCE_SITES                     = var.maintenance.sites
   })
 
   provisioning_api_env = merge(local.observability_env, {
@@ -203,6 +215,7 @@ locals {
     SDP_AGENT_CAPTURE_CONTENT             = tostring(var.foundry.capture_content)
     SDP_ANOMALIES_ENABLED                 = tostring(var.anomaly_detection.enabled)
     SDP_DIGESTS_ENABLED                   = tostring(var.site_digest.enabled)
+    SDP_MAINTENANCE_ENABLED               = tostring(var.maintenance.enabled)
   }
 
   # Python job (M7 design D1/D10): PostgreSQL with an Entra token as password, models with the workload identity.
@@ -237,6 +250,24 @@ locals {
     FOUNDRY_MODEL_DEPLOYMENT_NAME         = var.foundry.model_deployment_name
     SDP_DIGEST_SITES                      = var.site_digest.sites
     SDP_DIGEST_METRICS                    = var.site_digest.metrics
+    SDP_MAINTENANCE_ENABLED               = tostring(var.maintenance.enabled)
+  }
+
+  # Same image and identity, a third entry point (M9 design D1).
+  upkeep_env = {
+    APPLICATIONINSIGHTS_CONNECTION_STRING = var.application_insights.connection_string
+    OTEL_RESOURCE_ATTRIBUTES              = "deployment.environment=${var.environment_name}"
+    OTEL_SERVICE_NAME                     = "sdp-maintenance"
+    AZURE_CLIENT_ID                       = var.identities.anomaly_detector.client_id
+    SDP_DB_HOST                           = var.postgres.host
+    SDP_DB_NAME                           = var.postgres.database
+    SDP_DB_USER                           = var.identities.anomaly_detector.name
+    AZURE_OPENAI_ENDPOINT                 = var.foundry.openai_endpoint
+    FOUNDRY_MODEL_DEPLOYMENT_NAME         = var.foundry.model_deployment_name
+    SDP_DECISION_ENDPOINT                 = var.maintenance.decision_endpoint
+    SDP_DECISION_DEPLOYMENT               = var.maintenance.decision_deployment
+    SDP_MAINTENANCE_SITES                 = var.maintenance.sites
+    SDP_MAINTENANCE_CONFIDENCE            = var.maintenance.confidence
   }
 }
 
@@ -916,6 +947,61 @@ resource "azurerm_container_app_job" "site_digest" {
   }
 }
 
+# --- Maintenance job (M9): battery forecasts and maintenance queue --------------------------------------------
+# caj-maint-<token> is the database maintenance job: this one is the "upkeep" job.
+
+resource "azurerm_container_app_job" "upkeep" {
+  count                        = var.maintenance.enabled ? 1 : 0
+  name                         = "caj-upkeep-${var.token}"
+  resource_group_name          = var.resource_group_name
+  location                     = var.location
+  container_app_environment_id = var.container_app_environment_id
+  workload_profile_name        = "Consumption"
+  # Hourly; a failed run is retried by the next one (design D1).
+  replica_timeout_in_seconds = 600
+  replica_retry_limit        = 0
+  tags                       = var.tags
+
+  schedule_trigger_config {
+    cron_expression          = "0 * * * *"
+    parallelism              = 1
+    replica_completion_count = 1
+  }
+
+  identity {
+    type         = "UserAssigned"
+    identity_ids = [var.identities.anomaly_detector.id, var.identities.acr_pull.id]
+  }
+
+  registry {
+    server   = var.registry_server
+    identity = var.identities.acr_pull.id
+  }
+
+  template {
+    container {
+      name    = "maintenance"
+      image   = local.placeholder_image
+      command = ["maintenance"]
+      cpu     = 0.5
+      memory  = "1Gi"
+
+      dynamic "env" {
+        for_each = local.upkeep_env
+        content {
+          name  = env.key
+          value = env.value
+        }
+      }
+    }
+  }
+
+  lifecycle {
+    # Set by the post-provision hook (image built in ACR, shared with the anomaly detector).
+    ignore_changes = [template[0].container[0].image]
+  }
+}
+
 output "decoder_app_name" { value = azurerm_container_app.decoder.name }
 output "simulator_app_name" { value = azurerm_container_app.simulator.name }
 output "migrator_job_name" { value = azurerm_container_app_job.migrate.name }
@@ -929,3 +1015,4 @@ output "device_analyst_app_name" { value = azurerm_container_app.device_analyst.
 output "site_digest_job_name" { value = join("", azurerm_container_app_job.site_digest[*].name) }
 output "anomaly_detector_job_name" { value = join("", azurerm_container_app_job.anomaly_detector[*].name) }
 output "device_analyst_url" { value = "https://${azurerm_container_app.device_analyst.ingress[0].fqdn}" }
+output "upkeep_job_name" { value = join("", azurerm_container_app_job.upkeep[*].name) }

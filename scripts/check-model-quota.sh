@@ -3,7 +3,8 @@
 # instead of failing late in `terraform apply`. Mirrors the defaults of infra/main.tf (module "foundry").
 #
 # Usage: scripts/check-model-quota.sh
-#   reads AZURE_SUBSCRIPTION_ID, AZURE_ENV_NAME, AZURE_LOCATION, AGENT_MODEL_*, ANOMALY_DETECTION_ENABLED, DECISION_MODEL_CAPACITY
+#   reads AZURE_SUBSCRIPTION_ID, AZURE_ENV_NAME, AZURE_LOCATION, AGENT_MODEL_*, ANOMALY_DETECTION_ENABLED,
+#   MAINTENANCE_ENABLED, DECISION_MODEL_CAPACITY
 set -euo pipefail
 
 location="${AZURE_LOCATION:-francecentral}"
@@ -59,11 +60,13 @@ check "${AGENT_MODEL_NAME:-gpt-6-luna}" "${AGENT_MODEL_VERSION:-2026-09-22}" "${
   "${AGENT_MODEL_CAPACITY:-50}" OpenAI "${AGENT_MODEL_NAME:-gpt-6-luna}" \
   "Choose another model, SKU, capacity or region (azd env set AGENT_MODEL_NAME / AGENT_MODEL_VERSION / AGENT_MODEL_SKU / AGENT_MODEL_CAPACITY / AZURE_LOCATION) or request quota: https://aka.ms/oai/quotaincrease"
 
-# Anomaly detection (M7): Microsoft-Decision-1, capacity units of 1 request and 1,000 tokens per minute.
-enabled="${ANOMALY_DETECTION_ENABLED:-true}"
-if [[ "${enabled,,}" == "false" ]]; then
-  echo "Model preflight: anomaly detection disabled (ANOMALY_DETECTION_ENABLED=false), Microsoft-Decision-1 not checked."
+# Anomaly detection (M7) and maintenance (M9): Microsoft-Decision-1, capacity units of 1 request and 1,000 tokens per
+# minute; deployed when either feature is enabled.
+anomalies="${ANOMALY_DETECTION_ENABLED:-true}"
+maintenance="${MAINTENANCE_ENABLED:-true}"
+if [[ "${anomalies,,}" == "false" && "${maintenance,,}" == "false" ]]; then
+  echo "Model preflight: anomaly detection and maintenance disabled (ANOMALY_DETECTION_ENABLED=false, MAINTENANCE_ENABLED=false), Microsoft-Decision-1 not checked."
 else
   check Microsoft-Decision-1 1 DataZoneStandard "${DECISION_MODEL_CAPACITY:-30}" AIServices decision-1 \
-    "Lower DECISION_MODEL_CAPACITY, or switch anomaly detection off for this environment: azd env set ANOMALY_DETECTION_ENABLED false"
+    "Lower DECISION_MODEL_CAPACITY, or switch anomaly detection and maintenance off for this environment: azd env set ANOMALY_DETECTION_ENABLED false; azd env set MAINTENANCE_ENABLED false"
 fi

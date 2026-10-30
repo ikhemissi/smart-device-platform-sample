@@ -1,18 +1,18 @@
 #!/usr/bin/env bash
 # Builds the model-based analysis image in ACR (tagged with a hash of its sources, so unchanged code is not rebuilt) and
-# points the jobs that run it at it: the anomaly detector (M7 design D1) and the site digest (M8 design D1). Prints the
-# image reference. Does nothing when both are disabled (no job). Used by the postprovision hook; reads the azd
+# points the jobs that run it at it: the anomaly detector (M7 design D1), the site digest (M8 design D1) and the
+# maintenance job (M9 design D1). Prints the image reference. Does nothing when all three are disabled (no job). Used by the postprovision hook; reads the azd
 # environment values (Terraform outputs).
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 : "${AZURE_RESOURCE_GROUP:?}" "${AZURE_CONTAINER_REGISTRY_NAME:?}" "${AZURE_CONTAINER_REGISTRY_ENDPOINT:?}"
 JOBS=()
-for job in "${ANOMALY_DETECTOR_JOB_NAME:-}" "${DIGEST_JOB_NAME:-}"; do
+for job in "${ANOMALY_DETECTOR_JOB_NAME:-}" "${DIGEST_JOB_NAME:-}" "${UPKEEP_JOB_NAME:-}"; do
   [[ -n "$job" ]] && JOBS+=("$job")
 done
 if (( ${#JOBS[@]} == 0 )); then
-  echo "Anomaly detection and site digests disabled: no image to build" >&2
+  echo "Anomaly detection, site digests and maintenance disabled: no image to build" >&2
   exit 0
 fi
 
