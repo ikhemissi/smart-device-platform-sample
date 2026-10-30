@@ -497,6 +497,35 @@
         "x-sdp-required-role" : "read"
       }
     },
+    "/api/v1/devices/{deviceId}/maintenance" : {
+      "get" : {
+        "description" : "Whether the device is assessed, its latest assessment (battery forecast, reporting signals, probability of an intervention within 7 days) and its open or planned item.",
+        "operationId" : "getDeviceMaintenance",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "deviceId",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/DeviceMaintenance"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "Maintenance of a device",
+        "tags" : [ "Maintenance" ],
+        "x-sdp-required-role" : "read"
+      }
+    },
     "/api/v1/devices/{deviceId}/measurements" : {
       "get" : {
         "description" : "from (inclusive) to to (exclusive), at most 31 days, ascending time order, paged with an opaque cursor.",
@@ -950,6 +979,103 @@
         "x-sdp-required-role" : "read"
       }
     },
+    "/api/v1/maintenance" : {
+      "get" : {
+        "description" : "Items of the assessed sites, most likely first, filtered by site and status (default: open and planned, the queue). Empty when maintenance is off in the environment.",
+        "operationId" : "listMaintenance",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "siteId",
+          "required" : false,
+          "schema" : {
+            "maxLength" : 40,
+            "minLength" : 1,
+            "type" : "string"
+          }
+        }, {
+          "description" : "Statuses to list, repeated or comma-separated: open, planned, done, resolved.",
+          "in" : "query",
+          "name" : "status",
+          "required" : false,
+          "schema" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string",
+              "enum" : [ "open", "planned", "done", "resolved" ]
+            }
+          }
+        }, {
+          "in" : "query",
+          "name" : "limit",
+          "required" : false,
+          "schema" : {
+            "maximum" : 200,
+            "minimum" : 1,
+            "type" : "integer",
+            "format" : "int32",
+            "default" : 100
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "type" : "array",
+                  "items" : {
+                    "$ref" : "#/components/schemas/MaintenanceItem"
+                  }
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "Maintenance queue",
+        "tags" : [ "Maintenance" ],
+        "x-sdp-required-role" : "read"
+      }
+    },
+    "/api/v1/maintenance/{itemId}/status" : {
+      "post" : {
+        "description" : "Marks an open or planned item planned or done, with an optional comment (at most 1,000 characters), by the signed-in Editor. A done item leaves the queue and the device is not queued again for 7 days. 409 for a done or resolved item.",
+        "operationId" : "setMaintenanceStatus",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "itemId",
+          "required" : true,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int64"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/MaintenanceStatusInput"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/MaintenanceItem"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "summary" : "Plan or close a maintenance item",
+        "tags" : [ "Maintenance" ],
+        "x-sdp-required-role" : "write"
+      }
+    },
     "/api/v1/me" : {
       "get" : {
         "description" : "Available without any platform role so that clients can explain which permission to request.",
@@ -1395,6 +1521,24 @@
         },
         "description" : "Fields to change; null clears a field, absent fields are unchanged."
       },
+      "DeviceMaintenance" : {
+        "type" : "object",
+        "properties" : {
+          "assessment" : {
+            "$ref" : "#/components/schemas/MaintenanceAssessment"
+          },
+          "deviceId" : {
+            "type" : "string"
+          },
+          "enabled" : {
+            "type" : "boolean",
+            "description" : "Whether the device is assessed (maintenance on and its site configured)"
+          },
+          "item" : {
+            "$ref" : "#/components/schemas/MaintenanceItem"
+          }
+        }
+      },
       "DevicePage" : {
         "type" : "object",
         "properties" : {
@@ -1598,6 +1742,134 @@
           }
         },
         "nullable" : true
+      },
+      "MaintenanceAssessment" : {
+        "type" : "object",
+        "properties" : {
+          "assessedAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "battery" : {
+            "type" : "object",
+            "description" : "Battery forecast (metric, unit, level, slope_per_day, days_left, since, cutoff); null when the device reports no battery",
+            "nullable" : true
+          },
+          "decisionModel" : {
+            "type" : "string"
+          },
+          "decisionModelVersion" : {
+            "type" : "string"
+          },
+          "probability" : {
+            "type" : "number",
+            "description" : "Probability of an intervention within 7 days",
+            "format" : "double"
+          },
+          "signals" : {
+            "type" : "object",
+            "description" : "Reporting signals: minutes since the last message, messages, median interval and longest gap over the last 24 hours and the 7 days before, rejected messages"
+          }
+        },
+        "description" : "The latest assessment; null when there is none yet",
+        "nullable" : true
+      },
+      "MaintenanceItem" : {
+        "type" : "object",
+        "properties" : {
+          "battery" : {
+            "type" : "object",
+            "description" : "Battery forecast (metric, unit, level, slope_per_day, days_left, since, cutoff); null when the device reports no battery",
+            "nullable" : true
+          },
+          "deviceId" : {
+            "type" : "string"
+          },
+          "deviceName" : {
+            "type" : "string",
+            "nullable" : true
+          },
+          "id" : {
+            "type" : "integer",
+            "format" : "int64"
+          },
+          "openedAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "probability" : {
+            "type" : "number",
+            "description" : "Probability of an intervention within 7 days, from the decision model",
+            "format" : "double"
+          },
+          "reasons" : {
+            "type" : "object",
+            "description" : "The computed figures that crossed a rule (rule, value, threshold, unit), or the battery forecast and the probability when none did"
+          },
+          "resolvedAt" : {
+            "type" : "string",
+            "format" : "date-time",
+            "nullable" : true
+          },
+          "siteId" : {
+            "type" : "string"
+          },
+          "status" : {
+            "type" : "string",
+            "description" : "open and planned items are in the queue; done (by an Editor) and resolved (by the platform, when the probability fell below the confidence) close an item",
+            "enum" : [ "open", "planned", "done", "resolved" ]
+          },
+          "statusAt" : {
+            "type" : "string",
+            "format" : "date-time",
+            "nullable" : true
+          },
+          "statusBy" : {
+            "type" : "string",
+            "description" : "The Editor who set the status",
+            "nullable" : true
+          },
+          "statusComment" : {
+            "type" : "string",
+            "nullable" : true
+          },
+          "updatedAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "workOrder" : {
+            "type" : "string",
+            "description" : "Null until the language model wrote it; a later run retries",
+            "nullable" : true
+          },
+          "workOrderAt" : {
+            "type" : "string",
+            "format" : "date-time",
+            "nullable" : true
+          },
+          "workOrderModel" : {
+            "type" : "string",
+            "nullable" : true
+          }
+        }
+      },
+      "MaintenanceStatusInput" : {
+        "required" : [ "status" ],
+        "type" : "object",
+        "properties" : {
+          "comment" : {
+            "maxLength" : 1000,
+            "minLength" : 0,
+            "type" : "string",
+            "nullable" : true,
+            "example" : "Battery replaced"
+          },
+          "status" : {
+            "pattern" : "planned|done",
+            "type" : "string",
+            "enum" : [ "planned", "done" ]
+          }
+        }
       },
       "Measurement" : {
         "type" : "object",

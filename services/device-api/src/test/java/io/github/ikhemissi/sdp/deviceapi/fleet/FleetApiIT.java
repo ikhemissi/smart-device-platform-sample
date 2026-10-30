@@ -124,7 +124,7 @@ class FleetApiIT {
     void rollupsGiveTheSameSummaryAsRawMeasurements() {
         String uri = "/api/v1/fleet/metric-summary?metric=humidity&groupBy=device&from=" + HOUR.minus(Duration.ofDays(7)).minusSeconds(900)
                 + "&to=" + HOUR.minusSeconds(300);
-        JsonNode raw = json(get(uri));
+        List<JsonNode> raw = fleetGroups(json(get(uri)));
         var admin = CatalogDatabase.admin();
         try {
             // Same aggregation as the maintenance job (db-migrator MetricRollups), up to two hours before HOUR.
@@ -143,7 +143,7 @@ class FleetApiIT {
                     Timestamp.from(HOUR.minus(Duration.ofHours(2))));
             admin.update("UPDATE sdp.metric_rollup_state SET rolled_until = ?", Timestamp.from(HOUR.minus(Duration.ofHours(2))));
 
-            assertThat(json(get(uri))).isEqualTo(raw);
+            assertThat(fleetGroups(json(get(uri)))).isEqualTo(raw);
         } finally {
             admin.update("DELETE FROM sdp.metric_rollups_hourly WHERE device_id LIKE 'fleet-%'");
             admin.update("UPDATE sdp.metric_rollup_state SET rolled_until = NULL");
@@ -206,6 +206,17 @@ class FleetApiIT {
     private static String summary(String metric, String groupBy, String siteId) {
         return "/api/v1/fleet/metric-summary?metric=" + metric + "&groupBy=" + groupBy + "&from=" + HOUR.minus(Duration.ofDays(7))
                 + "&to=" + HOUR + (siteId == null ? "" : "&siteId=" + siteId);
+    }
+
+    // Other test classes share the database; only the fleet devices are rolled up here.
+    private static List<JsonNode> fleetGroups(JsonNode body) {
+        List<JsonNode> groups = new ArrayList<>();
+        body.get("groups").forEach(g -> {
+            if (g.get("siteId").asString().startsWith("fleet-")) {
+                groups.add(g);
+            }
+        });
+        return groups;
     }
 
     private static JsonNode group(JsonNode body, String siteId, String deviceId) {
