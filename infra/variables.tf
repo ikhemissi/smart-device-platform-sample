@@ -206,3 +206,22 @@ variable "decision_model_capacity" {
   type        = string
   default     = ""
 }
+
+# Site digests (M8). Set with `azd env set DIGEST_*`; empty values fall back to the defaults in main.tf.
+variable "digest_enabled" {
+  description = "Generate daily site digests (DIGEST_ENABLED, \"false\" to switch off). Empty: true."
+  type        = string
+  default     = ""
+}
+
+variable "digest_sites" {
+  description = "Comma-separated sites that get a daily digest (DIGEST_SITES). Empty: every site."
+  type        = string
+  default     = ""
+}
+
+variable "digest_metrics" {
+  description = "Comma-separated metrics summarised in digests (DIGEST_METRICS). Empty: see main.tf."
+  type        = string
+  default     = ""
+}

@@ -23,6 +23,7 @@ locals {
   }
   anomaly_detection_enabled = lower(coalesce(var.anomaly_detection_enabled, "true")) != "false"
   anomaly_sites             = coalesce(var.anomaly_sites, "paris-01")
+  digest_enabled            = lower(coalesce(var.digest_enabled, "true")) != "false"
 }
 
 resource "azurerm_resource_group" "main" {
@@ -224,6 +225,12 @@ module "apps" {
     confidence          = coalesce(var.anomaly_confidence, "0.7")
     decision_endpoint   = module.foundry.account_endpoint
     decision_deployment = module.foundry.decision_model_deployment_name
+  }
+  site_digest = {
+    enabled = local.digest_enabled
+    # Empty: every site.
+    sites   = trimspace(var.digest_sites)
+    metrics = coalesce(var.digest_metrics, "temperature,humidity,pressure,co2,illuminance,battery_voltage,battery_level")
   }
   tags = local.tags
 

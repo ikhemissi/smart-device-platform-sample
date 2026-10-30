@@ -1,13 +1,18 @@
 #!/usr/bin/env bash
-# Builds the anomaly detector image in ACR (tagged with a hash of its sources, so unchanged code is not rebuilt) and
-# points the anomaly detector job at it (M7 design D1). Prints the image reference. Does nothing when anomaly detection
-# is disabled (no job). Used by the postprovision hook; reads the azd environment values (Terraform outputs).
+# Builds the model-based analysis image in ACR (tagged with a hash of its sources, so unchanged code is not rebuilt) and
+# points the jobs that run it at it: the anomaly detector (M7 design D1) and the site digest (M8 design D1). Prints the
+# image reference. Does nothing when both are disabled (no job). Used by the postprovision hook; reads the azd
+# environment values (Terraform outputs).
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 : "${AZURE_RESOURCE_GROUP:?}" "${AZURE_CONTAINER_REGISTRY_NAME:?}" "${AZURE_CONTAINER_REGISTRY_ENDPOINT:?}"
-if [[ -z "${ANOMALY_DETECTOR_JOB_NAME:-}" ]]; then
-  echo "Anomaly detection disabled: no detector image to build" >&2
+JOBS=()
+for job in "${ANOMALY_DETECTOR_JOB_NAME:-}" "${DIGEST_JOB_NAME:-}"; do
+  [[ -n "$job" ]] && JOBS+=("$job")
+done
+if (( ${#JOBS[@]} == 0 )); then
+  echo "Anomaly detection and site digests disabled: no image to build" >&2
   exit 0
 fi
 
@@ -22,5 +27,7 @@ else
   echo "Building anomaly detector image $TAG in ACR..." >&2
   az acr build -r "$AZURE_CONTAINER_REGISTRY_NAME" -t "sdp/anomaly-detector:$TAG" --no-logs "$ROOT/$PROJECT" -o none
 fi
-az containerapp job update -n "$ANOMALY_DETECTOR_JOB_NAME" -g "$AZURE_RESOURCE_GROUP" --image "$IMAGE" -o none
+for job in "${JOBS[@]}"; do
+  az containerapp job update -n "$job" -g "$AZURE_RESOURCE_GROUP" --image "$IMAGE" -o none
+done
 echo "$IMAGE"

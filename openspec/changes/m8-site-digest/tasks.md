@@ -3,7 +3,7 @@
 ## 1. Data and infrastructure
 
 - [x] 1.1 Migration V9 (`sdp.site_digests`, `sdp.site_digest_requests`, grants for `sdp_insights` without alert recipients and `sdp_catalog`) and digest retention in the maintenance task; verify with db-migrator integration tests (privileges of both roles, one pending request per site, retention)
-- [ ] 1.2 Terraform: digest job (same image and identity as the anomaly detector, placeholder image), settings `DIGEST_ENABLED`, `DIGEST_SITES`, `DIGEST_METRICS` with the feature switch, device-api and agent environment, build script and post-provision step updating both jobs; verify `azd provision --preview`, `azd provision`, and with the feature switched off a plan without the digest job
+- [x] 1.2 Terraform: digest job (same image and identity as the anomaly detector, placeholder image), settings `DIGEST_ENABLED`, `DIGEST_SITES`, `DIGEST_METRICS` with the feature switch, device-api and agent environment, build script and post-provision step updating both jobs; verify `azd provision --preview`, `azd provision`, and with the feature switched off a plan without the digest job
 
 ## 2. Digest job
 

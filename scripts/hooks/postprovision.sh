@@ -27,7 +27,8 @@ for _ in $(seq 1 120); do
 done
 [[ "${STATUS:-}" == "Succeeded" ]] || { echo "Database migration timed out ($STATUS)" >&2; exit 1; }
 
-# 3. Anomaly detector image (M7), after the migration: its schema and database principal must exist first.
+# 3. Anomaly detector and site digest image (M7, M8), after the migration: their schema and database principal must
+#    exist first.
 "$ROOT/scripts/build-anomaly-detector-image.sh" >/dev/null
 
 # 4. Demo sites: CAs in Key Vault and DPS enrollment groups.

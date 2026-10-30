@@ -1,7 +1,13 @@
-"""Anomaly detector (M7, ADR-0011): one detection cycle per run of the scheduled Container Apps job."""
+"""Model-based analysis jobs (ADR-0011): anomaly detection (M7) and site digests (M8), one run per job execution."""
 
 
 def main() -> None:
     from .main import run
+
+    raise SystemExit(run())
+
+
+def site_digest() -> None:
+    from .digest.main import run
 
     raise SystemExit(run())

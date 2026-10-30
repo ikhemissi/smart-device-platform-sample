@@ -228,3 +228,8 @@ output "DECISION_MODEL_DEPLOYMENT_NAME" {
 output "FOUNDRY_ACCOUNT_ENDPOINT" {
   value = module.foundry.account_endpoint
 }
+
+output "DIGEST_JOB_NAME" {
+  description = "Site digest job; empty when DIGEST_ENABLED is false."
+  value       = module.apps.site_digest_job_name
+}

@@ -87,6 +87,10 @@ variable "anomaly_detection" {
     decision_deployment = string
   })
 }
+variable "site_digest" {
+  description = "Site digest job settings (M8 design D1/D9); the job exists only when enabled. Empty sites: every site."
+  type        = object({ enabled = bool, sites = string, metrics = string })
+}
 variable "tags" { type = map(string) }
 
 locals {
@@ -151,6 +155,8 @@ locals {
     SDP_EVENTHUB_PARTITIONS                   = tostring(var.eventhubs.partition_count)
     SDP_REDIS_HOST                            = var.redis.host
     SDP_REDIS_PORT                            = tostring(var.redis.port)
+    SDP_DIGEST_ENABLED                        = tostring(var.site_digest.enabled)
+    SDP_DIGEST_SITES                          = var.site_digest.sites
   })
 
   provisioning_api_env = merge(local.observability_env, {
@@ -196,6 +202,7 @@ locals {
     SDP_REDIS_PORT                        = tostring(var.redis.port)
     SDP_AGENT_CAPTURE_CONTENT             = tostring(var.foundry.capture_content)
     SDP_ANOMALIES_ENABLED                 = tostring(var.anomaly_detection.enabled)
+    SDP_DIGESTS_ENABLED                   = tostring(var.site_digest.enabled)
   }
 
   # Python job (M7 design D1/D10): PostgreSQL with an Entra token as password, models with the workload identity.
@@ -215,6 +222,21 @@ locals {
     SDP_ANOMALY_METRICS                   = var.anomaly_detection.metrics
     SDP_ANOMALY_DEVIATION                 = var.anomaly_detection.deviation
     SDP_ANOMALY_CONFIDENCE                = var.anomaly_detection.confidence
+  }
+
+  # Same image and identity as the anomaly detector, another entry point (M8 design D1).
+  site_digest_env = {
+    APPLICATIONINSIGHTS_CONNECTION_STRING = var.application_insights.connection_string
+    OTEL_RESOURCE_ATTRIBUTES              = "deployment.environment=${var.environment_name}"
+    OTEL_SERVICE_NAME                     = "sdp-site-digest"
+    AZURE_CLIENT_ID                       = var.identities.anomaly_detector.client_id
+    SDP_DB_HOST                           = var.postgres.host
+    SDP_DB_NAME                           = var.postgres.database
+    SDP_DB_USER                           = var.identities.anomaly_detector.name
+    AZURE_OPENAI_ENDPOINT                 = var.foundry.openai_endpoint
+    FOUNDRY_MODEL_DEPLOYMENT_NAME         = var.foundry.model_deployment_name
+    SDP_DIGEST_SITES                      = var.site_digest.sites
+    SDP_DIGEST_METRICS                    = var.site_digest.metrics
   }
 }
 
@@ -840,6 +862,60 @@ resource "azurerm_container_app_job" "anomaly_detector" {
   }
 }
 
+# --- Site digest job (M8) --------------------------------------------------------------------------------------
+
+resource "azurerm_container_app_job" "site_digest" {
+  count                        = var.site_digest.enabled ? 1 : 0
+  name                         = "caj-digest-${var.token}"
+  resource_group_name          = var.resource_group_name
+  location                     = var.location
+  container_app_environment_id = var.container_app_environment_id
+  workload_profile_name        = "Consumption"
+  # Every 5 minutes: the day's digests once 06:00 UTC has passed, and the ones Editors requested (design D2).
+  replica_timeout_in_seconds = 240
+  replica_retry_limit        = 0
+  tags                       = var.tags
+
+  schedule_trigger_config {
+    cron_expression          = "*/5 * * * *"
+    parallelism              = 1
+    replica_completion_count = 1
+  }
+
+  identity {
+    type         = "UserAssigned"
+    identity_ids = [var.identities.anomaly_detector.id, var.identities.acr_pull.id]
+  }
+
+  registry {
+    server   = var.registry_server
+    identity = var.identities.acr_pull.id
+  }
+
+  template {
+    container {
+      name    = "site-digest"
+      image   = local.placeholder_image
+      command = ["site-digest"]
+      cpu     = 0.5
+      memory  = "1Gi"
+
+      dynamic "env" {
+        for_each = local.site_digest_env
+        content {
+          name  = env.key
+          value = env.value
+        }
+      }
+    }
+  }
+
+  lifecycle {
+    # Set by the post-provision hook (image built in ACR, shared with the anomaly detector).
+    ignore_changes = [template[0].container[0].image]
+  }
+}
+
 output "decoder_app_name" { value = azurerm_container_app.decoder.name }
 output "simulator_app_name" { value = azurerm_container_app.simulator.name }
 output "migrator_job_name" { value = azurerm_container_app_job.migrate.name }
@@ -850,5 +926,6 @@ output "provisioning_api_url" { value = "https://${azurerm_container_app.provisi
 output "maintenance_job_name" { value = azurerm_container_app_job.maintain.name }
 output "alert_service_app_name" { value = azurerm_container_app.alert_service.name }
 output "device_analyst_app_name" { value = azurerm_container_app.device_analyst.name }
+output "site_digest_job_name" { value = join("", azurerm_container_app_job.site_digest[*].name) }
 output "anomaly_detector_job_name" { value = join("", azurerm_container_app_job.anomaly_detector[*].name) }
 output "device_analyst_url" { value = "https://${azurerm_container_app.device_analyst.ingress[0].fqdn}" }
