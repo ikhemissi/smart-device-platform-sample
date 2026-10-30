@@ -55,6 +55,10 @@ sdp:
   digest:
     enabled: ${SDP_DIGEST_ENABLED:false}
     sites: ${SDP_DIGEST_SITES:}
+  # Maintenance (M9): the job assesses the devices and keeps the queue; empty sites: every site.
+  maintenance:
+    enabled: ${SDP_MAINTENANCE_ENABLED:false}
+    sites: ${SDP_MAINTENANCE_SITES:}
   cache:
     # Azure Managed Redis (Entra ID authentication); the history cache is disabled when empty.
     host: ${SDP_REDIS_HOST:}
