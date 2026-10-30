@@ -26,7 +26,7 @@
 
 - [x] 4.1 `anomaliesEnabled` and `anomalySites` in `config.json`; device page *Anomalies* card; verify component tests (confirmed, to review, not analysed site, feature off)
 - [x] 4.2 *Anomalies* page with filters and the review dialog for Editors; verify component tests and the offline Playwright suite (including accessibility)
-- [ ] 4.3 Deploy the portal; verify with the user in the environment (device card and page show the anomaly of task 2.7; review it)
+- [x] 4.3 Deploy the portal; verify with the user in the environment (device card and page show the anomaly of task 2.7; review it)
 
 ## 5. Assistant
 
