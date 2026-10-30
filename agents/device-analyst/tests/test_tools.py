@@ -397,3 +397,85 @@ async def test_ambiguous_names_list_the_candidates(tools):
     result = json.loads(await call(tools, "get_thresholds", device_id="cold room"))
 
     assert result["error"].startswith("ambiguous: 'cold room' matches several devices: lyon-01-cayenne-001 (Lyon")
+
+
+MAINTENANCE_ITEM = {
+    "id": 7,
+    "deviceId": "paris-01-ruuvi5-001",
+    "deviceName": "Cold room",
+    "siteId": "paris-01",
+    "status": "open",
+    "probability": 0.81234,
+    "reasons": [
+        {"rule": "battery_days_left", "value": 4.6, "threshold": 7, "unit": "days", "level": 2.6, "level_unit": "V"}
+    ],
+    "battery": {
+        "metric": "battery_voltage",
+        "unit": "V",
+        "level": 2.6,
+        "slope_per_day": -0.0219,
+        "days_left": 4.6,
+        "since": "2026-10-20T00:00:00Z",
+        "cutoff": 2.5,
+    },
+    "workOrder": "Replace the battery of Cold room within 4 days.",
+    "workOrderModel": "gpt-6-luna",
+    "workOrderAt": "2026-10-28T11:00:00Z",
+    "openedAt": "2026-10-27T11:00:00Z",
+    "updatedAt": "2026-10-28T11:00:00Z",
+    "resolvedAt": None,
+    "statusBy": None,
+    "statusAt": None,
+    "statusComment": None,
+}
+
+
+@pytest.fixture
+def maintenance_tools(platform_api):
+    return {t.name: t for t in build_tools(platform_api, now=lambda: NOW, maintenance=True)}
+
+
+@respx.mock
+async def test_maintenance_queue_defaults_to_open_and_planned_and_cites_the_devices(maintenance_tools, context):
+    route = respx.get(f"{API}/maintenance").respond(json=[MAINTENANCE_ITEM])
+
+    result = data(await call(maintenance_tools, "list_maintenance", site_id="paris-01"))
+
+    params = route.calls.last.request.url.params
+    assert (params["siteId"], params["status"], params["limit"]) == ("paris-01", "open,planned", "50")
+    assert route.calls.last.request.headers["Authorization"] == "Bearer caller-token"
+    [item] = result["items"]
+    assert (item["deviceId"], item["probability"], item["status"]) == ("paris-01-ruuvi5-001", 0.812, "open")
+    assert item["battery"] == {"metric": "battery_voltage", "unit": "V", "level": 2.6, "slope_per_day": -0.022,
+                               "days_left": 4.6, "cutoff": 2.5}  # fmt: skip
+    assert item["reasons"][0]["rule"] == "battery_days_left"
+    assert item["workOrder"].startswith("Replace the battery")
+    assert "workOrderModel" not in item and "updatedAt" not in item
+    assert context.citations == [{"kind": "device", "deviceId": "paris-01-ruuvi5-001", "metrics": ["battery_voltage"]}]
+
+
+@respx.mock
+async def test_empty_maintenance_queue_of_a_site_cites_the_site(maintenance_tools, context):
+    route = respx.get(f"{API}/maintenance").respond(json=[])
+
+    result = data(await call(maintenance_tools, "list_maintenance", site_id="lyon-01", status=["done", "resolved"]))
+
+    assert route.calls.last.request.url.params["status"] == "done,resolved"
+    assert result["items"] == [] and result["status"] == ["done", "resolved"]
+    assert context.citations == [{"kind": "site", "siteId": "lyon-01"}]
+
+
+@respx.mock
+async def test_maintenance_queue_without_battery_and_errors(maintenance_tools, context):
+    respx.get(f"{API}/maintenance").respond(json=[{**MAINTENANCE_ITEM, "battery": None}])
+    [item] = data(await call(maintenance_tools, "list_maintenance"))["items"]
+    assert "battery" not in item
+    assert context.citations == [{"kind": "device", "deviceId": "paris-01-ruuvi5-001"}]
+
+    respx.get(f"{API}/maintenance").respond(status_code=403, json={"title": "Forbidden", "status": 403})
+    assert "error" in json.loads(await call(maintenance_tools, "list_maintenance"))
+
+
+async def test_maintenance_tool_only_where_maintenance_runs(platform_api):
+    assert "list_maintenance" not in {t.name for t in build_tools(platform_api)}
+    assert "list_maintenance" in {t.name for t in build_tools(platform_api, maintenance=True)}
