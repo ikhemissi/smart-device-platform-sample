@@ -19,6 +19,7 @@ Devices stop reporting when their battery dies or their radio degrades, and toda
 - **Assistant**: `list_maintenance` tool.
 - **Infrastructure**: maintenance job, settings `MAINTENANCE_ENABLED`, `MAINTENANCE_SITES`, `MAINTENANCE_CONFIDENCE`, simulator setting `SIMULATOR_AGING_DEVICES`; the `Microsoft-Decision-1` deployment exists when anomaly detection or maintenance is enabled.
 - **GitHub Copilot cloud agent**: setup steps and OpenSpec agent so that the cloud agent can implement and test the offline tasks; tasks are marked *cloud agent* or *Azure*.
+- **CI on pull requests** targeting `main`, so that the cloud agent's PR is checked.
 
 ## Capabilities
 
@@ -33,6 +34,7 @@ Devices stop reporting when their battery dies or their radio degrades, and toda
 - `telemetry-visualization`: the device page shows the battery forecast.
 - `web-portal`: Maintenance page.
 - `device-analyst-agent`: the assistant can list the maintenance queue.
+- `continuous-integration`: the pipeline also runs on pull requests targeting `main`.
 
 ## Impact
 
