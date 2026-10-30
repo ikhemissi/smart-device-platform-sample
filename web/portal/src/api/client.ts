@@ -4,6 +4,9 @@ import type {
   AssistantConversation,
   Citation,
   Alert,
+  Anomaly,
+  AnomalyQuery,
+  AnomalyStatus,
   AuditEvent,
   CertificateChange,
   CurrentUser,
@@ -14,6 +17,7 @@ import type {
   Measurement,
   Problem,
   ReportedMetric,
+  ReviewVerdict,
   Series,
   Site,
   SiteCertificate,
@@ -160,6 +164,34 @@ export class ApiClient {
 
   deviceAlerts(deviceId: string): Promise<Alert[]> {
     return this.json(`/devices/${encodeURIComponent(deviceId)}/alerts?limit=50`)
+  }
+
+  anomalies(query: AnomalyQuery): Promise<Anomaly[]> {
+    const params = new URLSearchParams()
+    for (const [key, value] of Object.entries(query)) {
+      if (value !== undefined && value !== '') {
+        params.set(key, Array.isArray(value) ? value.join(',') : String(value))
+      }
+    }
+    return this.json(`/anomalies?${params}`)
+  }
+
+  /** `to` omitted: the server uses its own "now". */
+  deviceAnomalies(deviceId: string, status: AnomalyStatus[], from: Date, to?: Date): Promise<Anomaly[]> {
+    const params = new URLSearchParams({ status: status.join(','), from: from.toISOString() })
+    if (to) {
+      params.set('to', to.toISOString())
+    }
+    return this.json(`/devices/${encodeURIComponent(deviceId)}/anomalies?${params}`)
+  }
+
+  async reviewAnomaly(id: number, verdict: ReviewVerdict, comment: string | null): Promise<Anomaly> {
+    const response = await this.request(`/anomalies/${id}/review`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ verdict, comment }),
+    })
+    return (await response.json()) as Anomaly
   }
 
   createConversation(): Promise<AssistantConversation> {

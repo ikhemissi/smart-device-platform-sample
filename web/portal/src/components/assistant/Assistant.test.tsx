@@ -1,6 +1,7 @@
 import { screen, waitFor, within } from '@testing-library/react'
 import { HttpResponse, http } from 'msw'
 import { describe, expect, it, vi } from 'vitest'
+import { NO_FEATURES } from '../../features'
 import { renderPortal } from '../../test/render'
 import { API, READER } from '../../test/server'
 
@@ -10,7 +11,7 @@ vi.mock('../TelemetryChart', () => ({ TelemetryChart: () => <div role="img" aria
 /** Requests received by the fake assistant API. */
 let agentRequests: Request[] = []
 
-const ASSISTANT = { features: { assistant: true } }
+const ASSISTANT = { features: { ...NO_FEATURES, assistant: true } }
 
 /** A Server-Sent Events response, sent in several chunks (one event split across two of them). */
 function sse(events: [string, unknown][]): Response {

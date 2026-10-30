@@ -29,7 +29,9 @@ import { StatusBadge } from '../components/StatusBadge'
 import { TelemetryChart } from '../components/TelemetryChart'
 import { Timestamp } from '../components/Timestamp'
 import { bucketName, metricLabel } from '../components/chartOption'
+import { useFeatures } from '../features'
 import { AlertsCard, ThresholdsCard } from './alerting/AlertingCards'
+import { AnomaliesCard } from './anomalies/AnomaliesCard'
 import { MAX_METRICS, PERIODS, RETENTION_MS, defaultMetrics, readState } from './devicePageState'
 
 /** Points requested for a chart: 1 h → raw, 24 h → 5-minute, 7 d → 15-minute, 30 d → 1-hour buckets at 30 s reporting. */
@@ -62,6 +64,7 @@ export function DevicePage() {
   const device = useDevice(deviceId)
   const metrics = useDeviceMetrics(deviceId)
   const latest = useLatestMeasurements(deviceId)
+  const features = useFeatures()
 
   const available = useMemo(() => metrics.data?.map((m) => m.metric) ?? [], [metrics.data])
   const selected = (state.metrics ?? defaultMetrics(available)).filter((m) => metrics.data === undefined || available.includes(m))
@@ -256,6 +259,17 @@ export function DevicePage() {
         )}
       </Card>
 
+      {features.anomalies && info && (
+        <AnomaliesCard
+          deviceId={deviceId}
+          siteId={info.siteId}
+          metrics={metrics.data ?? []}
+          period={state.period}
+          presetMs={preset?.ms}
+          from={state.from}
+          to={state.to}
+        />
+      )}
       <AlertsCard deviceId={deviceId} metrics={metrics.data ?? []} />
       <ThresholdsCard deviceId={deviceId} metrics={metrics.data ?? []} />
     </section>

@@ -122,6 +122,14 @@ export function apiHandlers(me: CurrentUser, log: Request[] = requests, token?: 
       record(request)
       return HttpResponse.json([])
     }),
+    http.get(`${API}/devices/:id/anomalies`, ({ request }) => {
+      record(request)
+      return HttpResponse.json([])
+    }),
+    http.get(`${API}/anomalies`, ({ request }) => {
+      record(request)
+      return HttpResponse.json([])
+    }),
     http.get(`${API}/devices/:id/series`, ({ request }) => {
       record(request)
       return HttpResponse.json(seriesResponse(new URL(request.url)))

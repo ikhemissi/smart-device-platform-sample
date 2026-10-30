@@ -3,6 +3,7 @@ import { Shell } from './components/Shell'
 import { DeviceListPage } from './pages/DeviceListPage'
 import { DevicePage } from './pages/DevicePage'
 import { NotFound } from './pages/NotFound'
+import { AnomaliesPage } from './pages/anomalies/AnomaliesPage'
 import { SitePage } from './pages/sites/SitePage'
 import { SitesPage } from './pages/sites/SitesPage'
 
@@ -15,6 +16,7 @@ export const routes: RouteObject[] = [
       { path: 'devices/:deviceId', element: <DevicePage /> },
       { path: 'sites', element: <SitesPage /> },
       { path: 'sites/:siteId', element: <SitePage /> },
+      { path: 'anomalies', element: <AnomaliesPage /> },
       { path: '*', element: <NotFound /> },
     ],
   },

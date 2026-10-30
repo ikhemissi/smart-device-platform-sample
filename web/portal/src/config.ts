@@ -6,6 +6,10 @@ export interface RuntimeConfig {
   apiBaseUrl: string
   /** The AI assistant (M6) is deployed behind the API. */
   assistantEnabled: boolean
+  /** The anomaly detector (M7) is deployed. */
+  anomaliesEnabled: boolean
+  /** Sites analysed by the anomaly detector. */
+  anomalySites: string[]
 }
 
 export async function loadConfig(): Promise<RuntimeConfig> {
@@ -23,5 +27,7 @@ export async function loadConfig(): Promise<RuntimeConfig> {
     ...(config as RuntimeConfig),
     apiBaseUrl: config.apiBaseUrl!.replace(/\/+$/, ''),
     assistantEnabled: config.assistantEnabled === true,
+    anomaliesEnabled: config.anomaliesEnabled === true,
+    anomalySites: Array.isArray(config.anomalySites) ? config.anomalySites.filter((site) => typeof site === 'string') : [],
   }
 }

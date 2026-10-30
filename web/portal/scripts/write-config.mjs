@@ -12,6 +12,12 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 export const REQUIRED = ['ENTRA_TENANT_ID', 'WEB_CLIENT_ID', 'API_SCOPE', 'API_BASE_URL']
 export const LOGIN_ORIGIN = 'https://login.microsoftonline.com'
 
+/** Sites analysed by the anomaly detector: ANOMALY_SITES (comma-separated), paris-01 when empty like in Terraform. */
+function anomalySites(value) {
+  const sites = (value ?? '').split(',').map((site) => site.trim()).filter(Boolean)
+  return sites.length > 0 ? sites : ['paris-01']
+}
+
 /** The generated files for an environment; also used by the end-to-end tests' site server. */
 export function portalFiles(env) {
   const config = {
@@ -21,6 +27,10 @@ export function portalFiles(env) {
     apiBaseUrl: env.API_BASE_URL,
     // The assistant entry point appears once the device analyst is deployed (PORTAL_ASSISTANT=false hides it).
     assistantEnabled: env.PORTAL_ASSISTANT ? env.PORTAL_ASSISTANT === 'true' : Boolean(env.DEVICE_ANALYST_URL),
+    // Anomalies appear once the detector is deployed (its job name is empty when ANOMALY_DETECTION_ENABLED=false;
+    // PORTAL_ANOMALIES=false hides them), for the sites it analyses.
+    anomaliesEnabled: env.PORTAL_ANOMALIES ? env.PORTAL_ANOMALIES === 'true' : Boolean(env.ANOMALY_DETECTOR_JOB_NAME),
+    anomalySites: anomalySites(env.ANOMALY_SITES),
   }
   const csp = [
     "default-src 'self'",

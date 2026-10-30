@@ -5,4 +5,7 @@ export const FAKE_ENV = {
   WEB_CLIENT_ID: 'cccccccc-0000-0000-0000-000000000001',
   API_SCOPE: 'api://aaaaaaaa-0000-0000-0000-000000000001/user_impersonation',
   API_BASE_URL: 'https://apim-e2e.azure-api.net/api/v1',
+  // Anomaly detection (M7) on, for paris-01 only.
+  ANOMALY_DETECTOR_JOB_NAME: 'caj-anomaly-detector-e2e',
+  ANOMALY_SITES: 'paris-01',
 }

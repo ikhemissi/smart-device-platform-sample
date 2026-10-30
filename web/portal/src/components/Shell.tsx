@@ -72,6 +72,11 @@ export function Shell() {
               <NavLink to="/sites" className={({ isActive }) => mergeClasses(styles.navLink, isActive && styles.active)}>
                 Sites
               </NavLink>
+              {features.anomalies && (
+                <NavLink to="/anomalies" className={({ isActive }) => mergeClasses(styles.navLink, isActive && styles.active)}>
+                  Anomalies
+                </NavLink>
+              )}
             </>
           )}
         </nav>

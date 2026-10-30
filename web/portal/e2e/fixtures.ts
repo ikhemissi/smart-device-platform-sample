@@ -95,6 +95,73 @@ interface FakeCertificate {
   addedAt: string
 }
 
+type AnomalyStatus = 'pending' | 'confirmed' | 'to_review' | 'dismissed' | 'reviewed'
+
+interface FakeAnomaly {
+  id: number
+  deviceId: string
+  deviceName: string | null
+  siteId: string
+  metric: string
+  unit: string | null
+  kind: 'deviation' | 'flat' | 'jump'
+  startedAt: string
+  endedAt: string
+  observedMin: number
+  observedMax: number
+  observedMean: number
+  observedLast: number
+  usualValue: number
+  spread: number
+  score: number
+  status: AnomalyStatus
+  decision: Exclude<AnomalyStatus, 'reviewed'>
+  classification: 'real_event' | 'sensor_fault' | 'expected_pattern' | 'cannot_tell' | null
+  confidence: number | null
+  probabilities: Record<string, number>
+  confidenceThreshold: number | null
+  decisionModel: string | null
+  decisionModelVersion: string | null
+  explanation: string | null
+  explanationModel: string | null
+  detectedAt: string
+  updatedAt: string
+  review: { reviewedAt: string; reviewedBy: string; verdict: 'correct' | 'incorrect'; comment: string | null } | null
+}
+
+/** Anomalies of paris-01 (the analysed site of the fake environment), most recent first. */
+function seedAnomalies(): FakeAnomaly[] {
+  const now = Date.now()
+  const anomaly = (id: number, deviceId: string, hoursAgo: number, decision: FakeAnomaly['decision'], changes: Partial<FakeAnomaly>): FakeAnomaly => {
+    const start = Math.floor((now - hoursAgo * 3_600_000) / 60_000) * 60_000
+    return {
+      id, deviceId, deviceName: null, siteId: 'paris-01', metric: 'temperature', unit: '°C', kind: 'deviation',
+      startedAt: new Date(start).toISOString(), endedAt: new Date(start + 25 * 60_000).toISOString(),
+      observedMin: 28.4, observedMax: 31.2, observedMean: 30.1, observedLast: 30.9, usualValue: 21, spread: 1.5, score: 6.2,
+      status: decision, decision, classification: 'real_event', confidence: 0.91,
+      probabilities: { real_event: 0.91, sensor_fault: 0.05, expected_pattern: 0.03, cannot_tell: 0.01 },
+      confidenceThreshold: 0.7, decisionModel: 'decision-1', decisionModelVersion: '1',
+      explanation: 'The temperature rose about 9 °C above its usual value for 25 minutes before coming back. A door left open is the likely cause.',
+      explanationModel: 'gpt-6-luna', detectedAt: new Date(start + 30 * 60_000).toISOString(), updatedAt: new Date(start + 30 * 60_000).toISOString(), review: null,
+      ...changes,
+    }
+  }
+  return [
+    anomaly(3, 'paris-01-ruuvi-001', 3, 'to_review', {
+      metric: 'humidity', unit: '%', kind: 'jump', classification: 'sensor_fault', confidence: 0.55,
+      observedMin: 12, observedMax: 48, observedMean: 30, observedLast: 12, usualValue: 47,
+      explanation: 'The humidity dropped from 48 % to 12 % in one reading and stayed there. A sensor fault is possible, but the model is not confident.',
+    }),
+    anomaly(2, 'paris-01-ruuvi-001', 6, 'confirmed', {}),
+    anomaly(1, 'paris-01-ruuvi-001', 10, 'dismissed', {
+      metric: 'pressure', unit: 'hPa', classification: 'expected_pattern', confidence: 0.88,
+      observedMin: 1004, observedMax: 1005.5, observedMean: 1004.6, observedLast: 1005.5, usualValue: 1012,
+      explanation: 'The pressure fell slowly, as it does when the weather changes.',
+    }),
+    anomaly(4, 'paris-01-bthome-002', 50, 'confirmed', { metric: 'temperature', confidence: 0.83 }),
+  ]
+}
+
 /** Minimal multipart reader: content of the first part (the uploaded file). */
 function firstPart(body: Buffer, contentType: string): string {
   const boundary = /boundary=([^;]+)/.exec(contentType)?.[1]
@@ -113,6 +180,10 @@ export class FakePlatform {
   readonly audit: { siteId: string; action: string; fingerprint: string | null }[] = []
   /** Thresholds created through the portal (M5); no alert is ever raised by the fake. */
   readonly thresholds: { id: string; deviceId: string; metric: string; min: number | null; max: number | null; recipients: string[]; enabled: boolean }[] = []
+  /** Anomalies (M7), updated by reviews. */
+  readonly anomalies = seedAnomalies()
+  /** Reviews sent through the portal. */
+  readonly reviews: { id: number; verdict: string; comment: string | null }[] = []
   private readonly latest = new Map<string, { measuredAt: string; payloadFormat: string; metrics: Record<string, number>; attributes: Record<string, string> }[]>()
   /** Access tokens presented to the API. */
   readonly tokens: string[] = []
@@ -276,6 +347,47 @@ export class FakePlatform {
       const page = Number(q.get('page') ?? 1)
       const pageSize = Number(q.get('pageSize') ?? 25)
       return route.fulfill({ headers: cors, json: { items: items.slice((page - 1) * pageSize, page * pageSize), page, pageSize, total: items.length } })
+    }
+    const anomalies = path.match(/^(?:\/devices\/([^/]+))?\/anomalies$/)
+    if (anomalies && request.method() === 'GET') {
+      const deviceId = anomalies[1] && decodeURIComponent(anomalies[1])
+      if (deviceId && !this.devices.some((d) => d.deviceId === deviceId)) return problem(404, 'Not Found')
+      const q = url.searchParams
+      const statuses = (q.get('status') ?? (deviceId ? 'confirmed,to_review,reviewed' : 'confirmed,to_review')).split(',')
+      const to = q.has('to') ? Date.parse(q.get('to')!) : Date.now()
+      const from = q.has('from') ? Date.parse(q.get('from')!) : to - 7 * 86_400_000
+      const items = this.anomalies.filter(
+        (a) =>
+          statuses.includes(a.status) &&
+          (!deviceId || a.deviceId === deviceId) &&
+          (!q.get('deviceId') || a.deviceId === q.get('deviceId')) &&
+          (!q.get('siteId') || a.siteId === q.get('siteId')) &&
+          Date.parse(a.startedAt) < to &&
+          Date.parse(a.endedAt) > from,
+      )
+      return route.fulfill({ headers: cors, json: items.sort((a, b) => b.startedAt.localeCompare(a.startedAt)) })
+    }
+    const review = path.match(/^\/anomalies\/(\d+)\/review$/)
+    if (review && request.method() === 'POST') {
+      if (!canWrite) return problem(403, 'Forbidden')
+      const anomaly = this.anomalies.find((a) => a.id === Number(review[1]))
+      if (!anomaly) return problem(404, 'Not Found')
+      if (anomaly.status === 'pending') return problem(409, 'Conflict')
+      const body = request.postDataJSON() as { verdict?: string; comment?: string | null }
+      const errors: Record<string, string[]> = {}
+      if (body.verdict !== 'correct' && body.verdict !== 'incorrect') errors.verdict = ['must be correct or incorrect']
+      if ((body.comment ?? '').length > 1000) errors.comment = ['size must be between 0 and 1000']
+      if (Object.keys(errors).length > 0) {
+        return route.fulfill({ status: 400, headers: { ...cors, 'Content-Type': 'application/problem+json' }, body: JSON.stringify({ title: 'Bad Request', status: 400, errors }) })
+      }
+      const comment = body.comment?.trim() || null
+      this.reviews.push({ id: anomaly.id, verdict: body.verdict!, comment })
+      Object.assign(anomaly, {
+        status: 'reviewed',
+        updatedAt: new Date().toISOString(),
+        review: { reviewedAt: new Date().toISOString(), reviewedBy: this.user.name, verdict: body.verdict, comment },
+      })
+      return route.fulfill({ headers: cors, json: anomaly })
     }
     const alerting = path.match(/^\/devices\/([^/]+)\/(thresholds|alerts)$/)
     if (alerting) {

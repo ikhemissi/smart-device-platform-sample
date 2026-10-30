@@ -230,3 +230,59 @@ export interface AnswerHandlers {
   onTool(tool: ToolActivity): void
   onDelta(text: string): void
 }
+
+/** Anomaly detection (M7). `pending`: not classified yet; `reviewed`: an Editor gave a verdict. */
+export type AnomalyStatus = 'pending' | 'confirmed' | 'to_review' | 'dismissed' | 'reviewed'
+export type AnomalyClassification = 'real_event' | 'sensor_fault' | 'expected_pattern' | 'cannot_tell'
+export type ReviewVerdict = 'correct' | 'incorrect'
+
+export interface AnomalyReview {
+  reviewedAt: string
+  /** Display name of the Editor. */
+  reviewedBy: string
+  verdict: ReviewVerdict
+  comment: string | null
+}
+
+export interface Anomaly {
+  id: number
+  deviceId: string
+  deviceName: string | null
+  siteId: string
+  metric: string
+  unit: string | null
+  kind: 'deviation' | 'flat' | 'jump'
+  startedAt: string
+  endedAt: string
+  observedMin: number
+  observedMax: number
+  observedMean: number
+  observedLast: number
+  /** The device's usual value at that time of day. */
+  usualValue: number
+  spread: number
+  score: number
+  status: AnomalyStatus
+  decision: Exclude<AnomalyStatus, 'reviewed'>
+  classification: AnomalyClassification | null
+  /** Probability of the classification (0–1). */
+  confidence: number | null
+  probabilities: Partial<Record<AnomalyClassification, number>>
+  confidenceThreshold: number | null
+  decisionModel: string | null
+  decisionModelVersion: string | null
+  explanation: string | null
+  explanationModel: string | null
+  detectedAt: string
+  updatedAt: string
+  review: AnomalyReview | null
+}
+
+export interface AnomalyQuery {
+  siteId?: string
+  deviceId?: string
+  status?: AnomalyStatus[]
+  from?: string
+  to?: string
+  limit?: number
+}

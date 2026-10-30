@@ -1,6 +1,6 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useApi } from './context'
-import type { DeviceEdit, DeviceQuery, Threshold, ThresholdInput } from './types'
+import type { AnomalyQuery, AnomalyStatus, DeviceEdit, DeviceQuery, ReviewVerdict, Threshold, ThresholdInput } from './types'
 
 export const queryKeys = {
   me: ['me'] as const,
@@ -16,6 +16,9 @@ export const queryKeys = {
     ['devices', 'series', deviceId, metrics, period, from, to] as const,
   thresholds: (deviceId: string) => ['devices', 'thresholds', deviceId] as const,
   deviceAlerts: (deviceId: string) => ['devices', 'alerts', deviceId] as const,
+  anomalies: (query: AnomalyQuery) => ['anomalies', 'list', query] as const,
+  deviceAnomalies: (deviceId: string, status: AnomalyStatus[], period: string, from?: string, to?: string) =>
+    ['anomalies', 'device', deviceId, status, period, from, to] as const,
 }
 
 export function useCurrentUser() {
@@ -202,4 +205,56 @@ export function useDeleteThreshold(deviceId: string) {
   const api = useApi()
   const invalidate = useInvalidateAlerting(deviceId)
   return useMutation({ mutationFn: (threshold: Threshold) => api.deleteThreshold(deviceId, threshold), onSettled: invalidate })
+}
+
+// --- Anomaly detection (M7) ------------------------------------------------------------------------------------
+
+/** The detector runs every few minutes: lists refresh every minute while visible. */
+const ANOMALIES_REFRESH_MS = 60_000
+
+export function useAnomalies(query: AnomalyQuery) {
+  const api = useApi()
+  return useQuery({
+    queryKey: queryKeys.anomalies(query),
+    queryFn: () => api.anomalies(query),
+    placeholderData: keepPreviousData,
+    refetchInterval: ANOMALIES_REFRESH_MS,
+    refetchIntervalInBackground: false,
+  })
+}
+
+export interface DeviceAnomaliesRequest {
+  deviceId: string
+  status: AnomalyStatus[]
+  /** Preset key of the device page, used to recompute the window on every refresh, or `custom`. */
+  period: string
+  presetMs?: number
+  from?: Date
+  to?: Date
+}
+
+/** Anomalies of a device over the device page's period (like its history). */
+export function useDeviceAnomalies(request: DeviceAnomaliesRequest) {
+  const api = useApi()
+  const live = request.period !== 'custom'
+  return useQuery({
+    queryKey: queryKeys.deviceAnomalies(request.deviceId, request.status, request.period, request.from?.toISOString(), request.to?.toISOString()),
+    queryFn: () =>
+      live
+        ? api.deviceAnomalies(request.deviceId, request.status, new Date(Date.now() - request.presetMs!))
+        : api.deviceAnomalies(request.deviceId, request.status, request.from!, request.to),
+    enabled: live ? request.presetMs !== undefined : !!request.from && !!request.to,
+    placeholderData: keepPreviousData,
+    refetchInterval: live ? ANOMALIES_REFRESH_MS : false,
+    refetchIntervalInBackground: false,
+  })
+}
+
+export function useReviewAnomaly() {
+  const api = useApi()
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, verdict, comment }: { id: number; verdict: ReviewVerdict; comment: string | null }) => api.reviewAnomaly(id, verdict, comment),
+    onSuccess: () => client.invalidateQueries({ queryKey: ['anomalies'] }),
+  })
 }
