@@ -19,6 +19,10 @@ public final class ReadingModel {
     }
 
     private static final double HOURS_PER_DAY = 24.0;
+    private static final double NORMAL_BATTERY_RATE = 0.0015;
+    private static final double NORMAL_BATTERY_PERIOD_DAYS = 400.0;
+    private static final double AGING_BATTERY_RATE = 0.035;
+    private static final double AGING_BATTERY_PERIOD_DAYS = 16.0;
     // Weather-like pressure drift: three slow waves (at most +/-7.5 hPa, about 1 hPa per hour at the steepest).
     private static final double[] PRESSURE_PERIODS_HOURS = {31, 53, 97};
     private static final double[] PRESSURE_AMPLITUDES_HPA = {3.5, 2.5, 1.5};
@@ -33,7 +37,8 @@ public final class ReadingModel {
     private final double humidityBase;
     private final double humidityAmplitude;
     private final double pressureBase;
-    private final double batteryStartVolts;
+    private final double batteryPhaseDays;
+    private final boolean agingBattery;
     private final double co2Base;
     private final double illuminancePeak;
     private final String mac;
@@ -43,9 +48,14 @@ public final class ReadingModel {
     private int movements;
 
     public ReadingModel(SimulatedDevice device, List<Anomaly> anomalies, Instant start) {
+        this(device, anomalies, start, false);
+    }
+
+    public ReadingModel(SimulatedDevice device, List<Anomaly> anomalies, Instant start, boolean agingBattery) {
         this.device = device;
         this.anomalies = anomalies.stream().filter(a -> a.deviceId().equals(device.deviceId())).toList();
         this.start = start;
+        this.agingBattery = agingBattery;
         Random seed = new Random(device.deviceId().hashCode() * 2_654_435_761L);
         this.temperatureBase = 16 + seed.nextDouble() * 8;
         this.temperatureAmplitude = 1.5 + seed.nextDouble() * 2.5;
@@ -53,7 +63,7 @@ public final class ReadingModel {
         this.humidityBase = 40 + seed.nextDouble() * 20;
         this.humidityAmplitude = 4 + seed.nextDouble() * 6;
         this.pressureBase = 1005 + seed.nextDouble() * 15;
-        this.batteryStartVolts = 2.9 + seed.nextDouble() * 0.2;
+        seed.nextDouble(); // Preserve the existing battery baseline draw.
         this.co2Base = 420 + seed.nextDouble() * 200;
         this.illuminancePeak = 300 + seed.nextDouble() * 500;
         byte[] macBytes = new byte[6];
@@ -67,6 +77,8 @@ public final class ReadingModel {
         for (int i = 0; i < pressurePhases.length; i++) {
             pressurePhases[i] = seed.nextDouble() * 2 * Math.PI;
         }
+        // Drawn after the existing values so other device characteristics remain unchanged.
+        this.batteryPhaseDays = seed.nextDouble() * 200;
     }
 
     public SimulatedDevice device() {
@@ -77,7 +89,7 @@ public final class ReadingModel {
         double hours = now.getEpochSecond() / 3600.0;
         double daily = Math.sin(2 * Math.PI * (hours - 9 - phaseHours) / HOURS_PER_DAY);
         double daylight = Math.max(0, Math.sin(2 * Math.PI * (hours % HOURS_PER_DAY - 6) / HOURS_PER_DAY));
-        double days = Duration.between(start, now).toSeconds() / 86_400.0;
+        double days = Duration.between(Instant.EPOCH, now).toSeconds() / 86_400.0;
 
         sequence = (sequence + 1) % 65_535;
         packetId = (packetId + 1) % 256;
@@ -88,7 +100,10 @@ public final class ReadingModel {
         double temperature = override("temperature", now, temperatureBase + temperatureAmplitude * daily + random.nextGaussian() * 0.08);
         double humidity = override("humidity", now, clamp(humidityBase - humidityAmplitude * daily + random.nextGaussian() * 0.3, 5, 95));
         double pressure = override("pressure", now, pressureBase + pressureDrift(hours) + random.nextGaussian() * 0.05);
-        double voltage = override("battery_voltage", now, clamp(batteryStartVolts - 0.002 * days + random.nextGaussian() * 0.002, 2.2, 3.6));
+        double batteryPeriod = agingBattery ? AGING_BATTERY_PERIOD_DAYS : NORMAL_BATTERY_PERIOD_DAYS;
+        double batteryRate = agingBattery ? AGING_BATTERY_RATE : NORMAL_BATTERY_RATE;
+        double batteryAge = (days + batteryPhaseDays) % batteryPeriod;
+        double voltage = override("battery_voltage", now, clamp(3.05 - batteryRate * batteryAge + random.nextGaussian() * 0.002, 2.2, 3.6));
         double co2 = override("co2", now, Math.max(400, co2Base + 350 * daylight + random.nextGaussian() * 15));
         double illuminance = override("illuminance", now, Math.max(0, illuminancePeak * daylight + random.nextGaussian() * 5));
 

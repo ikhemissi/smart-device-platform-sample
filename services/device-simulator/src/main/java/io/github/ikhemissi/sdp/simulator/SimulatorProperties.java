@@ -27,7 +27,8 @@ public record SimulatorProperties(
         @DefaultValue List<String> anomalies,
         @DefaultValue("iothub") String transport,
         @DefaultValue Dps dps,
-        @DefaultValue Ca ca) {
+        @DefaultValue Ca ca,
+        @DefaultValue List<String> agingDevices) {
 
     public record Dps(@DefaultValue("global.azure-devices-provisioning.net") String globalEndpoint, String idScope) {
     }
@@ -47,5 +48,6 @@ public record SimulatorProperties(
             throw new IllegalArgumentException("sdp.simulator.jitter must be >= 0 and smaller than the interval");
         }
         anomalies = anomalies == null ? List.of() : anomalies.stream().filter(a -> !a.isBlank()).toList();
+        agingDevices = agingDevices == null ? List.of() : agingDevices.stream().filter(id -> !id.isBlank()).toList();
     }
 }

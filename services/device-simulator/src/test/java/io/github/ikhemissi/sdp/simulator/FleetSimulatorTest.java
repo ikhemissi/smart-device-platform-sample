@@ -93,7 +93,8 @@ class FleetSimulatorTest {
     private FleetSimulator simulator(Duration interval, Duration duration) {
         SimulatorProperties properties = new SimulatorProperties(List.of("paris-01", "lyon-01"), 2,
                 List.of("ruuvi-df5", "bthome-v2"), interval, Duration.ofMillis(20), duration, 0, List.of(), "console",
-                new SimulatorProperties.Dps("global.azure-devices-provisioning.net", null), new SimulatorProperties.Ca(null, (Path) null));
+                new SimulatorProperties.Dps("global.azure-devices-provisioning.net", null), new SimulatorProperties.Ca(null, (Path) null),
+                List.of());
         List<SimulatedDevice> fleet = SimulatedDevice.plan(properties.sites(), 2, List.of(PayloadFormat.RUUVI_DF5, PayloadFormat.BTHOME_V2));
         simulator = new FleetSimulator(fleet, List.of(), properties, transport, new PayloadFactory(0, 1), Clock.systemUTC(), otel);
         return simulator;

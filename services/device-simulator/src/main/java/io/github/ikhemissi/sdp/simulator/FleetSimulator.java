@@ -81,9 +81,10 @@ public class FleetSimulator implements SmartLifecycle {
             return;
         }
         Instant start = clock.instant();
-        log.info("Starting simulated fleet: {} devices, sites={}, formats={}, interval={}±{}, corruptionRate={}, anomalies={}, duration={}",
+        log.info("Starting simulated fleet: {} devices, sites={}, formats={}, interval={}±{}, corruptionRate={}, anomalies={}, agingDevices={}, duration={}",
                 fleet.size(), properties.sites(), properties.formats(), properties.interval(), properties.jitter(),
-                properties.corruptionRate(), anomalies, properties.duration() == null ? "unlimited" : properties.duration());
+            properties.corruptionRate(), anomalies, properties.agingDevices(),
+            properties.duration() == null ? "unlimited" : properties.duration());
         devices = Executors.newThreadPerTaskExecutor(Thread.ofVirtual().name("device-", 0).factory());
         for (SimulatedDevice device : fleet) {
             devices.submit(() -> runDevice(device, start));
@@ -102,7 +103,7 @@ public class FleetSimulator implements SmartLifecycle {
     }
 
     private void runDevice(SimulatedDevice device, Instant start) {
-        ReadingModel model = new ReadingModel(device, anomalies, start);
+        ReadingModel model = new ReadingModel(device, anomalies, start, properties.agingDevices().contains(device.deviceId()));
         boolean first = true;
         while (running.get()) {
             DeviceConnection connection = connectWithRetry(device);

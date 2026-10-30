@@ -45,9 +45,12 @@ class ReadingModelTest {
         SimulatedDevice device = device(PayloadFormat.RUUVI_DF5);
         Instant now = START.plus(Duration.ofDays(3));
         // A model started three days ago and one started just now (a restart) agree at the same instant.
-        double running = new ReadingModel(device, List.of(), START).next(now).metrics().get("pressure").doubleValue();
-        double restarted = new ReadingModel(device, List.of(), now).next(now).metrics().get("pressure").doubleValue();
-        assertThat(restarted).isCloseTo(running, within(0.5));
+        ReadingModel.Reading running = new ReadingModel(device, List.of(), START).next(now);
+        ReadingModel.Reading restarted = new ReadingModel(device, List.of(), now).next(now);
+        assertThat(restarted.metrics().get("pressure").doubleValue())
+                .isCloseTo(running.metrics().get("pressure").doubleValue(), within(0.5));
+        assertThat(restarted.metrics().get("battery_voltage").doubleValue())
+                .isCloseTo(running.metrics().get("battery_voltage").doubleValue(), within(0.005));
     }
 
     @Test
@@ -107,6 +110,42 @@ class ReadingModelTest {
         double b = new ReadingModel(new SimulatedDevice("paris-01-ruuvi5-002", "paris-01", PayloadFormat.RUUVI_DF5), List.of(), START)
                 .next(START).metrics().get("temperature").doubleValue();
         assertThat(a).isNotCloseTo(b, within(0.01));
+    }
+
+    @Test
+    void agingBatteryCrossesItsCutoffAndRestartsWithinSixteenDays() {
+        SimulatedDevice device = device(PayloadFormat.RUUVI_DF5);
+        ReadingModel model = new ReadingModel(device, List.of(), START, true);
+        boolean crossedCutoff = false;
+        boolean replaced = false;
+        double previous = Double.NaN;
+        for (int hour = 0; hour <= 16 * 24; hour++) {
+            double voltage = model.next(START.plus(Duration.ofHours(hour))).metrics().get("battery_voltage").doubleValue();
+            crossedCutoff |= voltage <= 2.5;
+            if (crossedCutoff && previous <= 2.5 && voltage >= 3.0) {
+                replaced = true;
+            }
+            previous = voltage;
+        }
+        assertThat(crossedCutoff).isTrue();
+        assertThat(replaced).isTrue();
+    }
+
+    @Test
+    void agingConfigurationDoesNotChangeOtherValuesOrTheMac() {
+        SimulatedDevice device = device(PayloadFormat.RUUVI_DF5);
+        ReadingModel normal = new ReadingModel(device, List.of(), START);
+        ReadingModel aging = new ReadingModel(device, List.of(), START, true);
+
+        ReadingModel.Reading usual = normal.next(START);
+        ReadingModel.Reading aged = aging.next(START);
+        assertThat(aged.attributes()).isEqualTo(usual.attributes());
+        usual.metrics().forEach((metric, value) -> {
+            if (!metric.equals("battery_voltage")) {
+                assertThat(aged.metrics()).containsEntry(metric, value);
+            }
+        });
+        assertThat(aged.metrics().get("battery_voltage")).isNotEqualTo(usual.metrics().get("battery_voltage"));
     }
 
     @Test
