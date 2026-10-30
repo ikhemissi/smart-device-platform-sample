@@ -10,8 +10,8 @@ import org.springframework.stereotype.Component;
  * Database housekeeping, safe to run repeatedly: applies the configured retention to partitioned tables,
  * runs pg_partman maintenance (pre-creates future partitions, drops expired ones), purges old deduplication keys
  * in bounded batches, forgets metrics a device has not reported within the retention period and rolls up the hours
- * that became complete for fleet summaries ({@link MetricRollups}), and deletes anomalies, site digests and processed
- * digest requests older than the retention period.
+ * that became complete for fleet summaries ({@link MetricRollups}), and deletes anomalies, site digests, processed
+ * digest requests and closed (done or resolved) maintenance items older than the retention period.
  */
 @Component
 public class MaintenanceTask {
@@ -39,9 +39,13 @@ public class MaintenanceTask {
         int digests = jdbc.update("DELETE FROM sdp.site_digest_requests WHERE processed_at < now() - ?::interval",
                 interval(properties.retention()))
                 + jdbc.update("DELETE FROM sdp.site_digests WHERE generated_at < now() - ?::interval", interval(properties.retention()));
+        int items = jdbc.update("""
+                DELETE FROM sdp.maintenance_items
+                 WHERE status IN ('done', 'resolved') AND coalesce(resolved_at, status_at, updated_at) < now() - ?::interval
+                """, interval(properties.retention()));
         log.info("Database maintenance completed: retention={}, ledgerRetention={}, ledgerKeysPurged={}, deviceMetricsPurged={}, "
-                        + "anomaliesPurged={}, digestRowsPurged={}",
-                properties.retention(), properties.ledgerRetention(), purged, metrics, anomalies, digests);
+                        + "anomaliesPurged={}, digestRowsPurged={}, maintenanceItemsPurged={}",
+                properties.retention(), properties.ledgerRetention(), purged, metrics, anomalies, digests, items);
     }
 
     private void applyRetention() {

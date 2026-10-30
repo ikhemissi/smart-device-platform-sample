@@ -7,7 +7,7 @@ One-shot job that owns the database schema. It runs Flyway migrations from `libs
 | Task | What it does |
 |---|---|
 | `migrate` | Creates the workload principals (through the `postgres` database: on Azure with `pgaadauth`, as Entra principals), applies `db/migration` (versioned SQL, repeatable Java migration seeding `sdp.metric_definitions` from the codec catalogue), then grants each principal its group role |
-| `maintain` | Re-applies the retention to partitioned tables, runs `partman.run_maintenance_proc()` (pre-creates daily partitions for the next 7 days, drops expired ones), purges deduplication keys older than the ledger retention |
+| `maintain` | Re-applies the retention to partitioned tables, runs `partman.run_maintenance_proc()` (pre-creates daily partitions for the next 7 days, drops expired ones), purges deduplication keys older than the ledger retention, and deletes anomalies, site digests and closed (done or resolved) maintenance items older than the retention |
 
 The deployment runs `migrate,maintain` after every provisioning, and `maintain` hourly on a schedule.
 
