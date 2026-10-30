@@ -70,7 +70,7 @@ uv run anomaly-detector            # one cycle
 
 The same project has a second entry point, `site-digest`, run by its own scheduled job (every 5 minutes, same image and
 identity) ([PRD-008](../../docs/prd/PRD-008-m8-site-digest.md),
-[design](../../openspec/changes/m8-site-digest/design.md)):
+[design](../../openspec/changes/archive/2026-10-30-m8-site-digest/design.md)):
 
 | Step | Who | What |
 |---|---|---|

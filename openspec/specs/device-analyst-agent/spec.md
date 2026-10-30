@@ -91,3 +91,10 @@ When anomaly detection is enabled, the assistant SHALL be able to list recent an
 #### Scenario: Anomalies at a site
 - **WHEN** a user asks "Anything unusual at paris-01 today?"
 - **THEN** the answer lists today's confirmed anomalies and the ones to review, with classifications, confidences, devices and periods, or says there were none
+
+### Requirement: Site digest questions
+When site digests are enabled, the assistant SHALL be able to return a site's latest digest through the platform API with the user's permissions, presenting its period, brief and figures as recorded and citing the site.
+
+#### Scenario: Yesterday at a site
+- **WHEN** a user asks "What happened at lyon-01 in the last day?"
+- **THEN** the answer uses the site's latest digest, states its period and generation time, and cites the site
