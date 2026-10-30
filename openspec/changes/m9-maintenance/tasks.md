@@ -4,7 +4,7 @@ Tasks marked **[cloud agent]** are implemented and verified offline (no Azure ac
 
 ## 0. Delegation
 
-- [ ] 0.1 [Azure] Branch, draft PR, PRD-009, this change, and the cloud agent setup (`copilot-setup-steps.yml`, OpenSpec agent, AGENTS.md section); verify the setup workflow runs green on the branch
+- [x] 0.1 [Azure] Branch, draft PR, PRD-009, this change, and the cloud agent setup (`copilot-setup-steps.yml`, OpenSpec agent, AGENTS.md section); verify the setup workflow runs green on the branch
 
 ## 1. Simulator, data and infrastructure
 
