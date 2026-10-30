@@ -56,6 +56,7 @@ A person without either permission cannot see any data.
 | C7 | Analyse devices and measurements with an AI assistant | M6 |
 | C8 | Detect unusual readings automatically and classify them (real event, sensor fault, expected) | M7 |
 | C9 | A daily brief per site, written from the platform's figures | M8 |
+| C10 | Forecast device batteries and queue the devices likely to need an intervention | M9 |
 
 ## 6. Milestones
 
@@ -69,6 +70,7 @@ A person without either permission cannot see any data.
 | **M6 — AI analyst** | Users ask questions about devices and measurements in natural language | [PRD-006](PRD-006-m6-ai-analyst.md) |
 | **M7 — Anomaly detection** | Unusual readings are detected without thresholds, classified with a confidence and explained | [PRD-007](PRD-007-m7-anomaly-detection.md) |
 | **M8 — Site digest** | Each site page shows a daily brief of the last 24 hours, with its figures | [PRD-008](PRD-008-m8-site-digest.md) |
+| **M9 — Maintenance** | Battery forecasts and a maintenance queue sorted by the probability of an intervention within 7 days | [PRD-009](PRD-009-m9-maintenance.md) |
 
 Each milestone is demonstrable on its own and builds on the previous ones.
 

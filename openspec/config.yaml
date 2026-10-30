@@ -1,6 +1,6 @@
 schema: spec-driven
 githubCopilot:
-  cloudAgent: false
+  cloudAgent: true
 
 context: |
   Smart Device Platform demonstrator. Business requirements live in docs/prd, hard-to-reverse architecture decisions in docs/adr,
