@@ -46,7 +46,7 @@ function Portal({ msal, config }: { msal: PublicClientApplication; config: Runti
       session={state.session}
       api={state.api}
       queryClient={state.queryClient}
-      features={{ assistant: config.assistantEnabled, anomalies: config.anomaliesEnabled, anomalySites: config.anomalySites, digests: config.digestsEnabled }}
+      features={{ assistant: config.assistantEnabled, anomalies: config.anomaliesEnabled, anomalySites: config.anomalySites, digests: config.digestsEnabled, maintenance: config.maintenanceEnabled }}
     >
       <RouterProvider router={state.router} />
     </PortalProviders>

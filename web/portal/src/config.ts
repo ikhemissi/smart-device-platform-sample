@@ -12,6 +12,8 @@ export interface RuntimeConfig {
   anomalySites: string[]
   /** The site digest job (M8) is deployed. */
   digestsEnabled: boolean
+  /** The maintenance job (M9) is deployed. */
+  maintenanceEnabled: boolean
 }
 
 export async function loadConfig(): Promise<RuntimeConfig> {
@@ -31,6 +33,7 @@ export async function loadConfig(): Promise<RuntimeConfig> {
     assistantEnabled: config.assistantEnabled === true,
     anomaliesEnabled: config.anomaliesEnabled === true,
     digestsEnabled: config.digestsEnabled === true,
+    maintenanceEnabled: config.maintenanceEnabled === true,
     anomalySites: Array.isArray(config.anomalySites) ? config.anomalySites.filter((site) => typeof site === 'string') : [],
   }
 }

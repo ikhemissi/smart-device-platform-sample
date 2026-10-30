@@ -13,8 +13,11 @@ import type {
   DeviceDetails,
   DigestRequest,
   DeviceEdit,
+  DeviceMaintenance,
   DevicePage,
   DeviceQuery,
+  MaintenanceItem,
+  MaintenanceQuery,
   Measurement,
   Problem,
   ReportedMetric,
@@ -204,6 +207,26 @@ export class ApiClient {
       body: JSON.stringify({ verdict, comment }),
     })
     return (await response.json()) as Anomaly
+  }
+
+  maintenance(query: MaintenanceQuery): Promise<MaintenanceItem[]> {
+    const params = new URLSearchParams()
+    if (query.siteId) params.set('siteId', query.siteId)
+    if (query.status?.length) params.set('status', query.status.join(','))
+    return this.json(`/maintenance?${params}`)
+  }
+
+  deviceMaintenance(deviceId: string): Promise<DeviceMaintenance> {
+    return this.json(`/devices/${encodeURIComponent(deviceId)}/maintenance`)
+  }
+
+  async setMaintenanceStatus(id: number, status: 'planned' | 'done', comment: string | null): Promise<MaintenanceItem> {
+    const response = await this.request(`/maintenance/${id}/status`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status, comment }),
+    })
+    return (await response.json()) as MaintenanceItem
   }
 
   createConversation(): Promise<AssistantConversation> {

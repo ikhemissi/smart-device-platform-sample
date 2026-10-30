@@ -29,7 +29,7 @@ Tasks marked **[cloud agent]** are implemented and verified offline (no Azure ac
 
 ## 4. Portal
 
-- [ ] 4.1 [cloud agent] `maintenanceEnabled` in `config.json`; Maintenance page and the device page's *Battery and maintenance* card (design D9); verify component tests and the offline Playwright suite (including accessibility)
+- [x] 4.1 [cloud agent] `maintenanceEnabled` in `config.json`; Maintenance page and the device page's *Battery and maintenance* card (design D9); verify component tests and the offline Playwright suite (including accessibility)
 - [ ] 4.2 [Azure] Deploy the portal; verify with the user in the environment (queue with the aging devices, plan and close an item, device card)
 
 ## 5. Assistant and site digest

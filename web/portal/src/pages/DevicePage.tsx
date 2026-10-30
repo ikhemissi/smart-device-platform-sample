@@ -32,6 +32,7 @@ import { bucketName, metricLabel } from '../components/chartOption'
 import { useFeatures } from '../features'
 import { AlertsCard, ThresholdsCard } from './alerting/AlertingCards'
 import { AnomaliesCard } from './anomalies/AnomaliesCard'
+import { MaintenanceCard } from './maintenance/MaintenanceCard'
 import { MAX_METRICS, PERIODS, RETENTION_MS, defaultMetrics, readState } from './devicePageState'
 
 /** Points requested for a chart: 1 h → raw, 24 h → 5-minute, 7 d → 15-minute, 30 d → 1-hour buckets at 30 s reporting. */
@@ -270,6 +271,7 @@ export function DevicePage() {
           to={state.to}
         />
       )}
+      {features.maintenance && info && <MaintenanceCard deviceId={deviceId} />}
       <AlertsCard deviceId={deviceId} metrics={metrics.data ?? []} />
       <ThresholdsCard deviceId={deviceId} metrics={metrics.data ?? []} />
     </section>

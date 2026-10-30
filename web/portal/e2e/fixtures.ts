@@ -221,6 +221,64 @@ function firstPart(body: Buffer, contentType: string): string {
   return part.slice(part.indexOf('\r\n\r\n') + 4).replace(/\r\n$/, '')
 }
 
+type MaintenanceStatus = 'open' | 'planned' | 'done' | 'resolved'
+
+interface FakeMaintenanceItem {
+  id: number
+  deviceId: string
+  deviceName: string | null
+  siteId: string
+  status: MaintenanceStatus
+  probability: number
+  reasons: Record<string, unknown>[]
+  battery: Record<string, unknown> | null
+  workOrder: string | null
+  workOrderModel: string | null
+  workOrderAt: string | null
+  openedAt: string
+  updatedAt: string
+  resolvedAt: string | null
+  statusBy: string | null
+  statusAt: string | null
+  statusComment: string | null
+}
+
+/** The maintenance queue of paris-01 (the assessed site of the fake environment), like the maintenance job's. */
+function seedMaintenance(): FakeMaintenanceItem[] {
+  const now = Date.now()
+  const iso = (hoursAgo: number) => new Date(now - hoursAgo * 3_600_000).toISOString()
+  const item = (id: number, deviceId: string, status: MaintenanceStatus, probability: number, changes: Partial<FakeMaintenanceItem>): FakeMaintenanceItem => ({
+    id, deviceId, deviceName: null, siteId: 'paris-01', status, probability, reasons: [], battery: null,
+    workOrder: null, workOrderModel: null, workOrderAt: null, openedAt: iso(30), updatedAt: iso(1), resolvedAt: null,
+    statusBy: null, statusAt: null, statusComment: null, ...changes,
+  })
+  return [
+    item(1, 'paris-01-ruuvi-001', 'open', 0.86, {
+      reasons: [{ rule: 'battery_days_left', value: 4.6, threshold: 7, unit: 'days', level: 2.6, level_unit: 'V' }],
+      battery: { metric: 'battery_voltage', unit: 'V', level: 2.6, slope_per_day: -0.022, days_left: 4.6, since: iso(300), cutoff: 2.5 },
+      workOrder: 'Replace the battery of paris-01-ruuvi-001 within 4 days: 2.6 V, falling 0.022 V per day towards the 2.5 V cut-off.',
+      workOrderModel: 'gpt-6-luna',
+      workOrderAt: iso(1),
+    }),
+    item(2, 'paris-01-bthome-002', 'planned', 0.71, {
+      reasons: [{ rule: 'silent', value: 42, threshold: 15, unit: 'minutes' }],
+      battery: { metric: 'battery_level', unit: '%', level: 61, slope_per_day: -0.4, days_left: 127, since: iso(300), cutoff: 10 },
+      workOrder: 'Check the radio link of paris-01-bthome-002: silent for 42 minutes.',
+      workOrderModel: 'gpt-6-luna',
+      workOrderAt: iso(1),
+      statusBy: 'Erin Editor',
+      statusAt: iso(2),
+      statusComment: 'Tuesday morning round',
+    }),
+    item(3, 'paris-01-cayenne-003', 'done', 0.66, {
+      reasons: [{ rule: 'rejected_messages', value: 9, threshold: 5, unit: 'messages in 24 hours' }],
+      statusBy: 'Erin Editor',
+      statusAt: iso(20),
+      statusComment: 'Firmware reflashed',
+    }),
+  ]
+}
+
 export class FakePlatform {
   user: FakeUser = EDITOR
   devices = seedDevices()
@@ -241,6 +299,10 @@ export class FakePlatform {
     ['lyon-01', fakeDigest(2, 'lyon-01', Date.now() - 2 * 3_600_000, { brief: null, briefModel: null })],
   ])
   readonly digestRequests = new Map<string, { requestedAt: string; requestedBy: string }>()
+  /** Predictive maintenance (M9): assessed sites, the queue and the status changes sent through the portal. */
+  readonly maintenanceSites = ['paris-01']
+  readonly maintenance = seedMaintenance()
+  readonly maintenanceChanges: { id: number; status: string; comment: string | null }[] = []
   private readonly latest = new Map<string, { measuredAt: string; payloadFormat: string; metrics: Record<string, number>; attributes: Record<string, string> }[]>()
   /** Access tokens presented to the API. */
   readonly tokens: string[] = []
@@ -462,6 +524,44 @@ export class FakePlatform {
         review: { reviewedAt: new Date().toISOString(), reviewedBy: this.user.name, verdict: body.verdict, comment },
       })
       return route.fulfill({ headers: cors, json: anomaly })
+    }
+    if (path === '/maintenance' && request.method() === 'GET') {
+      const q = url.searchParams
+      const statuses = (q.get('status') ?? 'open,planned').split(',')
+      const items = this.maintenance
+        .filter((i) => statuses.includes(i.status) && (!q.get('siteId') || i.siteId === q.get('siteId')))
+        .sort((a, b) => b.probability - a.probability)
+      return route.fulfill({ headers: cors, json: items })
+    }
+    const maintenanceStatus = path.match(/^\/maintenance\/(\d+)\/status$/)
+    if (maintenanceStatus && request.method() === 'POST') {
+      if (!canWrite) return problem(403, 'Forbidden')
+      const item = this.maintenance.find((i) => i.id === Number(maintenanceStatus[1]))
+      if (!item) return problem(404, 'Not Found')
+      if (item.status === 'done' || item.status === 'resolved') return problem(409, 'Conflict')
+      const body = request.postDataJSON() as { status?: string; comment?: string | null }
+      const comment = body.comment?.trim() || null
+      this.maintenanceChanges.push({ id: item.id, status: body.status!, comment })
+      Object.assign(item, { status: body.status, statusBy: this.user.name, statusAt: new Date().toISOString(), statusComment: comment, updatedAt: new Date().toISOString() })
+      return route.fulfill({ headers: cors, json: item })
+    }
+    const deviceMaintenance = path.match(/^\/devices\/([^/]+)\/maintenance$/)
+    if (deviceMaintenance && request.method() === 'GET') {
+      const device = this.devices.find((d) => d.deviceId === decodeURIComponent(deviceMaintenance[1]))
+      if (!device) return problem(404, 'Not Found')
+      const enabled = this.maintenanceSites.includes(device.siteId)
+      const item = this.maintenance.find((i) => i.deviceId === device.deviceId && (i.status === 'open' || i.status === 'planned')) ?? null
+      const assessment = enabled
+        ? {
+            assessedAt: new Date(Date.now() - 20 * 60_000).toISOString(),
+            battery: item?.battery ?? { metric: 'battery_voltage', unit: 'V', level: 2.98, slope_per_day: -0.002, days_left: 240, since: new Date(Date.now() - 300 * 3_600_000).toISOString(), cutoff: 2.5 },
+            signals: {},
+            probability: item?.probability ?? 0.08,
+            decisionModel: 'decision-1',
+            decisionModelVersion: '1',
+          }
+        : null
+      return route.fulfill({ headers: cors, json: { deviceId: device.deviceId, enabled, assessment, item: enabled ? item : null } })
     }
     const alerting = path.match(/^\/devices\/([^/]+)\/(thresholds|alerts)$/)
     if (alerting) {

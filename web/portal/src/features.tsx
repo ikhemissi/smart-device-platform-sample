@@ -9,9 +9,11 @@ export interface Features {
   anomalySites: string[]
   /** Site digests (M8): the site page's Digest card. */
   digests: boolean
+  /** Predictive maintenance (M9): the Maintenance page and the device page's Battery and maintenance card. */
+  maintenance: boolean
 }
 
-export const NO_FEATURES: Features = { assistant: false, anomalies: false, anomalySites: [], digests: false }
+export const NO_FEATURES: Features = { assistant: false, anomalies: false, anomalySites: [], digests: false, maintenance: false }
 
 export const FeaturesContext = createContext<Features>(NO_FEATURES)
 

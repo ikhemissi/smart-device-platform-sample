@@ -10,4 +10,6 @@ export const FAKE_ENV = {
   ANOMALY_SITES: 'paris-01',
   // Site digests (M8) on.
   DIGEST_JOB_NAME: 'caj-site-digest-e2e',
+  // Predictive maintenance (M9) on.
+  UPKEEP_JOB_NAME: 'caj-upkeep-e2e',
 }

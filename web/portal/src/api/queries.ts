@@ -1,6 +1,6 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useApi } from './context'
-import type { AnomalyQuery, AnomalyStatus, DeviceEdit, DeviceQuery, ReviewVerdict, SiteDigest, Threshold, ThresholdInput } from './types'
+import type { AnomalyQuery, AnomalyStatus, DeviceEdit, DeviceQuery, MaintenanceQuery, ReviewVerdict, SiteDigest, Threshold, ThresholdInput } from './types'
 
 export const queryKeys = {
   me: ['me'] as const,
@@ -20,6 +20,8 @@ export const queryKeys = {
   deviceAnomalies: (deviceId: string, status: AnomalyStatus[], period: string, from?: string, to?: string) =>
     ['anomalies', 'device', deviceId, status, period, from, to] as const,
   siteDigest: (siteId: string) => ['site-digest', siteId] as const,
+  maintenance: (query: MaintenanceQuery) => ['maintenance', 'list', query] as const,
+  deviceMaintenance: (deviceId: string) => ['maintenance', 'device', deviceId] as const,
 }
 
 export function useCurrentUser() {
@@ -257,6 +259,42 @@ export function useReviewAnomaly() {
   return useMutation({
     mutationFn: ({ id, verdict, comment }: { id: number; verdict: ReviewVerdict; comment: string | null }) => api.reviewAnomaly(id, verdict, comment),
     onSuccess: () => client.invalidateQueries({ queryKey: ['anomalies'] }),
+  })
+}
+
+// --- Predictive maintenance (M9) ---------------------------------------------------------------------------------
+
+/** The maintenance job runs hourly: lists refresh every 5 minutes while visible. */
+const MAINTENANCE_REFRESH_MS = 5 * 60_000
+
+export function useMaintenance(query: MaintenanceQuery) {
+  const api = useApi()
+  return useQuery({
+    queryKey: queryKeys.maintenance(query),
+    queryFn: () => api.maintenance(query),
+    placeholderData: keepPreviousData,
+    refetchInterval: MAINTENANCE_REFRESH_MS,
+    refetchIntervalInBackground: false,
+  })
+}
+
+export function useDeviceMaintenance(deviceId: string) {
+  const api = useApi()
+  return useQuery({
+    queryKey: queryKeys.deviceMaintenance(deviceId),
+    queryFn: () => api.deviceMaintenance(deviceId),
+    refetchInterval: MAINTENANCE_REFRESH_MS,
+    refetchIntervalInBackground: false,
+  })
+}
+
+export function useSetMaintenanceStatus() {
+  const api = useApi()
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, status, comment }: { id: number; status: 'planned' | 'done'; comment: string | null }) =>
+      api.setMaintenanceStatus(id, status, comment),
+    onSuccess: () => client.invalidateQueries({ queryKey: ['maintenance'] }),
   })
 }
 
