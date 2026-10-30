@@ -3,7 +3,7 @@
 Scheduled Container Apps job (every 5 minutes) that finds unusual sensor readings on the monitored sites and records
 them in `sdp.anomalies` ([PRD-007](../../docs/prd/PRD-007-m7-anomaly-detection.md),
 [ADR-0011](../../docs/adr/ADR-0011-model-based-analysis.md),
-[design](../../openspec/changes/m7-anomaly-detection/design.md)).
+[design](../../openspec/changes/archive/2026-10-30-m7-anomaly-detection/design.md)).
 
 | Step | Who | What |
 |---|---|---|

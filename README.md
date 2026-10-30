@@ -4,7 +4,7 @@
 
 An end-to-end Azure sample of a sensor platform. Simulated devices send binary measurements, the platform decodes and stores them, people browse them in a web portal, get email alerts, manage which devices may connect, ask an AI assistant about the data, and review the anomalies a decision model finds in it.
 
-> **Status:** milestones M1–M6 and the operations workbook are delivered and archived; M7 (anomaly detection) is delivered and being archived. Baseline specifications are in [`openspec/specs/`](openspec/specs).
+> **Status:** all milestones (M1–M7) and the operations workbook are delivered and archived. Baseline specifications are in [`openspec/specs/`](openspec/specs).
 
 **Contents:** [What it shows](#what-it-shows) · [Architecture](#architecture) · [How it works](#how-it-works) · [Security](#security) · [Repository](#repository) · [Build and test](#build-and-test) · [Continuous integration](#continuous-integration) · [Deploy to Azure](#deploy-to-azure) · [Operate](#operate) · [Contributing](#contributing)
 
