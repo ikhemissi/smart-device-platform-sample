@@ -97,6 +97,22 @@ def test_episode_ends_at_the_last_unusual_reading():
     assert candidate.assessment.observed_min > candidate.assessment.usual_value + 9
 
 
+def test_neighbours_are_scored_over_the_candidate_period():
+    """Two devices warming up together: over the last 5 minutes both are far from usual, even though over the
+    whole 15-minute window the neighbour's average is diluted."""
+    rng = random.Random(11)
+    history, window = [], []
+    for device in (DEVICE, "paris-01-ruuvi5-002"):
+        history += series("temperature", temperature, NOW - timedelta(days=7), NOW - WINDOW, rng, device)
+        window += series("temperature", temperature, NOW - WINDOW, NOW, rng, device)
+    warm = [replace(r, value=r.value + 10) if r.measured_at >= NOW - timedelta(minutes=5) else r for r in window]
+    assessments, candidates = detect(warm, build_baselines(rollups(history)), deviation=4)
+    first = next(c for c in candidates if c.assessment.device_id == DEVICE)
+    window_score = next(a.score for a in assessments if a.device_id == "paris-01-ruuvi5-002")
+    assert first.neighbour_scores["paris-01-ruuvi5-002"] > 2 * window_score
+    assert first.neighbour_scores["paris-01-ruuvi5-002"] == pytest.approx(first.score, rel=0.3)
+
+
 def test_flat_line_is_flagged():
     baselines, window = scenario()
     stuck = [Reading(r.device_id, r.metric, r.measured_at, 23.7) for r in window]

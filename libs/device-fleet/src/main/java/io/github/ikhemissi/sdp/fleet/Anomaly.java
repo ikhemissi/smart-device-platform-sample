@@ -9,8 +9,8 @@ import java.util.regex.Pattern;
  * A forced value for one metric of one device during a time window, e.g. {@code paris-01-ruuvi5-001:temperature=12:5m}
  * (starts when the simulator starts) or {@code paris-01-ruuvi5-001:temperature=12:5m:2m} (starts 2 minutes later).
  * Without a ramp the value is forced at once and held almost constant (like a faulty sensor); with a ramp,
- * {@code temperature=35~5m}, the readings move to the value over 5 minutes with their usual noise, hold it, then return
- * over 5 minutes after the duration (like a room really warming up).
+ * {@code temperature=35~5m:10m}, the readings move to the value over 5 minutes with their usual noise, hold it for 10
+ * minutes, then return over 5 minutes (like a room really warming up).
  */
 public record Anomaly(String deviceId, String metric, double value, Duration duration, Duration delay, Duration ramp) {
 
@@ -36,7 +36,8 @@ public record Anomaly(String deviceId, String metric, double value, Duration dur
     /** Share of the forced value in the reading at {@code now}: 0 outside the anomaly, 1 while it is held. */
     public double weight(Instant simulatorStart, Instant now) {
         Instant from = simulatorStart.plus(delay);
-        Instant until = from.plus(duration);
+        // With a ramp the value is held for the whole duration once reached.
+        Instant until = from.plus(ramp).plus(duration);
         if (now.isBefore(from) || !now.isBefore(until.plus(ramp))) {
             return 0;
         }

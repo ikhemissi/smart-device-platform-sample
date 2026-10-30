@@ -89,6 +89,9 @@ class Assessment:
 class Candidate:
     kind: str  # deviation | flat | jump
     assessment: Assessment
+    # Scores of the same metric on the other devices over the candidate's own period (not the whole window, which
+    # would dilute a change that started a few minutes ago).
+    neighbour_scores: dict[str, float] = field(default_factory=dict)
 
     @property
     def score(self) -> float:
@@ -214,7 +217,22 @@ def detect(
             part = _unusual_part(kind, by_series[key], baseline, deviation)
             # The largest step is the window's (an isolated spike trimmed to one reading has no step of its own).
             candidates.append(Candidate(kind, replace(part, max_step=assessment.max_step) if part else assessment))
-    return assessments, candidates
+    return assessments, [replace(c, neighbour_scores=_neighbour_scores(c, by_series, baselines)) for c in candidates]
+
+
+def _neighbour_scores(
+    candidate: Candidate, by_series: dict[tuple[str, str], list[Reading]], baselines: dict[tuple[str, str], Baseline]
+) -> dict[str, float]:
+    a = candidate.assessment
+    scores = {}
+    for (device_id, metric), readings in sorted(by_series.items()):
+        baseline = baselines.get((device_id, metric))
+        if metric != a.metric or device_id == a.device_id or baseline is None:
+            continue
+        period = [r for r in readings if a.started_at <= r.measured_at <= a.ended_at]
+        if period and (assessment := assess(period, baseline)):
+            scores[device_id] = assessment.score
+    return scores
 
 
 def continues(episode_ended_at: datetime, candidate: Candidate) -> bool:

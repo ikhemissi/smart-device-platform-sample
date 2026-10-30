@@ -10,7 +10,7 @@ from typing import Any, Protocol
 import httpx
 
 from .db import Device
-from .detection import Assessment, Candidate
+from .detection import Candidate
 from .telemetry import tracer
 
 log = logging.getLogger(__name__)
@@ -132,10 +132,12 @@ def build_state(
     candidate: Candidate,
     device: Device,
     unit: str,
-    neighbours: Iterable[Assessment],
+    site_devices: Iterable[str],
     open_anomalies: Iterable[dict[str, Any]] = (),
 ) -> dict[str, Any]:
-    """The compact document the decision model (and later the LLM) sees: only data, no instructions."""
+    """The compact document the decision model (and later the LLM) sees: only data, no instructions. Neighbours are
+    the other devices of the same site, scored over the candidate's period."""
+    same_site = set(site_devices)
     a = candidate.assessment
     return {
         "device": {
@@ -163,9 +165,9 @@ def build_state(
         },
         "score": round(candidate.score, 2),
         "same_metric_on_other_devices_of_site": [
-            {"device": n.device_id, "score": round(n.score, 2)}
-            for n in neighbours
-            if n.metric == a.metric and n.device_id != a.device_id
+            {"device": device_id, "score": round(score, 2)}
+            for device_id, score in candidate.neighbour_scores.items()
+            if device_id in same_site
         ],
         "open_anomalies_of_device": list(open_anomalies),
     }

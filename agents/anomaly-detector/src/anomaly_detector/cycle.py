@@ -135,7 +135,8 @@ class Detector:
                 if o.device_id == a.device_id and o.metric != a.metric
             ]
             device = devices[a.device_id]
-            state = build_state(candidate, device, units.get(a.metric, ""), assessments, open_anomalies)
+            site_devices = [d.device_id for d in devices.values() if d.site_id == device.site_id]
+            state = build_state(candidate, device, units.get(a.metric, ""), site_devices, open_anomalies)
             anomaly = self.store.add(Anomaly.from_candidate(candidate, device.site_id, state))
             latest[(a.device_id, a.metric)] = anomaly
             result.created += 1

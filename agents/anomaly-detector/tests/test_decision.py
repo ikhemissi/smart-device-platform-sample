@@ -27,12 +27,9 @@ def assessment(device_id=DEVICE.device_id, metric="temperature", score=60.0):
 
 
 def state():
-    neighbours = [
-        assessment(),
-        assessment("paris-01-ruuvi5-002", score=0.4),
-        assessment("paris-01-ruuvi5-003", "humidity"),
-    ]
-    return build_state(Candidate("deviation", assessment()), DEVICE, "°C", neighbours)
+    neighbours = {"paris-01-ruuvi5-002": 0.4, "lyon-01-ruuvi5-001": 9.0}
+    candidate = Candidate("deviation", assessment(), neighbours)
+    return build_state(candidate, DEVICE, "°C", [DEVICE.device_id, "paris-01-ruuvi5-002"])
 
 
 def answer(**probabilities):

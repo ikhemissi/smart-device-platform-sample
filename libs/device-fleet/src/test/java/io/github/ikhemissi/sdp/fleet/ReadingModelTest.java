@@ -145,15 +145,16 @@ class ReadingModelTest {
         double before = model.next(START.plusSeconds(30)).metrics().get("temperature").doubleValue();
         double previous = before;
         List<Double> held = new java.util.ArrayList<>();
+        // Ramp up 1-6 min, held 6-16 min, ramp down 16-21 min.
         for (int s = 60; s <= 22 * 60; s += 30) {
             double t = model.next(START.plusSeconds(s)).metrics().get("temperature").doubleValue();
             assertThat(Math.abs(t - previous)).as("second %d", s).isLessThan(3.0);
-            if (s >= 6 * 60 && s < 11 * 60) {
+            if (s >= 6 * 60 && s < 16 * 60) {
                 held.add(t);
             }
             previous = t;
         }
-        assertThat(held).allSatisfy(t -> assertThat(t).isCloseTo(35.0, within(0.6)));
+        assertThat(held).hasSize(20).allSatisfy(t -> assertThat(t).isCloseTo(35.0, within(0.6)));
         assertThat(held.stream().distinct().count()).as("noisy, not constant").isGreaterThan(5);
         assertThat(previous).as("back to normal after the ramp down").isCloseTo(before, within(2.0));
     }
