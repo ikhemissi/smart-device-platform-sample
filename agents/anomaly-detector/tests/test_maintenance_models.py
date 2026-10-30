@@ -46,7 +46,8 @@ def test_state_holds_the_device_battery_and_signals_only():
     assert s["device"] == {"id": "paris-01-ruuvi5-003", "site": "paris-01", "payload_format": "ruuvi-v5"}
     assert s["battery"]["days_left"] == 3.0
     assert s["signals"]["last_24h"]["messages"] == 2880
-    assert build_state(DEVICE, None, SIGNALS)["battery"] is None
+    # A device without battery says so explicitly (a null battery read as a risk to the live decision model).
+    assert build_state(DEVICE, None, SIGNALS)["battery"] == {"reported": False}
 
 
 @respx.mock

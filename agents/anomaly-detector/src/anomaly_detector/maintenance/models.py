@@ -22,9 +22,12 @@ QUESTION = "intervention"
 INSTRUCTIONS = (
     "Will this device need an on-site intervention (battery replacement, repair or reset) within the next 7 days?"
 )
+# A missing battery is not a risk: many devices do not report one (live check, M9 task 2.5: without this, devices
+# without battery got probabilities near 0.9).
 CRITERIA = {
-    "true": "the battery reaches its cut-off within 7 days, or the device is failing to report",
-    "false": "the device will keep working without a visit for 7 days",
+    "true": "the battery forecast reaches its cut-off within 7 days, or the reporting signals show the device failing "
+    "(silent, gaps much longer than usual, many rejected messages)",
+    "false": "otherwise; a device that does not report its battery is judged on its reporting signals only",
 }
 MODEL_VERSION = "1"
 
@@ -45,7 +48,7 @@ def build_state(device: MaintenanceDevice, battery: Forecast | None, signals: Si
     """The document the decision model sees: the device, its battery forecast and its signals; no instructions."""
     return {
         "device": {"id": device.device_id, "site": device.site_id, "payload_format": device.payload_format},
-        "battery": battery.as_json() if battery else None,
+        "battery": battery.as_json() if battery else {"reported": False},
         "signals": signals.as_json(),
     }
 
