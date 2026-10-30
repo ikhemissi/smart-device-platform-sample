@@ -55,6 +55,7 @@ A person without either permission cannot see any data.
 | C6 | Email alerts when a measurement crosses a threshold, for a selected subset of devices | M5 |
 | C7 | Analyse devices and measurements with an AI assistant | M6 |
 | C8 | Detect unusual readings automatically and classify them (real event, sensor fault, expected) | M7 |
+| C9 | A daily brief per site, written from the platform's figures | M8 |
 
 ## 6. Milestones
 
@@ -67,6 +68,7 @@ A person without either permission cannot see any data.
 | **M5 — Threshold alerting** | Selected devices trigger email alerts when out of range | [PRD-005](PRD-005-m5-threshold-alerting.md) |
 | **M6 — AI analyst** | Users ask questions about devices and measurements in natural language | [PRD-006](PRD-006-m6-ai-analyst.md) |
 | **M7 — Anomaly detection** | Unusual readings are detected without thresholds, classified with a confidence and explained | [PRD-007](PRD-007-m7-anomaly-detection.md) |
+| **M8 — Site digest** | Each site page shows a daily brief of the last 24 hours, with its figures | [PRD-008](PRD-008-m8-site-digest.md) |
 
 Each milestone is demonstrable on its own and builds on the previous ones.
 
