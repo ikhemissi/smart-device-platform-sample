@@ -2,9 +2,9 @@
 
 [![CI](https://github.com/ikhemissi/smart-device-platform-sample/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/ikhemissi/smart-device-platform-sample/actions/workflows/ci.yml)
 
-An end-to-end Azure sample of a sensor platform. Simulated devices send binary measurements, the platform decodes and stores them, people browse them in a web portal, get email alerts, manage which devices may connect, and ask an AI assistant about the data.
+An end-to-end Azure sample of a sensor platform. Simulated devices send binary measurements, the platform decodes and stores them, people browse them in a web portal, get email alerts, manage which devices may connect, ask an AI assistant about the data, and review the anomalies a decision model finds in it.
 
-> **Status:** all milestones (M1–M6) and the operations workbook are delivered and archived. Baseline specifications are in [`openspec/specs/`](openspec/specs).
+> **Status:** milestones M1–M6 and the operations workbook are delivered and archived; M7 (anomaly detection) is delivered and being archived. Baseline specifications are in [`openspec/specs/`](openspec/specs).
 
 **Contents:** [What it shows](#what-it-shows) · [Architecture](#architecture) · [How it works](#how-it-works) · [Security](#security) · [Repository](#repository) · [Build and test](#build-and-test) · [Continuous integration](#continuous-integration) · [Deploy to Azure](#deploy-to-azure) · [Operate](#operate) · [Contributing](#contributing)
 
@@ -19,6 +19,7 @@ An end-to-end Azure sample of a sensor platform. Simulated devices send binary m
 | M5 | Threshold alerting | Thresholds per device, emails without floods, alert history | [m5-threshold-alerting](docs/demo/m5-threshold-alerting.md) |
 | — | Operations workbook | KPIs, latest errors, PostgreSQL / IoT Hub / Event Hubs metrics | [Operate](#operate) |
 | M6 | AI assistant | Questions in natural language, grounded answers with sources, `gpt-6-luna` | [m6-ai-analyst](docs/demo/m6-ai-analyst.md) |
+| M7 | Anomaly detection | Statistics select, `Microsoft-Decision-1` classifies (real event, sensor fault, …) with a confidence, `gpt-6-luna` explains; reviews in the portal | [m7-anomaly-detection](docs/demo/m7-anomaly-detection.md) |
 
 ## Architecture
 
@@ -38,6 +39,7 @@ flowchart LR
     PROV[provisioning-api]
     ALERT[alert-service]
     AGENT["device-analyst<br/>(AI agent)"]
+    DET["anomaly-detector<br/>(job, every 5 min)"]
   end
   subgraph Data
     PG[(PostgreSQL)]
@@ -51,7 +53,9 @@ flowchart LR
   DEC --> SB --> ALERT --> ACS[ACS Email]
   API --> PG & REDIS
   PROV --> DPS & IOT
-  AGENT --> FOUNDRY["Foundry<br/>gpt-6-luna"]
+  AGENT --> FOUNDRY["Foundry<br/>gpt-6-luna,<br/>Microsoft-Decision-1"]
+  DET --> PG
+  DET --> FOUNDRY
   AGENT -->|"user's token"| APIM
   AGENT --> REDIS
 ```
@@ -59,7 +63,7 @@ flowchart LR
 | Layer | Technology |
 |---|---|
 | Platform services | Java 25, Spring Boot 4 |
-| AI agent | Python 3.13, Microsoft Agent Framework, Foundry (`gpt-6-luna`, EU data zone) |
+| AI agent and anomaly detector | Python 3.13, Microsoft Agent Framework, Foundry (`gpt-6-luna`, `Microsoft-Decision-1`, EU data zone) |
 | Portal | React, TypeScript, Fluent UI, MSAL, on Azure Static Web Apps |
 | Infrastructure | Terraform, deployed with azd |
 | Observability | OpenTelemetry → Application Insights, Azure Monitor workbook |
@@ -180,15 +184,32 @@ sequenceDiagram
   AG-->>S: SSE: tool, delta… done with sources
 ```
 
-- **Grounded and read-only:** nine read-only tools; the assistant can never see more than the user and declines to change anything.
+- **Grounded and read-only:** read-only tools (ten where anomaly detection runs); the assistant can never see more than the user and declines to change anything.
 - **Conversations** live in Redis, belong to their author and expire after an hour.
 - **Quality is measured:** an evaluation set of 17 questions scored for groundedness, relevance and tool use; first text within 5 s for all of them ([agent README](agents/device-analyst/README.md#evaluation)).
 
-### 6. Observability
+### 6. Anomaly detection (M7)
 
 ```mermaid
 flowchart LR
-  W["All services and the agent"] -->|OpenTelemetry, Entra auth| AI[Application Insights]
+  J["anomaly-detector<br/>(every 5 min)"] -->|"last 15 min vs<br/>7-day hourly profile"| PG[(PostgreSQL)]
+  J -->|"candidate + neighbours"| D["Microsoft-Decision-1<br/>real event · sensor fault ·<br/>expected · cannot tell"]
+  J -->|confirmed only| L["gpt-6-luna<br/>explanation"]
+  J -->|"anomaly, probabilities,<br/>threshold, explanation"| PG
+  PG --> API[device-api] --> UI["Portal: device card,<br/>Anomalies page, reviews"]
+  API --> AG[AI assistant]
+```
+
+- **Statistics select, the decision model decides, the LLM explains** ([ADR-0011](docs/adr/ADR-0011-model-based-analysis.md)): readings far from the device's usual value for that hour, flat lines and jumps become candidates; `Microsoft-Decision-1` gives a probability per class; confirmed anomalies get a short explanation.
+- **Status from the confidence** (`ANOMALY_CONFIDENCE`): confirmed, to review (unsure) or dismissed; Editors record whether the classification was correct.
+- **Every decision is recorded:** all probabilities, the threshold, the model and its version; a failed model call is retried by the next cycle.
+- **Tuned on the environment's data** with dry runs (no write): about 3 candidates and 1.7 confirmed anomalies a day on `paris-01` ([detector README](agents/anomaly-detector/README.md#tuning)).
+
+### 7. Observability
+
+```mermaid
+flowchart LR
+  W["All services, the agent<br/>and the detector"] -->|OpenTelemetry, Entra auth| AI[Application Insights]
   APIM[API Management] --> AI
   AI --> WB["Operations workbook"]
   AI --> F["Foundry tracing"]
@@ -215,6 +236,7 @@ Details: [docs/security.md](docs/security.md). All resources carry the tenant ta
 |---|---|
 | `services/` | Java services: `telemetry-decoder`, `device-simulator`, `device-api`, `provisioning-api`, `alert-service`, `db-migrator` (each with a README) |
 | `agents/device-analyst/` | AI agent and its evaluation set |
+| `agents/anomaly-detector/` | Anomaly detection job (statistics, decision model, explanations) |
 | `web/portal/` | Web portal |
 | `libs/` | Shared Java libraries: payload codecs, simulated fleet, security/observability, database schema, test support |
 | `infra/` | Terraform (deployed with azd) |
@@ -240,6 +262,7 @@ export DOCKER_HOST=unix:///run/user/$(id -u)/podman/podman.sock TESTCONTAINERS_R
 | Portal | `cd web/portal && npm ci && npm run lint && npm test && npm run build` |
 | Portal end-to-end (API faked) | `cd web/portal && npm run e2e:podman` |
 | AI agent | `cd agents/device-analyst && uv sync && uv run ruff check src tests && uv run pytest` |
+| Anomaly detector | `cd agents/anomaly-detector && uv sync && uv run ruff check src tests && uv run pytest` (dry run: `uv run anomaly-detector --dry-run --days 7`) |
 | Infrastructure | `terraform -chdir=infra fmt -check -recursive && terraform -chdir=infra validate` |
 | Local database | `scripts/local-postgres.sh start && scripts/run-migrations.sh --local` |
 
@@ -251,7 +274,7 @@ Every push to `main` runs [`.github/workflows/ci.yml`](.github/workflows/ci.yml)
 flowchart LR
   P["push to main"] --> J["java<br/>build, unit +<br/>integration tests"]
   P --> W["portal<br/>lint, types, tests,<br/>build, Playwright"]
-  P --> A["agent<br/>ruff, pytest,<br/>image build"]
+  P --> A["Python (agent, detector)<br/>ruff, pytest,<br/>image build"]
   P --> I["infra-specs<br/>Terraform, actionlint,<br/>OpenSpec"]
   P --> D["dependencies<br/>vulnerability gate,<br/>outdated report"]
   D --> CS["Code scanning<br/>(all findings)"]
@@ -262,12 +285,12 @@ flowchart LR
 |---|---|---|
 | `java` | Build, unit and integration tests (Testcontainers: PostgreSQL, Event Hubs and Service Bus emulators) | `./mvnw verify` |
 | `portal` | Lint, type check, unit tests, production build, end-to-end tests with the API faked | `cd web/portal && npm ci && npm run lint && npx tsc -b && npm test && npm run build && npm run e2e:podman` |
-| `agent` | Ruff lint and format, tests, image build | `cd agents/device-analyst && uv sync --locked && uv run ruff check src tests evals && uv run ruff format --check src tests evals && uv run pytest` |
+| `agent` (matrix: `device-analyst`, `anomaly-detector`) | Ruff lint and format, tests, image build | `cd agents/device-analyst && uv sync --locked && uv run ruff check src tests evals && uv run ruff format --check src tests evals && uv run pytest` (same in `agents/anomaly-detector` with `src tests`) |
 | `infra-specs` | Terraform format and validation (no Azure access), workflow lint, OpenSpec strict validation | `terraform -chdir=infra fmt -check -recursive && terraform -chdir=infra init -backend=false && terraform -chdir=infra validate`, `actionlint`, `openspec validate --all --strict` |
 | `dependencies` | Vulnerability gate and outdated report | `scripts/scan-vulnerabilities.sh`, `scripts/report-outdated.sh` |
 
 - **No secrets, no Azure access:** only the built-in `GITHUB_TOKEN`, read-only except for publishing code scanning results. Third-party actions are pinned to commit SHAs.
-- **Vulnerability policy:** the run fails on **High or Critical** findings that have a fixed version, in the Maven, npm and Python lock files and in the shipped images (Java runtime base image, AI agent image). All findings, including lower severities and unfixed ones, are listed in the repository's **Security → Code scanning** tab. To accept a finding temporarily, add it to [`.trivyignore.yaml`](.trivyignore.yaml) with a justification and an expiry date; after that date it fails the run again.
+- **Vulnerability policy:** the run fails on **High or Critical** findings that have a fixed version, in the Maven, npm and Python lock files and in the shipped images (Java runtime base image, AI agent and anomaly detector images). All findings, including lower severities and unfixed ones, are listed in the repository's **Security → Code scanning** tab. To accept a finding temporarily, add it to [`.trivyignore.yaml`](.trivyignore.yaml) with a justification and an expiry date; after that date it fails the run again.
 - **Outdated dependencies:** newer stable versions of direct dependencies (Maven, npm, Python, Terraform providers, actions) are listed in each run's summary. This report never fails the run.
 
 ## Deploy to Azure
@@ -283,7 +306,7 @@ azd up
 ```mermaid
 flowchart LR
   A["preprovision<br/>model quota check,<br/>Terraform state store"] --> B["Terraform<br/>all resources"]
-  B --> C["postprovision<br/>migrate database,<br/>prepare demo sites"]
+  B --> C["postprovision<br/>migrate database,<br/>build detector image,<br/>prepare demo sites"]
   C --> D["deploy<br/>6 services + portal"]
 ```
 
@@ -300,6 +323,12 @@ flowchart LR
 | `AGENT_MODEL_SKU` / `AGENT_MODEL_CAPACITY` | `DataZoneStandard` / `50` | Deployment SKU (EU data zone) and thousands of tokens per minute |
 | `AGENT_CAPTURE_CONTENT` | `false` | `true` records prompts and answers in traces (demos only) |
 | `PORTAL_ASSISTANT` | on when the agent is deployed | `false` hides the Assistant button |
+| `ANOMALY_DETECTION_ENABLED` | `true` | `false` removes the detector job and the `Microsoft-Decision-1` deployment (data kept) |
+| `ANOMALY_SITES` | `paris-01` | Sites analysed for anomalies (comma-separated) |
+| `ANOMALY_METRICS` | `temperature,humidity,pressure,co2,illuminance` | Metrics analysed |
+| `ANOMALY_DEVIATION` / `ANOMALY_CONFIDENCE` | `4` / `0.7` | Distance from the usual value that makes a candidate; probability from which a classification is applied without review |
+| `DECISION_MODEL_CAPACITY` | `30` | `Microsoft-Decision-1` capacity (1 request and 1,000 tokens per minute per unit) |
+| `PORTAL_ANOMALIES` | on when the detector is deployed | `false` hides the anomaly card and page |
 
 ## Operate
 
@@ -313,6 +342,8 @@ flowchart LR
 | `scripts/check-workbook-queries.sh` | Run the workbook's queries against the environment |
 | `scripts/remove-test-site.sh` | Remove a `test-*` / `e2e-*` site and everything attached |
 | `scripts/agent-env.sh` | Write the AI agent's local `.env` from the azd environment |
+| `scripts/anomaly-env.sh` | Write the anomaly detector's local `.env` (dry runs with your identity) |
+| `scripts/build-anomaly-detector-image.sh` | Build the detector image in ACR and point the job at it (also run by `postprovision`) |
 
 ## Contributing
 

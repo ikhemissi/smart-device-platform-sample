@@ -119,10 +119,24 @@ Exact built-in role names are verified at implementation; a scoped custom role i
 | Topic | Guideline |
 |---|---|
 | Model | Default deployment `gpt-6-luna` (version `2026-09-22`), SKU DataZoneStandard (EU), 50K tokens/min; name, version, SKU and capacity are azd settings (`AGENT_MODEL_*`) checked against quota before provisioning (`scripts/check-model-quota.sh`). |
-| Foundry | AI Services account with local authentication disabled and a project connected to Application Insights; the agent identity only holds `Cognitive Services OpenAI User`. |
+| Foundry | AI Services account with local authentication disabled and a project connected to Application Insights; the agent identity only holds `Cognitive Services OpenAI User` (the anomaly detector holds Foundry User, see below). |
 | Conversations | Stored in Azure Managed Redis, owner-bound (`oid`), sliding expiry 1 h, max 50 messages. |
 | API | Server-Sent Events (`delta`, `tool`, `done` with citations); the SPA uses `fetch`-based SSE to send the `Authorization` header. |
 | Guardrails | Read-only tools, max 10 tool calls per turn, bounded tool results, instructions to cite devices/periods and to ignore instructions found in data. |
 | Limits | 20 messages per minute per user, enforced exactly by the agent (sliding window in Redis, 429 with `Retry-After`); APIM keeps the same limit as an outer guard (its counters are approximate). |
 | Responsiveness | Model called through the Responses API (`store=false`) with reasoning effort `low` (configurable): the first answer text must arrive within 5 s for ≥ 90 % of evaluation questions. |
 | Evaluation | `agents/device-analyst/evals/questions.jsonl` (PRD-006 questions and edge cases) scored for groundedness, relevance and tool-call accuracy with Azure AI Evaluation, plus code-based checks; thresholds in the agent's README, the script fails below them. |
+| Anomaly tool | `list_anomalies` is registered only where anomaly detection runs (`SDP_ANOMALIES_ENABLED`); it reports classifications and confidences as recorded and never reclassifies. |
+
+### Model-based analysis (anomaly detection, ADR-0011)
+
+| Topic | Guideline |
+|---|---|
+| Shape | Python job (`agents/anomaly-detector`, same conventions as the agent) on a Container Apps schedule (every 5 min, one cycle per run, 4-minute timeout, no retry: the next cycle retries); image built in ACR by `scripts/build-anomaly-detector-image.sh` from `postprovision`. |
+| Roles | Statistics select candidates; `Microsoft-Decision-1` (deployment `decision-1`: deployment names must not contain "Microsoft") classifies with a probability per class; `gpt-6-luna` explains confirmed anomalies from the decision's data only. The decision client is behind an interface so another scorer can replace the preview model. |
+| Access | Workload identity with **Foundry User** on the Foundry account (the decision API needs `accounts/AIServices/providers/action`, outside `Cognitive Services OpenAI User`), PostgreSQL group role `sdp_insights` (reads data, writes `sdp.anomalies` only); the device API records reviews only. |
+| Decisions | Every classification is stored with all probabilities, the threshold applied, the model and version; a failed call leaves the candidate `pending` for the next cycle; reviews never change the automated decision. |
+| Context for the model | Data only (no instructions): the window's statistics, the device's usual value, spread and usual range for that hour, its open anomalies, and the same metric's scores on the other devices of the site **over the candidate's period**. |
+| Tuning | Thresholds are settings (`ANOMALY_DEVIATION`, `ANOMALY_CONFIDENCE`) chosen with dry runs over the environment's data (`--dry-run [--classify]`, nothing written); record the measured counts in the detector's README. |
+| Switch | `ANOMALY_DETECTION_ENABLED=false` removes the job and the decision deployment; the portal and the agent follow (`anomaliesEnabled`, `SDP_ANOMALIES_ENABLED`). |
+| Telemetry | One cycle = one Application Insights request `sdp.anomaly.cycle` (role `sdp-anomaly-detector`) with its counts, child spans `sdp.anomaly.classify` (probabilities) and `sdp.anomaly.explain` (token usage); Azure SDK token requests are not traced. |

@@ -31,6 +31,7 @@ How to work on this repository. These rules come from how the demonstrator was b
 - Region `francecentral` for everything except Static Web Apps (`eastus2`). Every resource carries the tags `SecurityControl=Ignore` and `CostControl=Ignore`.
 - API Management: Basic v2 by default (Standard v2 only for VNet integration or private endpoints).
 - AI model: `gpt-6-luna` (DataZoneStandard, EU) on the environment's Foundry account; check quota before changing it.
+- Decision model: `Microsoft-Decision-1` (deployment `decision-1`, DataZoneStandard) for anomaly detection; switch it off with `ANOMALY_DETECTION_ENABLED=false`. Tune detection with dry runs, not by trial in the environment.
 
 ## Security (non-negotiable)
 
@@ -47,6 +48,7 @@ How to work on this repository. These rules come from how the demonstrator was b
 | Integration tests | Testcontainers on **Podman** (no Docker locally; CI uses the runner's Docker) | `DOCKER_HOST=unix:///run/user/$(id -u)/podman/podman.sock TESTCONTAINERS_RYUK_DISABLED=true` |
 | Portal | React, TypeScript, Vite, Fluent UI v9 | `npm run lint`, `npx tsc -b`, `npm test`, `bash scripts/e2e-podman.sh` (offline Playwright), `bash scripts/e2e-environment.sh` (against sdp-dev) |
 | AI agent | Python 3.13, uv, FastAPI, Microsoft Agent Framework | `uv run pytest`, `uv run ruff check src tests`, `uv run --group eval python evals/run_eval.py` |
+| Anomaly detector | Python 3.13, uv, psycopg, httpx, openai | `uv run pytest`, `uv run pytest -m live` (after `scripts/anomaly-env.sh`), `uv run anomaly-detector --dry-run --days 7 [--classify]` |
 | Infrastructure | Terraform via azd | `terraform -chdir=infra fmt -recursive`, `terraform -chdir=infra validate` |
 
 - OpenAPI documents are generated from code and committed (`services/*/openapi.json`, `agents/device-analyst/openapi.json`); a test fails when they drift. API Management imports them.
@@ -69,5 +71,8 @@ How to work on this repository. These rules come from how the demonstrator was b
 - Locally, use **Podman** for anything that needs a container engine (`docker` is not functional on the development machine). Scripts pick `podman`, then `docker`; `CONTAINER_CLI` overrides (CI sets `docker`).
 - On a busy machine `az` calls can exceed azd's timeout (`AzureCLICredential: signal: killed`); retry, or deploy the portal with the Static Web Apps CLI.
 - Application Insights counts 4xx responses as failed requests.
+- KQL reserved words cannot be column aliases (e.g. `cycles=count()` fails with a vague "BadArgumentError: The request had some invalid properties"): rename the alias.
+- Anomaly injections restart the simulator; an anomaly ending less than 15 minutes before the next one on the same device and metric extends it (one episode). Use other devices, or wait, between demo injections.
+- `az containerapp job update` can hang after applying: check the image with `az containerapp job show`.
 - Foundry deployment names must not contain the reserved word "Microsoft" (e.g. `decision-1` for `Microsoft-Decision-1`).
 - `Cognitive Services OpenAI User` only covers Azure OpenAI models; other Foundry models (e.g. the decision API) need *Foundry User*. A `PermissionDenied` error names the missing data action.
