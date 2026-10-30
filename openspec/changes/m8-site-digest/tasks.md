@@ -19,7 +19,7 @@
 ## 4. Portal
 
 - [x] 4.1 `digestsEnabled` in `config.json`; *Digest* card on the site page with figures, linked device ids, *Regenerate* for Editors and the pending state (design D7); verify component tests and the offline Playwright suite (including accessibility)
-- [ ] 4.2 Deploy the portal; verify with the user in the environment (digest of `paris-01`, regenerate it)
+- [x] 4.2 Deploy the portal; verify with the user in the environment (digest of `paris-01`, regenerate it)
 
 ## 5. Assistant
 
