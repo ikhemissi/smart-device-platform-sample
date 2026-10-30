@@ -2,10 +2,6 @@ from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 
 import pytest
-from opentelemetry import trace
-from opentelemetry.sdk.trace import TracerProvider
-from opentelemetry.sdk.trace.export import SimpleSpanProcessor
-from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 from opentelemetry.trace import SpanKind
 
 from anomaly_detector.config import Settings
@@ -16,17 +12,10 @@ from anomaly_detector.explanation import Explanation
 from anomaly_detector.replay import MemoryStore, ReplaySource, dry_run
 
 from .test_detection import DEVICE, WINDOW, rollups, series, temperature
+from .tracing import EXPORTER
 
 NOW = datetime(2026, 10, 29, 15, 0, tzinfo=UTC)
 DEVICES = [Device(DEVICE, "paris-01", "Cold room 1", "ruuvi-v5")]
-EXPORTER = InMemorySpanExporter()
-
-
-@pytest.fixture(scope="module", autouse=True)
-def tracing():
-    provider = TracerProvider()
-    provider.add_span_processor(SimpleSpanProcessor(EXPORTER))
-    trace.set_tracer_provider(provider)
 
 
 @pytest.fixture
