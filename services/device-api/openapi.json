@@ -1465,7 +1465,7 @@
             "format" : "date-time"
           },
           "figures" : {
-            "type" : "string",
+            "type" : "object",
             "description" : "Devices, metrics, alerts, anomalies, rejected messages and certificates of the period, as computed by the platform"
           },
           "generatedAt" : {

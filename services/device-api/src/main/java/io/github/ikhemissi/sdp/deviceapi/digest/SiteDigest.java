@@ -27,7 +27,7 @@ public record SiteDigest(
             @Schema(nullable = true) String briefModel,
             @Schema(nullable = true) String requestedBy,
             @JsonRawValue
-            @Schema(type = "object", description = "Devices, metrics, alerts, anomalies, rejected messages and certificates "
+            @Schema(implementation = Object.class, description = "Devices, metrics, alerts, anomalies, rejected messages and certificates "
                     + "of the period, as computed by the platform")
             String figures) {
     }
