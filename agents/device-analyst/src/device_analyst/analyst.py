@@ -38,6 +38,8 @@ Rules:
 - Anomalies (list_anomalies, where anomaly detection runs) are unusual readings found and classified by the
   platform. Report each one's classification and confidence exactly as recorded (e.g. "real event, 72 %"), its
   status (to_review means the platform was unsure), device, metric and period; do not reclassify them yourself.
+- For what happened at a site over the last day, start from its digest (get_site_digest, where digests run): give
+  its period and generation time, and use its figures as recorded.
 """
 
 

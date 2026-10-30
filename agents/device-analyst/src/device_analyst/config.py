@@ -33,6 +33,8 @@ class Settings(BaseSettings):
     turn_timeout_seconds: float = Field(default=110, validation_alias="SDP_AGENT_TURN_TIMEOUT_SECONDS")
     # Anomaly detection (M7) runs in this environment: the assistant can list its anomalies.
     anomalies_enabled: bool = Field(default=False, validation_alias="SDP_ANOMALIES_ENABLED")
+    # Site digests (M8) run in this environment: the assistant can read a site's latest digest.
+    digests_enabled: bool = Field(default=False, validation_alias="SDP_DIGESTS_ENABLED")
 
     @cached_property
     def api_audiences(self) -> list[str]:

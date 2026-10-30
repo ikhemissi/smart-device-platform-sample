@@ -285,6 +285,61 @@ async def test_anomaly_tool_only_where_detection_runs(platform_api):
     assert "list_anomalies" in {t.name for t in build_tools(platform_api, anomalies=True)}
 
 
+DIGEST = {
+    "siteId": "lyon-01",
+    "enabled": True,
+    "digest": {
+        "id": 4,
+        "trigger": "requested",
+        "periodFrom": "2026-10-29T15:55:21Z",
+        "periodTo": "2026-10-30T15:55:21Z",
+        "comparisonFrom": "2026-10-22T15:55:21Z",
+        "generatedAt": "2026-10-30T15:55:21Z",
+        "brief": "All 10 devices are reporting.",
+        "briefModel": "gpt-6-luna",
+        "requestedBy": "Erin",
+        "figures": {
+            "site": {"id": "lyon-01"},
+            "period": {},
+            "comparison": {},
+            "devices": {"total": 10, "reporting": 10},
+            "metrics": [{"metric": "temperature", "average": 20.123456}],
+        },
+    },
+    "pendingRequest": None,
+}
+
+
+@respx.mock
+async def test_site_digest_returns_the_brief_and_figures_and_cites_the_site(platform_api, context):
+    tools = {t.name: t for t in build_tools(platform_api, now=lambda: NOW, digests=True)}
+    respx.get(f"{API}/sites/lyon-01/digest").respond(json=DIGEST)
+
+    result = data(await call(tools, "get_site_digest", site_id="lyon-01"))
+
+    assert result["brief"] == "All 10 devices are reporting."
+    assert (result["periodFrom"], result["generatedAt"]) == ("2026-10-29T15:55:21Z", "2026-10-30T15:55:21Z")
+    assert result["figures"] == {
+        "devices": {"total": 10, "reporting": 10},
+        "metrics": [{"metric": "temperature", "average": 20.123}],
+    }
+    assert result["newDigestRequested"] is False
+    assert context.citations == [{"kind": "site", "siteId": "lyon-01"}]
+
+
+@respx.mock
+async def test_site_without_digest(platform_api):
+    tools = {t.name: t for t in build_tools(platform_api, now=lambda: NOW, digests=True)}
+    respx.get(f"{API}/sites/nice-01/digest").respond(json={"siteId": "nice-01", "enabled": False, "digest": None})
+    result = data(await call(tools, "get_site_digest", site_id="nice-01"))
+    assert result["note"] == "this site has no digests in this environment"
+
+
+async def test_digest_tool_only_where_digests_run(platform_api):
+    assert "get_site_digest" not in {t.name for t in build_tools(platform_api)}
+    assert "get_site_digest" in {t.name for t in build_tools(platform_api, digests=True)}
+
+
 async def test_tools_are_read_only():
     names = {t.name for t in build_tools(None)}  # type: ignore[arg-type]
     assert names == {

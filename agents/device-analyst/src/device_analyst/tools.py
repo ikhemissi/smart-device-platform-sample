@@ -98,10 +98,13 @@ ANOMALY_FIELDS = (
 
 
 def build_tools(
-    api: PlatformApi, now: Callable[[], datetime] = lambda: datetime.now(UTC), anomalies: bool = False
+    api: PlatformApi,
+    now: Callable[[], datetime] = lambda: datetime.now(UTC),
+    anomalies: bool = False,
+    digests: bool = False,
 ) -> list[FunctionTool]:
-    """The tools, bound to a platform API client. Times default to now and the previous 24 hours. The anomaly tool is
-    available only where anomaly detection is enabled (M7)."""
+    """The tools, bound to a platform API client. Times default to now and the previous 24 hours. The anomaly and digest
+    tools are available only where anomaly detection (M7) and site digests (M8) run."""
 
     def window(
         from_time: str | None, to_time: str | None, default: timedelta = timedelta(hours=24)
@@ -334,6 +337,35 @@ def build_tools(
             _recorder().cite({"kind": "site", "siteId": site_id})
         return as_data({"from": iso(start), "to": iso(end), **bounded(items)})
 
+    @tool(
+        description="The latest daily digest of a site: a short brief written by the platform from computed "
+        "figures (devices reporting and silent, metric averages over the last 24 hours compared with the 7 days "
+        "before, alerts, anomalies, rejected messages, certificates expiring soon), with its period and generation "
+        "time. Use it for 'what happened at <site>' questions."
+    )
+    async def get_site_digest(site_id: Annotated[str, Field(description="Site id, e.g. lyon-01")]) -> str:
+        try:
+            result = await call(f"/sites/{segment(site_id)}/digest")
+        except ApiError as e:
+            return error(e)
+        _recorder().cite({"kind": "site", "siteId": site_id})
+        digest = result.get("digest")
+        if not result.get("enabled"):
+            return as_data({"siteId": site_id, "digest": None, "note": "this site has no digests in this environment"})
+        if digest is None:
+            return as_data({"siteId": site_id, "digest": None, "note": "no digest yet"})
+        return as_data(
+            {
+                "siteId": site_id,
+                "periodFrom": digest["periodFrom"],
+                "periodTo": digest["periodTo"],
+                "generatedAt": digest["generatedAt"],
+                "brief": digest.get("brief"),
+                "figures": {k: v for k, v in digest["figures"].items() if k not in ("site", "period", "comparison")},
+                "newDigestRequested": result.get("pendingRequest") is not None,
+            }
+        )
+
     return [
         list_sites,
         fleet_status,
@@ -345,6 +377,7 @@ def build_tools(
         list_alerts,
         get_thresholds,
         *([list_anomalies] if anomalies else []),
+        *([get_site_digest] if digests else []),
     ]
 
 
