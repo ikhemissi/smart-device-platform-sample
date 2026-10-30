@@ -50,6 +50,8 @@ Status: highest option `real_event`/`sensor_fault` with p ≥ `ANOMALY_CONFIDENC
 
 Observed on `sdp-dev` (live calls on real states): the neighbours drive the call. One device deviating alone (step or gradual +10 °C, z ≈ 25) → `sensor_fault` 0.975–0.989; the same rise on three devices of the site → `real_event` 0.964; a stuck value → `sensor_fault` 0.97; the largest natural deviation of the day (pressure, z = −2.9) → `real_event` 0.665 (to review at 0.7).
 
+End-to-end on `sdp-dev` (task 2.9): one device forced at once to 35 °C → confirmed `sensor_fault` 0.98, detected 4.5 min after the start; three devices warming gradually to 32 °C over 10 minutes (`32~10m`) → two confirmed `real_event` (0.72, 0.77) and one to review (0.49), detected within 4 minutes. A 15 °C rise in 5 minutes on three devices still read as a sensor fault: a demo uses a plausible warm-up rate. Neighbours are scored over the candidate's own period (the whole window diluted a change that had just started) and limited to the same site.
+
 Failure handling: a candidate whose classification failed is stored as **pending** and re-submitted by the next cycle (still within the 10-minute target when the failure is transient); the cycle span records the error.
 
 ### D4. Explanation by gpt-6-luna
