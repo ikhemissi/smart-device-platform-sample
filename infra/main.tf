@@ -24,6 +24,11 @@ locals {
   anomaly_detection_enabled = lower(coalesce(var.anomaly_detection_enabled, "true")) != "false"
   anomaly_sites             = coalesce(var.anomaly_sites, "paris-01")
   digest_enabled            = lower(coalesce(var.digest_enabled, "true")) != "false"
+  maintenance_enabled       = lower(coalesce(var.maintenance_enabled, "true")) != "false"
+  # Microsoft-Decision-1 serves both anomaly detection (M7) and maintenance (M9).
+  decision_model_enabled = local.anomaly_detection_enabled || local.maintenance_enabled
+  # Empty: one aging Ruuvi device per demo site (M9 design D11).
+  simulator_aging_devices = coalesce(trimspace(var.simulator_aging_devices), join(",", [for site in var.demo_sites : "${site}-ruuvi5-003"]))
 }
 
 resource "azurerm_resource_group" "main" {
@@ -177,11 +182,14 @@ module "apps" {
     checkpoint_container_url = module.ingestion.checkpoint_container_url
     partition_count          = module.ingestion.event_hub_partition_count
   }
-  dps_id_scope           = module.ingestion.dps_id_scope
-  key_vault_uri          = module.core.key_vault_uri
-  decoder_image          = var.decoder_image
-  simulator_image        = var.simulator_image
-  simulator_settings     = merge({ SDP_SIM_SITES = join(",", var.demo_sites) }, var.simulator_settings)
+  dps_id_scope    = module.ingestion.dps_id_scope
+  key_vault_uri   = module.core.key_vault_uri
+  decoder_image   = var.decoder_image
+  simulator_image = var.simulator_image
+  simulator_settings = merge({
+    SDP_SIM_SITES         = join(",", var.demo_sites)
+    SDP_SIM_AGING_DEVICES = local.simulator_aging_devices
+  }, var.simulator_settings)
   device_api_image       = var.device_api_image
   provisioning_api_image = var.provisioning_api_image
   provisioning = {
@@ -232,6 +240,14 @@ module "apps" {
     sites   = trimspace(var.digest_sites)
     metrics = coalesce(var.digest_metrics, "temperature,humidity,pressure,co2,illuminance,battery_voltage,battery_level")
   }
+  maintenance = {
+    enabled = local.maintenance_enabled
+    # Empty: every site.
+    sites               = trimspace(var.maintenance_sites)
+    confidence          = coalesce(var.maintenance_confidence, "0.5")
+    decision_endpoint   = module.foundry.account_endpoint
+    decision_deployment = module.foundry.decision_model_deployment_name
+  }
   tags = local.tags
 
   # Workload identities must hold their roles before the apps start.
@@ -267,7 +283,7 @@ module "foundry" {
     sku      = coalesce(var.agent_model_sku, "DataZoneStandard")
     capacity = tonumber(coalesce(var.agent_model_capacity, "50"))
   }
-  decision_model = local.anomaly_detection_enabled ? {
+  decision_model = local.decision_model_enabled ? {
     capacity = tonumber(coalesce(var.decision_model_capacity, "30"))
   } : null
   application_insights = {

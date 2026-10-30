@@ -21,7 +21,7 @@ variable "model" {
   })
 }
 variable "decision_model" {
-  description = "Microsoft-Decision-1 deployment of the anomaly detector (M7 design D6); null when the feature is off."
+  description = "Microsoft-Decision-1 deployment of the anomaly detector (M7 design D6) and the maintenance job (M9 design D4); null when both are off."
   type        = object({ capacity = number })
   default     = null
 }

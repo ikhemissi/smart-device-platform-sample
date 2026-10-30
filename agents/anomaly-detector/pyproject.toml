@@ -20,6 +20,7 @@ dependencies = [
 [project.scripts]
 anomaly-detector = "anomaly_detector:main"
 site-digest = "anomaly_detector:site_digest"
+maintenance = "anomaly_detector:maintenance"
 
 [build-system]
 requires = ["uv_build>=0.13.5,<0.14.0"]
