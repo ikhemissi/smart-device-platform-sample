@@ -16,7 +16,7 @@ Tasks marked **[cloud agent]** are implemented and verified offline (no Azure ac
 ## 2. Maintenance job
 
 - [x] 2.1 [cloud agent] Battery forecast (design D2) as pure functions; verify unit tests: steady decline gives the expected days left, a replacement (jump up) and a model change (jump down) start a new segment, recent days weigh more, less than 24 hours gives the level only, voltage and level cut-offs
-- [ ] 2.2 [cloud agent] Data loading and reporting signals (design D3) with plain-row loaders and pure computations; verify unit tests on seeded rows (gaps, silence, rejected messages, devices without battery)
+- [x] 2.2 [cloud agent] Data loading and reporting signals (design D3) with plain-row loaders and pure computations; verify unit tests on seeded rows (gaps, silence, rejected messages, devices without battery)
 - [ ] 2.3 [cloud agent] Intervention probability (design D4) and work orders (design D6); verify unit tests with mocked HTTP (state holds the signals only, probability parsed, failure keeps the previous assessment, work order prompt and grounding check, failure leaves no work order)
 - [ ] 2.4 [cloud agent] Run orchestration and queue lifecycle (design D5), storage, telemetry (request span before connecting, children per decision and work order) and `maintenance --dry-run [--site]` (prints assessments and the queue changes, writes nothing, `--no-models` skips model calls); verify unit tests with fakes (open, update, refresh work order after 24 h, resolve, done blocks for 7 days, one item per device)
 - [ ] 2.5 [Azure] Live checks: a dry run against `sdp-dev` (forecasts of the aging devices, signals of all devices, live decision and work order); fix what the live data reveals
