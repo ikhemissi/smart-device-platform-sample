@@ -41,5 +41,5 @@ Tasks marked **[cloud agent]** are implemented and verified offline (no Azure ac
 ## 6. CI, documentation and demo
 
 - [ ] 6.1 [cloud agent] CI covers the new code; verify a green CI run on the PR
-- [ ] 6.2 [cloud agent] README (capability, flow, settings), detector README, AGENTS.md, implementation guidelines (§10) and the demo guide `docs/demo/m9-maintenance.md` (draft); verify links and offline commands
+- [x] 6.2 [cloud agent] README (capability, flow, settings), detector README, AGENTS.md, implementation guidelines (§10) and the demo guide `docs/demo/m9-maintenance.md` (draft); verify links and offline commands
 - [ ] 6.3 [Azure] Verify the demo guide as written (with the user for the portal steps); merge the PR; archive the change

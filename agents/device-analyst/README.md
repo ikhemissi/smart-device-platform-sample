@@ -29,7 +29,9 @@ keeps its 50 latest messages; a second message while one is being answered gets 
 answers without buffering (`openapi.json` is imported by the gateway; a test keeps it in line with the routes).
 
 Tools (all read-only): `list_sites`, `fleet_status`, `metric_summary`, `search_devices`, `get_device`,
-`get_latest_measurements`, `get_series`, `list_alerts`, `get_thresholds` — see `src/device_analyst/tools.py`.
+`get_latest_measurements`, `get_series`, `list_alerts`, `get_thresholds`, and where the jobs run `list_anomalies`
+(`SDP_ANOMALIES_ENABLED`), `get_site_digest` (`SDP_DIGESTS_ENABLED`) and `list_maintenance` (`SDP_MAINTENANCE_ENABLED`)
+— see `src/device_analyst/tools.py`.
 
 ## Configuration
 

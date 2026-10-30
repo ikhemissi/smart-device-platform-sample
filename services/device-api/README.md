@@ -21,6 +21,9 @@ Platform API for the device catalog, telemetry history and alerting: the signed-
 | `DELETE /api/v1/devices/{deviceId}/thresholds/{thresholdId}` | `DeviceData.Write` | Deletes a threshold (204) and closes its open alert without email; its past alerts are kept. `If-Match` is optional |
 | `GET /api/v1/devices/{deviceId}/alerts` | `DeviceData.Read` | The device's alerts open at some point between `from` (default 30 days ago) and `to` (default now; at most 92 days), most recent first (`limit` default 100, maximum 500) |
 | `GET /api/v1/alerts` | `DeviceData.Read` | Alerts of all devices, filtered by `status` (`open`, `closed`, `cancelled`) and `siteId`, same period and limit |
+| `GET /api/v1/maintenance` | `DeviceData.Read` | Maintenance queue (M9), most likely first: `siteId`, `status` (repeated or comma-separated; default `open,planned`), `limit` (≤ 200). Empty when maintenance is off |
+| `GET /api/v1/devices/{deviceId}/maintenance` | `DeviceData.Read` | `{enabled, assessment, item}`: the device's latest battery forecast, signals and probability, and its queue item; `enabled` is false when maintenance is off or does not assess the site |
+| `POST /api/v1/maintenance/{itemId}/status` | `DeviceData.Write` | `{status: planned \| done, comment?}` (comment ≤ 1000); 409 for a `done` or `resolved` item. Settings `SDP_MAINTENANCE_ENABLED`, `SDP_MAINTENANCE_SITES` |
 
 - A device is `reporting` when it was last seen within `SDP_REPORTING_WINDOW` (15 minutes), `silent` otherwise.
 - The ETag covers only the editable fields and the last change, so incoming telemetry does not invalidate an edit in progress.
@@ -54,7 +57,8 @@ The OpenAPI 3.0 document is [openapi.json](openapi.json). API Management imports
   - `SELECT` on sites, devices, measurements and metric definitions;
   - `UPDATE` only on the editable device columns and the audit columns;
   - thresholds: full access to `alert_thresholds` and their evaluation state (locked during a change, so it is serialised with the alert service);
-  - alerts: `SELECT`, and `UPDATE` of `status` and `closed_at` only (cancellation).
+  - alerts: `SELECT`, and `UPDATE` of `status` and `closed_at` only (cancellation);
+  - maintenance: `SELECT` on assessments and items, and `UPDATE` of the items' status columns only (`status`, `status_by`, `status_at`, `status_comment`, `updated_at`).
 
   Edits record the editor's object id (`updated_by`), display name (`updated_by_name`) and time.
 
