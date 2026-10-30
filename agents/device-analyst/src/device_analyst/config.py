@@ -31,6 +31,8 @@ class Settings(BaseSettings):
     reasoning_effort: str = Field(default="low", validation_alias="SDP_AGENT_REASONING_EFFORT")
     max_tool_calls: int = Field(default=10, validation_alias="SDP_AGENT_MAX_TOOL_CALLS")
     turn_timeout_seconds: float = Field(default=110, validation_alias="SDP_AGENT_TURN_TIMEOUT_SECONDS")
+    # Anomaly detection (M7) runs in this environment: the assistant can list its anomalies.
+    anomalies_enabled: bool = Field(default=False, validation_alias="SDP_ANOMALIES_ENABLED")
 
     @cached_property
     def api_audiences(self) -> list[str]:

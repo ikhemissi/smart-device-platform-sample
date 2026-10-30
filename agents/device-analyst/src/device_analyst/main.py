@@ -52,7 +52,8 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     )
     app.state.token_validator = TokenValidator(settings.tenant_id, settings.api_audiences)
     app.state.store = ConversationStore(redis, settings.conversation_ttl_seconds, settings.max_conversation_messages)
-    app.state.analyst = Analyst(client, build_tools(PlatformApi(http)), reasoning_effort=settings.reasoning_effort)
+    tools = build_tools(PlatformApi(http), anomalies=settings.anomalies_enabled)
+    app.state.analyst = Analyst(client, tools, reasoning_effort=settings.reasoning_effort)
     try:
         # Warm up before the first readiness probe: the Redis connection and the model's Entra token (getting the
         # first token takes seconds, which would delay the first answer).

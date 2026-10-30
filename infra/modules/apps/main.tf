@@ -195,6 +195,7 @@ locals {
     SDP_REDIS_HOST                        = var.redis.host
     SDP_REDIS_PORT                        = tostring(var.redis.port)
     SDP_AGENT_CAPTURE_CONTENT             = tostring(var.foundry.capture_content)
+    SDP_ANOMALIES_ENABLED                 = tostring(var.anomaly_detection.enabled)
   }
 
   # Python job (M7 design D1/D10): PostgreSQL with an Entra token as password, models with the workload identity.

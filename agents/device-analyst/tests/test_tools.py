@@ -199,6 +199,92 @@ async def test_device_alerts_filter_status_and_default_to_seven_days(tools):
     assert result["items"] == [{"id": 1, "status": "open", "metric": "temperature"}]
 
 
+ANOMALY = {
+    "id": 9,
+    "deviceId": "paris-01-ruuvi5-001",
+    "deviceName": None,
+    "siteId": "paris-01",
+    "metric": "temperature",
+    "unit": "°C",
+    "kind": "deviation",
+    "startedAt": "2026-10-28T08:56:48Z",
+    "endedAt": "2026-10-28T09:09:49Z",
+    "observedMin": 20.512345,
+    "observedMax": 32.3,
+    "observedMean": 28.1,
+    "observedLast": 32.0,
+    "usualValue": 19.4,
+    "spread": 0.2,
+    "score": 42.2,
+    "status": "confirmed",
+    "decision": "confirmed",
+    "classification": "real_event",
+    "confidence": 0.7225,
+    "probabilities": {"real_event": 0.7225, "sensor_fault": 0.25},
+    "decisionModel": "microsoft-decision-1",
+    "explanation": "Device paris-01-ruuvi5-001 warmed up.",
+    "review": {"reviewedAt": "2026-10-28T10:00:00Z", "reviewedBy": "Erin", "verdict": "correct", "comment": None},
+}
+
+
+@pytest.fixture
+def anomaly_tools(platform_api):
+    return {t.name: t for t in build_tools(platform_api, now=lambda: NOW, anomalies=True)}
+
+
+@respx.mock
+async def test_site_anomalies_default_to_confirmed_and_to_review_over_seven_days(anomaly_tools, context):
+    route = respx.get(f"{API}/anomalies").respond(json=[ANOMALY])
+
+    result = data(await call(anomaly_tools, "list_anomalies", site_id="paris-01"))
+
+    params = route.calls.last.request.url.params
+    assert (params["siteId"], params["status"], params["from"]) == (
+        "paris-01",
+        "confirmed,to_review",
+        "2026-10-21T12:00:00Z",
+    )
+    [item] = result["items"]
+    assert (item["classification"], item["confidence"], item["status"]) == ("real_event", 0.723, "confirmed")
+    assert item["observedMin"] == 20.512
+    assert "probabilities" not in item and "decisionModel" not in item and "score" not in item
+    assert item["review"] == {"verdict": "correct", "reviewedBy": "Erin"}
+    assert context.citations == [
+        {
+            "kind": "device",
+            "deviceId": "paris-01-ruuvi5-001",
+            "metrics": ["temperature"],
+            "from": "2026-10-28T08:56:48Z",
+            "to": "2026-10-28T09:09:49Z",
+        }
+    ]
+
+
+@respx.mock
+async def test_device_anomalies_accept_a_name_and_statuses(anomaly_tools):
+    respx.get(f"{API}/devices/Cold%20room/anomalies").respond(
+        404, json={"detail": "Device 'Cold room' does not exist."}
+    )
+    respx.get(f"{API}/devices").respond(
+        json={"items": [{"deviceId": "paris-01-ruuvi5-001", "displayName": "Cold room"}]}
+    )
+    route = respx.get(f"{API}/devices/paris-01-ruuvi5-001/anomalies").respond(json=[])
+
+    result = data(
+        await call(anomaly_tools, "list_anomalies", device_id="Cold room", status=["dismissed", "reviewed"],
+                   from_time="2026-10-28T00:00:00Z")
+    )  # fmt: skip
+
+    assert route.calls.last.request.url.params["status"] == "dismissed,reviewed"
+    assert route.calls.last.request.url.params["from"] == "2026-10-28T00:00:00Z"
+    assert result["items"] == []
+
+
+async def test_anomaly_tool_only_where_detection_runs(platform_api):
+    assert "list_anomalies" not in {t.name for t in build_tools(platform_api)}
+    assert "list_anomalies" in {t.name for t in build_tools(platform_api, anomalies=True)}
+
+
 async def test_tools_are_read_only():
     names = {t.name for t in build_tools(None)}  # type: ignore[arg-type]
     assert names == {

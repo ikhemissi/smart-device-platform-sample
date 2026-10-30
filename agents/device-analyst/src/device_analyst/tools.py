@@ -90,8 +90,18 @@ Iso = Annotated[str | None, Field(description="ISO 8601 UTC time, e.g. 2026-10-2
 DeviceRef = Annotated[str, Field(description="Device id (e.g. paris-01-ruuvi5-001) or its name (e.g. Lyon cold room)")]
 
 
-def build_tools(api: PlatformApi, now: Callable[[], datetime] = lambda: datetime.now(UTC)) -> list[FunctionTool]:
-    """The tools, bound to a platform API client. Times default to now and the previous 24 hours."""
+# What the assistant needs of an anomaly (M7 design D9): the record without model internals.
+ANOMALY_FIELDS = (
+    "id", "deviceId", "deviceName", "siteId", "metric", "unit", "kind", "startedAt", "endedAt", "observedMin",
+    "observedMax", "observedLast", "usualValue", "status", "classification", "confidence", "explanation", "review",
+)  # fmt: skip
+
+
+def build_tools(
+    api: PlatformApi, now: Callable[[], datetime] = lambda: datetime.now(UTC), anomalies: bool = False
+) -> list[FunctionTool]:
+    """The tools, bound to a platform API client. Times default to now and the previous 24 hours. The anomaly tool is
+    available only where anomaly detection is enabled (M7)."""
 
     def window(
         from_time: str | None, to_time: str | None, default: timedelta = timedelta(hours=24)
@@ -283,6 +293,47 @@ def build_tools(api: PlatformApi, now: Callable[[], datetime] = lambda: datetime
             return error(e)
         return as_data({"deviceId": device_id, "thresholds": thresholds})
 
+    @tool(
+        description="Anomalies found by the platform's anomaly detection on the analysed sites, most recent first: "
+        "unusual readings classified as real_event, sensor_fault, expected_pattern or cannot_tell with a confidence "
+        "(0-1), status confirmed, to_review (the platform was unsure), dismissed or reviewed (an Editor gave a "
+        "verdict), and an explanation. Filter by site, device, status and period (default: last 7 days; default "
+        "statuses: confirmed and to_review)."
+    )
+    async def list_anomalies(
+        site_id: Annotated[str | None, Field(description="Site id")] = None,
+        device_id: Annotated[str | None, Field(description="Device id or name")] = None,
+        status: Annotated[
+            list[Literal["confirmed", "to_review", "dismissed", "reviewed"]] | None,
+            Field(description="Statuses to include (default: confirmed and to_review)"),
+        ] = None,
+        from_time: Iso = None,
+        to_time: Iso = None,
+    ) -> str:
+        start, end = window(from_time, to_time, timedelta(days=7))
+        params: dict[str, Any] = {"from": iso(start), "to": iso(end), "limit": MAX_ITEMS}
+        statuses = ",".join(status or ["confirmed", "to_review"])
+        try:
+            if device_id:
+                device_id, found = await device_call(device_id, "/anomalies", {**params, "status": statuses})
+            else:
+                found = await call("/anomalies", {**params, "siteId": site_id, "status": statuses})
+        except ApiError as e:
+            return error(e)
+        items = []
+        for a in found:
+            _recorder().cite(
+                {"kind": "device", "deviceId": a["deviceId"], "metrics": [a["metric"]], "from": a["startedAt"],
+                 "to": a["endedAt"]}
+            )  # fmt: skip
+            item = {k: a.get(k) for k in ANOMALY_FIELDS}
+            if item["review"]:
+                item["review"] = {k: item["review"].get(k) for k in ("verdict", "reviewedBy", "comment")}
+            items.append(item)
+        if site_id and not items:
+            _recorder().cite({"kind": "site", "siteId": site_id})
+        return as_data({"from": iso(start), "to": iso(end), **bounded(items)})
+
     return [
         list_sites,
         fleet_status,
@@ -293,6 +344,7 @@ def build_tools(api: PlatformApi, now: Callable[[], datetime] = lambda: datetime
         get_series,
         list_alerts,
         get_thresholds,
+        *([list_anomalies] if anomalies else []),
     ]
 
 
