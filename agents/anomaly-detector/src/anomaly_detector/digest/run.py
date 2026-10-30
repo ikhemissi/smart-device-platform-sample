@@ -2,6 +2,7 @@
 model failure left missing. The same logic runs against PostgreSQL and, in tests, against fakes."""
 
 import logging
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime, time, timedelta
 from typing import Any, Protocol
@@ -119,11 +120,12 @@ class DigestRun:
         result.generated.append(self.store.save(site_id, trigger, window, figures, brief, request))
 
 
-def traced_run(digest_run: DigestRun, now: datetime) -> RunResult:
-    """A run as one Application Insights request (SERVER span) with its counts."""
+def traced_run(execute: Callable[[], RunResult]) -> RunResult:
+    """A run as one Application Insights request (SERVER span) with its counts. `execute` connects and runs, so a
+    database failure shows as a failed request too."""
     with tracer.start_as_current_span("sdp.digest.run", kind=SpanKind.SERVER) as span:
         try:
-            result = digest_run.run(now)
+            result = execute()
         except Exception as error:
             span.record_exception(error)
             span.set_status(Status(StatusCode.ERROR, type(error).__name__))

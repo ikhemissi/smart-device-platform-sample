@@ -12,7 +12,7 @@ from azure.identity import DefaultAzureCredential, get_bearer_token_provider
 
 from . import db, telemetry
 from .config import Settings
-from .cycle import Detector, traced_cycle
+from .cycle import CycleResult, Detector, traced_cycle
 from .decision import Classification, Classifier, DecisionClient
 from .explanation import Explainer
 from .pg import PgSource, PgStore
@@ -62,16 +62,15 @@ def run(argv: list[str] | None = None) -> int:
         return _dry_run(args, settings, credential, _Throttled(classifier, 25) if args.classify else None)
 
     telemetry.configure(settings, credential)
-    try:
+    explainer = Explainer(settings.openai_endpoint, settings.model_deployment, token)
+
+    def execute() -> CycleResult:
         with db.connect(settings, credential) as conn:
-            detector = Detector(
-                settings,
-                PgSource(conn, settings),
-                PgStore(conn, settings.sites),
-                classifier,
-                Explainer(settings.openai_endpoint, settings.model_deployment, token),
-            )
-            r = traced_cycle(detector, datetime.now(UTC))
+            store = PgStore(conn, settings.sites)
+            return Detector(settings, PgSource(conn, settings), store, classifier, explainer).run(datetime.now(UTC))
+
+    try:
+        r = traced_cycle(settings.sites, execute)
         log.info(
             "Cycle completed: devices=%d assessed=%d candidates=%d created=%d extended=%d retried=%d decisions=%s "
             "explained=%d errors=%d",

@@ -159,7 +159,8 @@ def test_dry_run_calls_no_model_and_counts_episodes(settings):
 def test_live_cycle_is_one_request_span_with_counts(settings):
     EXPORTER.clear()
     source = history_and_readings(NOW - timedelta(minutes=5), NOW)
-    traced_cycle(detector(settings, source, FakeClassifier(), FakeExplainer()), NOW)
+    d = detector(settings, source, FakeClassifier(), FakeExplainer())
+    traced_cycle(settings.sites, lambda: d.run(NOW))
     spans = {s.name: s for s in EXPORTER.get_finished_spans()}
     cycle = spans["sdp.anomaly.cycle"]
     assert cycle.kind == SpanKind.SERVER

@@ -1,5 +1,6 @@
 from datetime import UTC, datetime, timedelta
 
+import pytest
 from opentelemetry.trace import SpanKind
 
 from anomaly_detector.digest.brief import Brief
@@ -109,10 +110,23 @@ def test_a_failed_brief_is_kept_without_brief_then_added_by_a_later_run():
 
 def test_a_run_is_one_request_span_with_its_counts():
     EXPORTER.clear()
-    traced_run(DigestRun(FakeSource(sites=["paris-01"]), FakeStore(), FakeBriefer()), MORNING)
+    traced_run(lambda: DigestRun(FakeSource(sites=["paris-01"]), FakeStore(), FakeBriefer()).run(MORNING))
     spans = {s.name: s for s in EXPORTER.get_finished_spans()}
     run = spans["sdp.digest.run"]
     assert run.kind == SpanKind.SERVER
     assert (run.attributes["sdp.digest.sites"], run.attributes["sdp.digest.scheduled"]) == (1, 1)
     assert spans["sdp.digest.figures"].parent.span_id == run.context.span_id
     assert spans["sdp.digest.figures"].attributes["sdp.digest.site"] == "paris-01"
+
+
+def test_a_failure_before_the_run_is_a_failed_request():
+    EXPORTER.clear()
+
+    def unreachable():
+        raise TimeoutError("connection timeout expired")
+
+    with pytest.raises(TimeoutError):
+        traced_run(unreachable)
+    [run] = [s for s in EXPORTER.get_finished_spans() if s.name == "sdp.digest.run"]
+    assert not run.status.is_ok
+    assert run.events[0].name == "exception"

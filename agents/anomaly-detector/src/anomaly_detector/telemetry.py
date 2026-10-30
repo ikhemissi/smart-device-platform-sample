@@ -32,7 +32,9 @@ def configure(settings: Settings, credential: TokenCredential) -> None:
                 for name in ("azure_sdk", "requests", "urllib", "urllib3", "django", "fastapi", "flask", "psycopg2")
             },
         )
-    HTTPXClientInstrumentor().instrument()
+    instrumentor = HTTPXClientInstrumentor()
+    if not instrumentor.is_instrumented_by_opentelemetry:  # the distro may have instrumented httpx already
+        instrumentor.instrument()
 
 
 def flush() -> None:

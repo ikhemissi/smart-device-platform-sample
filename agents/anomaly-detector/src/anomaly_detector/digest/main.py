@@ -13,7 +13,7 @@ from .. import db, telemetry
 from .brief import Briefer
 from .config import DigestSettings
 from .figures import Window
-from .run import DigestRun, traced_run
+from .run import DigestRun, RunResult, traced_run
 from .store import PgSource, PgStore
 
 log = logging.getLogger("site_digest")
@@ -54,9 +54,13 @@ def run(argv: list[str] | None = None) -> int:
         return 0
 
     telemetry.configure(settings, credential)
-    try:
+
+    def execute() -> RunResult:
         with db.connect(settings, credential) as conn:
-            r = traced_run(DigestRun(PgSource(conn, settings), PgStore(conn), briefer), now)
+            return DigestRun(PgSource(conn, settings), PgStore(conn), briefer).run(now)
+
+    try:
+        r = traced_run(execute)
         log.info("Digest run completed: sites=%d scheduled=%d requested=%d briefs_added=%d errors=%d",
                  r.sites, r.scheduled, r.requested, r.briefs_added, r.errors)  # fmt: skip
         return 0

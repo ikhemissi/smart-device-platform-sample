@@ -24,7 +24,7 @@ def connect(settings: Settings, credential: TokenCredential) -> psycopg.Connecti
         sslmode="require",
         application_name="sdp-anomaly-detector",
         row_factory=dict_row,
-        connect_timeout=15,
+        connect_timeout=30,
         # Each write stands alone: what a cycle recorded is kept even if a later step fails.
         autocommit=True,
     )

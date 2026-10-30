@@ -5,6 +5,7 @@ explanation). The same logic runs live (PostgreSQL) and in dry runs (replayed da
 
 import logging
 from collections import Counter
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from typing import Any, Protocol
@@ -186,12 +187,13 @@ class Detector:
         result.explained += 1
 
 
-def traced_cycle(detector: Detector, now: datetime) -> CycleResult:
-    """A live cycle as one Application Insights request (SERVER span), with its counts as attributes."""
+def traced_cycle(sites: list[str], execute: Callable[[], CycleResult]) -> CycleResult:
+    """A live cycle as one Application Insights request (SERVER span), with its counts as attributes. `execute` connects
+    and runs the cycle, so a database or model failure at any step shows as a failed request."""
     with tracer.start_as_current_span("sdp.anomaly.cycle", kind=SpanKind.SERVER) as span:
-        span.set_attribute("sdp.anomaly.sites", detector.settings.sites)
+        span.set_attribute("sdp.anomaly.sites", sites)
         try:
-            result = detector.run(now)
+            result = execute()
         except Exception as error:
             span.record_exception(error)
             span.set_status(Status(StatusCode.ERROR, type(error).__name__))
