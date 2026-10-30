@@ -9,7 +9,8 @@ cd "$(dirname "$0")/.."
 
 MAVEN_LOG="$(mktemp)"
 UV_LOG="$(mktemp)"
-trap 'rm -f "$MAVEN_LOG" "$UV_LOG"' EXIT
+DETECTOR_UV_LOG="$(mktemp)"
+trap 'rm -f "$MAVEN_LOG" "$UV_LOG" "$DETECTOR_UV_LOG"' EXIT
 # Dependencies and imported BOMs declared by the build (not every artifact the BOMs manage), and parent POMs.
 # Stable releases only (no alpha, beta, milestone, release candidate or snapshot).
 PRERELEASE='(?i).+[-.](alpha|beta|m|rc|cr|milestone|preview|snapshot)[-.]?[0-9]*.*'
@@ -19,12 +20,15 @@ PRERELEASE='(?i).+[-.](alpha|beta|m|rc|cr|milestone|preview|snapshot)[-.]?[0-9]*
 ./mvnw -B -ntp org.codehaus.mojo:versions-maven-plugin:2.23.0:display-parent-updates -Dmaven.version.ignore="$PRERELEASE" \
   >>"$MAVEN_LOG" 2>&1 || true
 (cd agents/device-analyst && uv tree --outdated --depth 1 --frozen) >"$UV_LOG" 2>&1 || echo "UV-FAILED" >>"$UV_LOG"
+(cd agents/anomaly-detector && uv tree --outdated --depth 1 --frozen) >"$DETECTOR_UV_LOG" 2>&1 ||
+  echo "UV-FAILED" >>"$DETECTOR_UV_LOG"
 
-python3 - "$MAVEN_LOG" "$UV_LOG" <<'PY' || echo "_Outdated report failed unexpectedly._"
+python3 - "$MAVEN_LOG" "$UV_LOG" "$DETECTOR_UV_LOG" <<'PY' || echo "_Outdated report failed unexpectedly._"
 import json, re, subprocess, sys, urllib.request
 from pathlib import Path
 
 maven_log, uv_log = Path(sys.argv[1]).read_text(), Path(sys.argv[2]).read_text()
+detector_uv_log = Path(sys.argv[3]).read_text()
 
 
 def get_json(url):
@@ -70,8 +74,9 @@ except Exception as e:  # noqa: BLE001 - informational report
 table("Web portal (npm)", rows, note)
 
 # Python (uv)
-rows = [(m.group(1), m.group(2), m.group(3)) for m in re.finditer(r"── (\S+) v(\S+).*?\(latest: v(\S+)\)", uv_log)]
-table("AI agent (Python)", rows, "uv lookup failed." if "UV-FAILED" in uv_log else None)
+for title, log in (("AI agent (Python)", uv_log), ("Anomaly detector (Python)", detector_uv_log)):
+    rows = [(m.group(1), m.group(2), m.group(3)) for m in re.finditer(r"── (\S+) v(\S+).*?\(latest: v(\S+)\)", log)]
+    table(title, rows, "uv lookup failed." if "UV-FAILED" in log else None)
 
 # Terraform providers: lock file versus registry
 rows, note = [], None

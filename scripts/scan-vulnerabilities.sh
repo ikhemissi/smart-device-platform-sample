@@ -11,16 +11,20 @@ SARIF_DIR=""
 [[ "${1:-}" == "--sarif-dir" ]] && SARIF_DIR="$2"
 
 # Shipped images: the Java services' runtime base image (the services add only their jars, scanned through Maven),
-# and the AI agent's image as built from its Dockerfile (Podman, or Docker when Podman is absent; CONTAINER_CLI overrides).
+# and the Python images (AI agent, anomaly detector) as built from their Dockerfiles (Podman, or Docker when Podman is
+# absent; CONTAINER_CLI overrides).
 ENGINE="${CONTAINER_CLI:-$(command -v podman || command -v docker || true)}"
 [[ -n "$ENGINE" ]] || { echo "podman or docker is required" >&2; exit 1; }
-AGENT_IMAGE_TAR="$(mktemp -d)/device-analyst.tar"
-"$ENGINE" build --quiet -t localhost/sdp-device-analyst:scan agents/device-analyst >/dev/null
-"$ENGINE" save -o "$AGENT_IMAGE_TAR" localhost/sdp-device-analyst:scan
+IMAGE_DIR="$(mktemp -d)"
+for project in device-analyst anomaly-detector; do
+  "$ENGINE" build --quiet -t "localhost/sdp-$project:scan" "agents/$project" >/dev/null
+  "$ENGINE" save -o "$IMAGE_DIR/$project.tar" "localhost/sdp-$project:scan"
+done
 # name=reference (a registry image, or "--input <tar>" for a locally built one); the name keys the SARIF file.
 IMAGES=(
   "java-runtime=$(sed -n 's/^ARG RUNTIME_IMAGE=//p' services/Dockerfile)"
-  "device-analyst=--input $AGENT_IMAGE_TAR"
+  "device-analyst=--input $IMAGE_DIR/device-analyst.tar"
+  "anomaly-detector=--input $IMAGE_DIR/anomaly-detector.tar"
 )
 # Maven dependencies are resolved by Maven into the local repository first; Trivy then reads them offline (resolving
 # them itself from Maven Central gets rate-limited on shared CI runners).
