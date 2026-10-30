@@ -29,4 +29,4 @@
 
 - [x] 6.1 CI and scans cover the new code (same project and image as the detector); verify a green run on `main`
 - [x] 6.2 README (capability, flow, settings), detector README, AGENTS.md and implementation guidelines (§10); verify links and commands
-- [ ] 6.3 Demo guide `docs/demo/m8-site-digest.md`; verify it as written (with the user for the portal steps)
+- [x] 6.3 Demo guide `docs/demo/m8-site-digest.md`; verify it as written (with the user for the portal steps)

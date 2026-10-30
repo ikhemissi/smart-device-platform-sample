@@ -170,7 +170,8 @@ describe('sites', () => {
     expect(await screen.findByRole('status')).toHaveTextContent('Site nice-01 created')
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
     expect(created).toEqual({ siteId: 'nice-01', displayName: 'Nice warehouse' })
-    await user.click(screen.getByRole('link', { name: 'open nice-01' }))
+    // The page stays aria-hidden for a moment after the modal dialog closes: wait until the link is accessible.
+    await user.click(await screen.findByRole('link', { name: 'open nice-01' }))
     expect(router.state.location.pathname).toBe('/sites/nice-01')
     expect(requests.length).toBeGreaterThan(0)
   })
