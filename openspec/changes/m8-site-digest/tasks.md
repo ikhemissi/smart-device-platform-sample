@@ -8,7 +8,7 @@
 ## 2. Digest job
 
 - [x] 2.1 Figures (design D3): devices, metrics with comparison, alerts without recipients, anomalies, rejected messages, expiring certificates, bounded lists; verify unit tests on seeded data and a live computation for `paris-01` against `sdp-dev`
-- [ ] 2.2 Brief with `gpt-6-luna` (design D4); verify unit tests (prompt holds the figures only, failure leaves no brief) and live briefs for `paris-01` and `lyon-01` whose numbers all appear in their figures
+- [x] 2.2 Brief with `gpt-6-luna` (design D4); verify unit tests (prompt holds the figures only, failure leaves no brief) and live briefs for `paris-01` and `lyon-01` whose numbers all appear in their figures
 - [ ] 2.3 Run orchestration (due scheduled digests, requested ones, missing briefs; design D2), persistence, OpenTelemetry (design D10) and `--dry-run --site` (design D11); verify unit tests with fakes and a local dry run against `sdp-dev`
 - [ ] 2.4 Deploy the job; verify the day's digests of every configured site are generated, the run's trace in Application Insights, and that a second run generates nothing
 

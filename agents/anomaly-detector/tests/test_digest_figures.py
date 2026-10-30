@@ -106,6 +106,7 @@ def test_alerts_anomalies_rejections_and_certificates():
     }  # fmt: skip
     anomalies = figures["anomalies"]
     assert anomalies["byStatus"] == {"confirmed": 1, "dismissed": 1}
+    assert anomalies["byClassification"] == {"expected_pattern": 1, "real_event": 1}
     assert [(a["deviceId"], a["confidencePercent"]) for a in anomalies["items"]] == [("paris-01-a", 91)]
     assert figures["rejectedMessages"] == {"total": 4, "byReason": {"truncated": 1, "unknown_format": 3}}
     assert figures["certificates"]["expiringWithin30Days"] == [
@@ -123,5 +124,5 @@ def test_a_quiet_site():
     figures = compute(site(alerts=[], anomalies=[], rejected={}, certificates=[], metrics=[]), Window(AT))
     assert figures["metrics"] == []
     assert figures["alerts"] == {"openNow": 0, "total": 0, "items": []}
-    assert figures["anomalies"] == {"byStatus": {}, "total": 0, "items": []}
+    assert figures["anomalies"] == {"byStatus": {}, "byClassification": {}, "total": 0, "items": []}
     assert figures["rejectedMessages"] == {"total": 0, "byReason": {}}

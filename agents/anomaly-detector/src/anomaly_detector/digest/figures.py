@@ -112,6 +112,7 @@ def compute(data: SiteData, window: Window) -> dict[str, Any]:
     at = window.generated_at
     silent = sorted((d for d in data.devices if at - d.last_seen_at > SILENCE), key=lambda d: d.last_seen_at)
     anomaly_status = Counter(a["status"] for a in data.anomalies)
+    anomaly_classes = Counter(a["classification"] or "pending" for a in data.anomalies)
     expiring = [c for c in data.certificates if c["notAfter"] - at <= CERTIFICATE_WARNING]
     return {
         "site": {"id": data.site_id, "name": data.site_name},
@@ -144,6 +145,7 @@ def compute(data: SiteData, window: Window) -> dict[str, Any]:
         },
         "anomalies": {
             "byStatus": dict(sorted(anomaly_status.items())),
+            "byClassification": dict(sorted(anomaly_classes.items())),
             # Dismissed ones are counted, not listed: they are expected patterns.
             **_bounded(
                 [
