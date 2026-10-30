@@ -11,9 +11,11 @@ import io.github.ikhemissi.sdp.codecs.RejectionReason;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.provider.ValueSource;
 
 /**
  * Spec device-simulation: "Realistic readings", "Real-format payloads", "Fault and anomaly injection".
@@ -85,6 +87,106 @@ class ReadingModelTest {
                 assertThat(d.metrics().get("pressure").doubleValue()).isBetween(990.0, 1030.0);
             });
         }
+    }
+
+    private static double battery(ReadingModel model, Instant at) {
+        return model.next(at).metrics().get("battery_voltage").doubleValue();
+    }
+
+    /** The instant of the device's next new battery (a jump up of the noise-free voltage) after {@code from}. */
+    private static Instant nextReplacement(ReadingModel model, Instant from) {
+        Instant t = from;
+        double previous = model.batteryVolts(t);
+        for (int h = 1; h <= 24 * 401; h++) {
+            Instant next = from.plus(Duration.ofHours(h));
+            double v = model.batteryVolts(next);
+            if (v > previous + 0.01) {
+                return next;
+            }
+            previous = v;
+            t = next;
+        }
+        throw new AssertionError("no replacement within a period");
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void batteryStaysContinuousWhenTheSimulatorRestarts(boolean aging) {
+        SimulatedDevice device = device(PayloadFormat.RUUVI_DF5);
+        Instant now = START.plus(Duration.ofDays(3));
+        double running = battery(new ReadingModel(device, List.of(), START, aging), now);
+        double restarted = battery(new ReadingModel(device, List.of(), now, aging), now);
+        assertThat(restarted).isCloseTo(running, within(0.01));
+    }
+
+    @Test
+    void agingDeviceCrossesTheCutOffWithinSixteenDaysThenGetsANewBattery() {
+        ReadingModel model = new ReadingModel(device(PayloadFormat.RUUVI_DF5), List.of(), START, true);
+        Instant replaced = nextReplacement(model, START);
+        assertThat(Duration.between(START, replaced)).isLessThanOrEqualTo(Duration.ofDays(16));
+        assertThat(battery(model, replaced)).isCloseTo(ReadingModel.NEW_BATTERY_VOLTS, within(0.01));
+
+        Instant crossing = null;
+        double previous = Double.NaN;
+        for (int h = 0; h < 16 * 24; h++) {
+            Instant at = replaced.plus(Duration.ofHours(h));
+            double v = model.batteryVolts(at);
+            if (!Double.isNaN(previous) && h < 15 * 24) {
+                assertThat(previous - v).as("hourly decline at hour %d", h).isBetween(0.0, 0.002);
+            }
+            if (crossing == null && v < 2.5) {
+                crossing = at;
+            }
+            previous = v;
+        }
+        assertThat(crossing).as("crosses 2.5 V").isNotNull();
+        assertThat(Duration.between(replaced, crossing)).isBetween(Duration.ofDays(14), Duration.ofDays(16));
+        Instant again = nextReplacement(model, crossing);
+        assertThat(Duration.between(replaced, again)).isEqualTo(Duration.ofDays(16));
+        assertThat(model.batteryVolts(again)).isCloseTo(ReadingModel.NEW_BATTERY_VOLTS, within(0.001));
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = PayloadFormat.class, names = {"RUUVI_DF5", "RUUVI_DF3"})
+    void normalDeviceStaysAboveTwoPointSevenFiveVoltsForTwoHundredDaysAfterANewBattery(PayloadFormat format) {
+        ReadingModel model = new ReadingModel(device(format), List.of(), START);
+        Instant replaced = nextReplacement(model, START);
+        for (int d = 0; d < 200; d++) {
+            assertThat(battery(model, replaced.plus(Duration.ofDays(d)))).as("day %d", d).isGreaterThan(2.745);
+        }
+    }
+
+    @Test
+    void normalDemoFleetIsWithinTwoHundredDaysOfANewBatteryAtTheBatteryEpoch() {
+        for (SimulatedDevice device : SimulatedDevice.plan(List.of("paris-01", "lyon-01", "marseille-01"), 10,
+                List.of(PayloadFormat.values()))) {
+            assertThat(new ReadingModel(device, List.of(), START).batteryVolts(ReadingModel.BATTERY_EPOCH))
+                    .as(device.deviceId()).isBetween(2.75, ReadingModel.NEW_BATTERY_VOLTS);
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void otherValuesAndMacAreUnchangedByTheBatteryModel(boolean aging) {
+        // Golden values from the reading model before M9 (device paris-01-ruuvi5-003, second reading).
+        ReadingModel model = new ReadingModel(new SimulatedDevice("paris-01-ruuvi5-003", "paris-01", PayloadFormat.RUUVI_DF5),
+                List.of(), START, aging);
+        model.next(START.plusSeconds(3600));
+        ReadingModel.Reading reading = model.next(START.plusSeconds(3630));
+        assertThat(reading.attributes()).containsEntry("mac", "DE:37:72:34:B3:65");
+        assertThat(reading.metrics().get("temperature").doubleValue()).isEqualTo(21.82974911574985);
+        assertThat(reading.metrics().get("humidity").doubleValue()).isEqualTo(63.73008640549239);
+        assertThat(reading.metrics().get("pressure").doubleValue()).isEqualTo(1006.2189388191229);
+        assertThat(reading.metrics().get("acceleration_z").doubleValue()).isEqualTo(1.002160962093985);
+        assertThat(reading.metrics().get("measurement_sequence").intValue()).isEqualTo(552);
+
+        ReadingModel bthome = new ReadingModel(new SimulatedDevice("paris-01-bthome-003", "paris-01", PayloadFormat.BTHOME_V2),
+                List.of(), START, aging);
+        bthome.next(START.plusSeconds(3600));
+        Map<String, Number> m = bthome.next(START.plusSeconds(3630)).metrics();
+        assertThat(m.get("temperature").doubleValue()).isEqualTo(20.703165948489563);
+        assertThat(m.get("co2").intValue()).isEqualTo(469);
+        assertThat(m.get("packet_id").intValue()).isEqualTo(226);
     }
 
     @Test

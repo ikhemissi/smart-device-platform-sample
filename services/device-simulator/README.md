@@ -7,7 +7,7 @@ Simulates a fleet of sensors spread over several sites, sending **real device fo
 - **Fleet**: devices `<siteId>-<format>-<nnn>` (e.g. `paris-01-ruuvi5-007`), formats assigned round-robin per site from the format mix; identities are stable across restarts.
 - **Identity**: at start, each device gets an in-memory EC P-256 certificate (CN = device id, client authentication) signed by its site CA, read from Key Vault secret `site-<siteId>-ca` (PEM bundle: CA certificate + private key) with the simulator's Entra identity. It registers with DPS (enrollment group of its site), then connects to the assigned IoT Hub over MQTT. Connection failures are retried with back-off (2 s → 60 s).
 - **Losing trust**: when the IoT Hub client gives up reconnecting (for instance after its site's last certificate was removed, which disables its devices), the device joins again through DPS with the same back-off: DPS refuses it while its site trusts no certificate, and it resumes sending once a certificate is added again.
-- **Readings**: per-device baselines (seeded by device id); temperature/humidity follow a daily cycle with noise, pressure drifts, battery discharges, counters increase; values stay within each format's valid range. Encoded with the same codec library as the decoder.
+- **Readings**: per-device baselines (seeded by device id); temperature/humidity follow a daily cycle with noise, pressure drifts, counters increase; the battery follows a sawtooth computed from the time and the device seed (a new battery at 3.05 V, then −0.0015 V a day over a 400-day life; at the battery epoch 2026-10-01 each device is 0–200 days into its battery), so it stays continuous across restarts. **Aging devices** (`SDP_SIM_AGING_DEVICES`) lose 0.035 V a day and reach the 2.5 V cut-off in about 16 days, then get a new battery (spec device-simulation, change `m9-maintenance` design D11); values stay within each format's valid range. Encoded with the same codec library as the decoder.
 - **Messages**: binary body (`application/octet-stream`), a unique message id, and a W3C `traceparent` property from a `sdp.device.send` PRODUCER span, so each message can be followed into the decoder.
 - **Faults and anomalies**: a share of messages can be corrupted (unknown leading byte `0x7F`, or truncated frame); anomalies force a metric of a device to a value for a time window.
 - **Stop**: on `SIGTERM` (or after `SDP_SIM_DURATION`) all devices stop and connections close within 10 s.
@@ -23,6 +23,7 @@ Simulates a fleet of sensors spread over several sites, sending **real device fo
 | `SDP_SIM_DURATION` | — | Optional run duration (e.g. `15m`); runs until stopped otherwise |
 | `SDP_SIM_CORRUPTION_RATE` | `0` | Share of corrupted messages, e.g. `0.01` |
 | `SDP_SIM_ANOMALIES` | — | Comma-separated `<deviceId>:<metric>=<value>[~<ramp>]:<duration>[:<delay>]` |
+| `SDP_SIM_AGING_DEVICES` | — | Comma-separated device ids whose battery drains in about two weeks (Terraform sets `SIMULATOR_AGING_DEVICES`, default `<site>-ruuvi5-003` per site) |
 | `SDP_SIM_TRANSPORT` | `iothub` | `iothub` (DPS + IoT Hub) or `console` (dry run, logs payloads) |
 | `SDP_DPS_ID_SCOPE` | — | DPS ID scope (required for `iothub`) |
 | `SDP_DPS_GLOBAL_ENDPOINT` | `global.azure-devices-provisioning.net` | DPS global endpoint |
