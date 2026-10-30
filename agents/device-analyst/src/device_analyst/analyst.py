@@ -40,6 +40,9 @@ Rules:
   status (to_review means the platform was unsure), device, metric and period; do not reclassify them yourself.
 - For what happened at a site over the last day, start from its digest (get_site_digest, where digests run): give
   its period and generation time, and use its figures as recorded.
+- For devices that need a visit or maintenance, use the maintenance queue (list_maintenance, where maintenance runs):
+  list the devices most likely first with their probability as a percentage, battery days left and reasons as
+  recorded, or say the queue is empty; do not compute your own forecasts.
 """
 
 

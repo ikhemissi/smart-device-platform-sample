@@ -35,6 +35,8 @@ class Settings(BaseSettings):
     anomalies_enabled: bool = Field(default=False, validation_alias="SDP_ANOMALIES_ENABLED")
     # Site digests (M8) run in this environment: the assistant can read a site's latest digest.
     digests_enabled: bool = Field(default=False, validation_alias="SDP_DIGESTS_ENABLED")
+    # Predictive maintenance (M9) runs in this environment: the assistant can list the maintenance queue.
+    maintenance_enabled: bool = Field(default=False, validation_alias="SDP_MAINTENANCE_ENABLED")
 
     @cached_property
     def api_audiences(self) -> list[str]:

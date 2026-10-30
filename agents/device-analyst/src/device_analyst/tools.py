@@ -97,14 +97,24 @@ ANOMALY_FIELDS = (
 )  # fmt: skip
 
 
+# What the assistant needs of a maintenance item (M9 design D10): the computed figures, the work order and the status.
+MAINTENANCE_FIELDS = (
+    "id", "deviceId", "deviceName", "siteId", "status", "probability", "reasons", "workOrder", "openedAt", "statusBy",
+    "statusAt", "statusComment",
+)  # fmt: skip
+BATTERY_FIELDS = ("metric", "unit", "level", "slope_per_day", "days_left", "cutoff")
+
+
 def build_tools(
     api: PlatformApi,
     now: Callable[[], datetime] = lambda: datetime.now(UTC),
     anomalies: bool = False,
     digests: bool = False,
+    maintenance: bool = False,
 ) -> list[FunctionTool]:
-    """The tools, bound to a platform API client. Times default to now and the previous 24 hours. The anomaly and digest
-    tools are available only where anomaly detection (M7) and site digests (M8) run."""
+    """The tools, bound to a platform API client. Times default to now and the previous 24 hours. The anomaly, digest
+    and maintenance tools are available only where anomaly detection (M7), site digests (M8) and predictive
+    maintenance (M9) run."""
 
     def window(
         from_time: str | None, to_time: str | None, default: timedelta = timedelta(hours=24)
@@ -366,6 +376,38 @@ def build_tools(
             }
         )
 
+    @tool(
+        description="The maintenance queue: devices likely to need an on-site intervention within 7 days, most likely "
+        "first, with the probability (0-1) from the platform's decision model, the battery forecast (level, trend per "
+        "day, days_left before the cut-off), the reasons (computed figures that crossed a rule: battery_days_left, "
+        "silent, reporting_gaps, rejected_messages; or battery_forecast and probability when none did), the work order "
+        "and the status: open, planned (an Editor planned the visit), done (an Editor closed it) or resolved (the "
+        "platform closed it). Filter by site and status (default: open and planned)."
+    )
+    async def list_maintenance(
+        site_id: Annotated[str | None, Field(description="Site id")] = None,
+        status: Annotated[
+            list[Literal["open", "planned", "done", "resolved"]] | None,
+            Field(description="Statuses to include (default: open and planned)"),
+        ] = None,
+    ) -> str:
+        statuses = ",".join(status or ["open", "planned"])
+        try:
+            found = await call("/maintenance", {"siteId": site_id, "status": statuses, "limit": MAX_ITEMS})
+        except ApiError as e:
+            return error(e)
+        items = []
+        for m in found:
+            battery = m.get("battery")
+            metrics = [battery["metric"]] if battery else []
+            _recorder().cite({"kind": "device", "deviceId": m["deviceId"], "metrics": metrics})
+            item = {k: m.get(k) for k in MAINTENANCE_FIELDS}
+            item["battery"] = {k: battery.get(k) for k in BATTERY_FIELDS} if battery else None
+            items.append(item)
+        if site_id and not items:
+            _recorder().cite({"kind": "site", "siteId": site_id})
+        return as_data({"status": statuses.split(","), **bounded(items)})
+
     return [
         list_sites,
         fleet_status,
@@ -378,6 +420,7 @@ def build_tools(
         get_thresholds,
         *([list_anomalies] if anomalies else []),
         *([get_site_digest] if digests else []),
+        *([list_maintenance] if maintenance else []),
     ]
 
 
