@@ -16,7 +16,10 @@ def sites(conn: psycopg.Connection, configured: list[str]) -> list[str]:
     return [s for s in known if s in configured] if configured else known
 
 
-def load(conn: psycopg.Connection, site_id: str, metrics: list[str], window: Window) -> SiteData:
+def load(
+    conn: psycopg.Connection, site_id: str, metrics: list[str], window: Window, maintenance: bool = False
+) -> SiteData:
+    """`maintenance`: the maintenance job assesses the site (its queue is part of the figures)."""
     site = conn.execute("SELECT display_name FROM sdp.sites WHERE site_id = %s", (site_id,)).fetchone()
     return SiteData(
         site_id=site_id,
@@ -31,6 +34,7 @@ def load(conn: psycopg.Connection, site_id: str, metrics: list[str], window: Win
         anomalies=_anomalies(conn, site_id, window),
         rejected=_rejected(conn, site_id, window),
         certificates=_certificates(conn, site_id),
+        maintenance=_maintenance(conn, site_id) if maintenance else None,
     )
 
 
@@ -79,6 +83,20 @@ def _certificates(conn: psycopg.Connection, site_id: str) -> list[dict[str, Any]
         "SELECT slot, subject, not_after FROM sdp.site_certificates WHERE site_id = %s", (site_id,)
     ).fetchall()
     return [{"slot": r["slot"], "subject": r["subject"], "notAfter": r["not_after"]} for r in rows]
+
+
+def _maintenance(conn: psycopg.Connection, site_id: str) -> list[dict[str, Any]]:
+    """The site's queue at generation time (open and planned items), most likely first (migration V10)."""
+    rows = conn.execute(
+        """SELECT device_id, status, probability, (battery ->> 'days_left')::float8 AS days_left
+             FROM sdp.maintenance_items WHERE site_id = %s AND status IN ('open', 'planned')
+            ORDER BY probability DESC, device_id""",
+        (site_id,),
+    ).fetchall()
+    return [
+        {"deviceId": r["device_id"], "status": r["status"], "probability": r["probability"], "daysLeft": r["days_left"]}
+        for r in rows
+    ]
 
 
 def _metrics(conn: psycopg.Connection, site_id: str, metrics: list[str], window: Window) -> list[MetricRow]:

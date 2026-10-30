@@ -23,11 +23,15 @@ Then mention notable metric changes compared with the previous 7 days (a change 
 anomalies, rejected messages and certificates expiring soon. Summarise anomalies: how many, by classification in plain
 words (real event, sensor fault, expected pattern, cannot tell) and by status (confirmed, to review, reviewed), naming
 at most three devices with the confidence of their most recent anomaly.
+When maintenance figures are present, give the number of devices in the maintenance queue (open, and planned visits)
+and name at most three of the most likely ones with their probability of needing a visit within 7 days and, when
+known, their battery days left; if the queue is empty, say that no device needs a visit.
 Use numbers exactly as they appear in the figures (with their unit), name devices by their id, and give times in UTC as
 HH:MM. If nothing is notable, say so in one sentence. Use only facts present in the figures; do not guess causes or
 give advice."""
 
-# Numbers a brief may state without them being figures: the periods' lengths and the silence and certificate windows.
+# Numbers a brief may state without them being figures: the periods' lengths (and the maintenance horizon of 7 days)
+# and the silence and certificate windows.
 DEFINITIONS = {24.0, 7.0, 15.0, 30.0}
 # A number not glued to letters or to an identifier's hyphen (so "ruuvi3", "paris-01" and "CO2" are not numbers).
 NUMBER = re.compile(r"(?<![\w.\-])-?\d+(?:\.\d+)?(?![\w])")

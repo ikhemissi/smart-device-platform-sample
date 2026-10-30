@@ -23,7 +23,8 @@ class PgSource:
         return data.sites(self.conn, self.settings.sites)
 
     def figures(self, site_id: str, window: Window) -> dict[str, Any]:
-        return compute(data.load(self.conn, site_id, self.settings.metrics, window), window)
+        loaded = data.load(self.conn, site_id, self.settings.metrics, window, self.settings.assesses(site_id))
+        return compute(loaded, window)
 
 
 @dataclass

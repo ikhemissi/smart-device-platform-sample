@@ -15,6 +15,8 @@ COMPARISON = timedelta(days=7)
 SILENCE = timedelta(minutes=15)
 CERTIFICATE_WARNING = timedelta(days=30)
 MAX_ITEMS = 20
+# The most likely devices of the maintenance queue listed in the figures (M9 design D10).
+MAINTENANCE_ITEMS = 5
 
 
 @dataclass(frozen=True)
@@ -64,6 +66,8 @@ class SiteData:
     anomalies: list[dict[str, Any]]
     rejected: dict[str, int]
     certificates: list[dict[str, Any]]
+    # The site's open and planned maintenance items, most likely first; None when maintenance does not assess the site.
+    maintenance: list[dict[str, Any]] | None = None
 
 
 def _iso(at: datetime | None) -> str | None:
@@ -108,13 +112,30 @@ def _metrics(rows: Iterable[MetricRow], units: dict[str, str]) -> list[dict[str,
     return figures
 
 
+def _maintenance(items: list[dict[str, Any]]) -> dict[str, Any]:
+    by_status = Counter(i["status"] for i in items)
+    return {
+        "open": by_status["open"],
+        "planned": by_status["planned"],
+        "mostLikely": [
+            {
+                "deviceId": i["deviceId"],
+                "status": i["status"],
+                "probabilityPercent": round(100 * i["probability"]),
+                "daysLeft": round(i["daysLeft"], 1) if i["daysLeft"] is not None else None,
+            }
+            for i in sorted(items, key=lambda i: (-i["probability"], i["deviceId"]))[:MAINTENANCE_ITEMS]
+        ],
+    }
+
+
 def compute(data: SiteData, window: Window) -> dict[str, Any]:
     at = window.generated_at
     silent = sorted((d for d in data.devices if at - d.last_seen_at > SILENCE), key=lambda d: d.last_seen_at)
     anomaly_status = Counter(a["status"] for a in data.anomalies)
     anomaly_classes = Counter(a["classification"] or "pending" for a in data.anomalies)
     expiring = [c for c in data.certificates if c["notAfter"] - at <= CERTIFICATE_WARNING]
-    return {
+    figures: dict[str, Any] = {
         "site": {"id": data.site_id, "name": data.site_name},
         "period": {"from": _iso(window.period_from), "to": _iso(at)},
         "comparison": {"from": _iso(window.comparison_from), "to": _iso(window.period_from)},
@@ -177,3 +198,6 @@ def compute(data: SiteData, window: Window) -> dict[str, Any]:
             ]
         },
     }
+    if data.maintenance is not None:
+        figures["maintenance"] = _maintenance(data.maintenance)
+    return figures

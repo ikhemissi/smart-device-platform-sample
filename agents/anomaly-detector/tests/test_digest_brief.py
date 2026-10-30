@@ -64,6 +64,27 @@ def test_grounded_text_has_no_unsupported_number():
     assert unsupported_numbers(text, FIGURES) == []
 
 
+MAINTENANCE = {**FIGURES, "maintenance": {"open": 2, "planned": 1, "mostLikely": [
+    {"deviceId": "paris-01-ruuvi5-004", "status": "open", "probabilityPercent": 86, "daysLeft": 4.6},
+    {"deviceId": "paris-01-bthome-002", "status": "planned", "probabilityPercent": 71, "daysLeft": None}]}}  # fmt: skip
+
+
+def test_instructions_mention_the_maintenance_queue():
+    assert "maintenance queue" in INSTRUCTIONS
+
+
+def test_maintenance_counts_are_grounded():
+    text = (
+        "Three devices are in the maintenance queue (2 open, 1 planned visit): paris-01-ruuvi5-004 (86 %, 4.6 days of "
+        "battery left) and paris-01-bthome-002 (71 %) may need a visit within 7 days."
+    )
+    assert unsupported_numbers(text, MAINTENANCE) == []
+    assert unsupported_numbers("4 devices are in the maintenance queue; paris-01-ruuvi5-004 at 90 %.", MAINTENANCE) == [
+        "4",
+        "90",
+    ]
+
+
 def test_invented_numbers_are_reported():
     text = "Temperature averaged 22.4 °C; 4 devices were silent; humidity rose by -5 %."
     assert unsupported_numbers(text, FIGURES) == ["22.4", "4", "-5"]
