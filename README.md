@@ -2,9 +2,9 @@
 
 [![CI](https://github.com/ikhemissi/smart-device-platform-sample/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/ikhemissi/smart-device-platform-sample/actions/workflows/ci.yml)
 
-An end-to-end Azure sample of a sensor platform. Simulated devices send binary measurements, the platform decodes and stores them, people browse them in a web portal, get email alerts, manage which devices may connect, ask an AI assistant about the data, review the anomalies a decision model finds in it, and read a daily brief of each site.
+An end-to-end Azure sample of a sensor platform. Simulated devices send binary measurements, the platform decodes and stores them, people browse them in a web portal, get email alerts, manage which devices may connect, ask an AI assistant about the data, review the anomalies a decision model finds in it, read a daily brief of each site, and see which devices need a visit before their battery runs out.
 
-> **Status:** all milestones (M1–M8) and the operations workbook are delivered and archived. Baseline specifications are in [`openspec/specs/`](openspec/specs).
+> **Status:** milestones M1–M8 and the operations workbook are delivered and archived; M9 (predictive maintenance) is in progress ([change](openspec/changes/m9-maintenance/proposal.md)). Baseline specifications are in [`openspec/specs/`](openspec/specs).
 
 **Contents:** [What it shows](#what-it-shows) · [Architecture](#architecture) · [How it works](#how-it-works) · [Security](#security) · [Repository](#repository) · [Build and test](#build-and-test) · [Continuous integration](#continuous-integration) · [Deploy to Azure](#deploy-to-azure) · [Operate](#operate) · [Contributing](#contributing)
 
@@ -21,6 +21,7 @@ An end-to-end Azure sample of a sensor platform. Simulated devices send binary m
 | M6 | AI assistant | Questions in natural language, grounded answers with sources, `gpt-6-luna` | [m6-ai-analyst](docs/demo/m6-ai-analyst.md) |
 | M7 | Anomaly detection | Statistics select, `Microsoft-Decision-1` classifies (real event, sensor fault, …) with a confidence, `gpt-6-luna` explains; reviews in the portal | [m7-anomaly-detection](docs/demo/m7-anomaly-detection.md) |
 | M8 | Site digest | A daily brief per site written by `gpt-6-luna` from figures the platform computes; regenerated on request | [m8-site-digest](docs/demo/m8-site-digest.md) |
+| M9 | Predictive maintenance | Battery forecasts and reporting signals computed in code, `Microsoft-Decision-1` gives the probability of a visit within 7 days, `gpt-6-luna` writes the work order; a maintenance queue in the portal | [m9-maintenance](docs/demo/m9-maintenance.md) (draft) |
 
 ## Architecture
 
@@ -40,7 +41,7 @@ flowchart LR
     PROV[provisioning-api]
     ALERT[alert-service]
     AGENT["device-analyst<br/>(AI agent)"]
-    DET["anomaly-detector and site-digest<br/>(jobs, every 5 min)"]
+    DET["anomaly-detector, site-digest<br/>(jobs, every 5 min)<br/>and maintenance (hourly)"]
   end
   subgraph Data
     PG[(PostgreSQL)]
@@ -185,7 +186,7 @@ sequenceDiagram
   AG-->>S: SSE: tool, delta… done with sources
 ```
 
-- **Grounded and read-only:** read-only tools (plus anomalies and site digests where they run); the assistant can never see more than the user and declines to change anything.
+- **Grounded and read-only:** read-only tools (plus anomalies, site digests and the maintenance queue where they run); the assistant can never see more than the user and declines to change anything.
 - **Conversations** live in Redis, belong to their author and expire after an hour.
 - **Quality is measured:** an evaluation set of 17 questions scored for groundedness, relevance and tool use; first text within 5 s for all of them ([agent README](agents/device-analyst/README.md#evaluation)).
 
@@ -222,7 +223,25 @@ flowchart LR
 - **Regenerate** records a request; the job serves it within 5 minutes, so the device API keeps data-plane access only.
 - If the model fails, the figures are shown without a brief and a later run adds it.
 
-### 8. Observability
+### 8. Predictive maintenance (M9)
+
+```mermaid
+flowchart LR
+  J["maintenance<br/>(hourly)"] -->|"battery trend,<br/>reporting signals"| PG[(PostgreSQL)]
+  J -->|"device state"| D["Microsoft-Decision-1<br/>p(visit within 7 days)"]
+  J -->|new items| L["gpt-6-luna<br/>work order"]
+  J -->|"assessment, queue item"| PG
+  PG --> API[device-api] --> UI["Portal: Maintenance page,<br/>Battery and maintenance card"]
+  API --> AG[AI assistant]
+  PG --> DG[site digest]
+```
+
+- **Forecast in code:** a weighted trend of each device's hourly battery averages since its last sudden change (a replacement) gives the level, the trend per day and the days left before the cut-off (2.5 V or 10 %); reporting signals (gaps, silence, rejected messages) come from SQL.
+- **The decision model gives the probability** that the device needs a visit within 7 days; from `MAINTENANCE_CONFIDENCE` the device enters the queue with the reasons that crossed a rule and a short work order. Items leave the queue when the probability falls (resolved) or when an Editor marks the visit done; *Planned* records an intervention being organised.
+- **Everywhere the data is used:** the queue is in the portal (page and device card), in the assistant (`list_maintenance`) and in the site digest's figures.
+- **Demo devices age:** the simulator drains the battery of `<site>-ruuvi5-003` in about two weeks, then replaces it (`SIMULATOR_AGING_DEVICES`).
+
+### 9. Observability
 
 ```mermaid
 flowchart LR
@@ -253,7 +272,7 @@ Details: [docs/security.md](docs/security.md). All resources carry the tenant ta
 |---|---|
 | `services/` | Java services: `telemetry-decoder`, `device-simulator`, `device-api`, `provisioning-api`, `alert-service`, `db-migrator` (each with a README) |
 | `agents/device-analyst/` | AI agent and its evaluation set |
-| `agents/anomaly-detector/` | Model-based analysis jobs: anomaly detection (statistics, decision model, explanations) and site digests |
+| `agents/anomaly-detector/` | Model-based analysis jobs: anomaly detection (statistics, decision model, explanations), site digests and predictive maintenance |
 | `web/portal/` | Web portal |
 | `libs/` | Shared Java libraries: payload codecs, simulated fleet, security/observability, database schema, test support |
 | `infra/` | Terraform (deployed with azd) |
@@ -279,7 +298,7 @@ export DOCKER_HOST=unix:///run/user/$(id -u)/podman/podman.sock TESTCONTAINERS_R
 | Portal | `cd web/portal && npm ci && npm run lint && npm test && npm run build` |
 | Portal end-to-end (API faked) | `cd web/portal && npm run e2e:podman` |
 | AI agent | `cd agents/device-analyst && uv sync && uv run ruff check src tests && uv run pytest` |
-| Anomaly detector and site digest | `cd agents/anomaly-detector && uv sync && uv run ruff check src tests && uv run pytest` (dry runs: `uv run anomaly-detector --dry-run --days 7`, `uv run site-digest --dry-run --site paris-01`) |
+| Anomaly detector, site digest and maintenance | `cd agents/anomaly-detector && uv sync && uv run ruff check src tests && uv run pytest` (dry runs: `uv run anomaly-detector --dry-run --days 7`, `uv run site-digest --dry-run --site paris-01`, `uv run maintenance --dry-run --site paris-01 --no-models`) |
 | Infrastructure | `terraform -chdir=infra fmt -check -recursive && terraform -chdir=infra validate` |
 | Local database | `scripts/local-postgres.sh start && scripts/run-migrations.sh --local` |
 
@@ -350,6 +369,10 @@ flowchart LR
 | `DIGEST_SITES` | every site | Sites that get a daily digest (comma-separated) |
 | `DIGEST_METRICS` | `temperature,humidity,pressure,co2,illuminance,battery_voltage,battery_level` | Metrics summarised in digests |
 | `PORTAL_DIGESTS` | on when the digest job is deployed | `false` hides the Digest card |
+| `MAINTENANCE_ENABLED` | `true` | `false` removes the maintenance job; the portal, the assistant tool and the digest figures follow (data kept) |
+| `MAINTENANCE_SITES` | every site | Sites assessed for maintenance (comma-separated) |
+| `MAINTENANCE_CONFIDENCE` | `0.5` | Probability of a visit within 7 days from which a device enters the queue |
+| `SIMULATOR_AGING_DEVICES` | `<site>-ruuvi5-003` per demo site | Simulated devices whose battery drains in about two weeks |
 | `PORTAL_MAINTENANCE` | on when the maintenance job is deployed | `false` hides the Maintenance page and the device page's *Battery and maintenance* card |
 
 ## Operate
@@ -364,8 +387,8 @@ flowchart LR
 | `scripts/check-workbook-queries.sh` | Run the workbook's queries against the environment |
 | `scripts/remove-test-site.sh` | Remove a `test-*` / `e2e-*` site and everything attached |
 | `scripts/agent-env.sh` | Write the AI agent's local `.env` from the azd environment |
-| `scripts/anomaly-env.sh` | Write the anomaly detector's and site digest's local `.env` (dry runs with your identity) |
-| `scripts/build-anomaly-detector-image.sh` | Build the detector and digest image in ACR and point both jobs at it (also run by `postprovision`) |
+| `scripts/anomaly-env.sh` | Write the local `.env` of the anomaly detector, site digest and maintenance jobs (dry runs with your identity) |
+| `scripts/build-anomaly-detector-image.sh` | Build the detector image in ACR and point the anomaly, digest and maintenance jobs at it (also run by `postprovision`) |
 
 ## Contributing
 

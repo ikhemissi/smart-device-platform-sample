@@ -48,7 +48,7 @@ How to work on this repository. These rules come from how the demonstrator was b
 | Integration tests | Testcontainers on **Podman** (no Docker locally; CI uses the runner's Docker) | `DOCKER_HOST=unix:///run/user/$(id -u)/podman/podman.sock TESTCONTAINERS_RYUK_DISABLED=true` |
 | Portal | React, TypeScript, Vite, Fluent UI v9 | `npm run lint`, `npx tsc -b`, `npm test`, `bash scripts/e2e-podman.sh` (offline Playwright), `bash scripts/e2e-environment.sh` (against sdp-dev) |
 | AI agent | Python 3.13, uv, FastAPI, Microsoft Agent Framework | `uv run pytest`, `uv run ruff check src tests`, `uv run --group eval python evals/run_eval.py` |
-| Anomaly detector and site digest | Python 3.13, uv, psycopg, httpx, openai | `uv run pytest`, `uv run pytest -m live` (after `scripts/anomaly-env.sh`), `uv run anomaly-detector --dry-run --days 7 [--classify]`, `uv run site-digest --dry-run --site <id>` |
+| Anomaly detector, site digest and maintenance | Python 3.13, uv, psycopg, httpx, openai | `uv run pytest`, `uv run pytest -m live` (after `scripts/anomaly-env.sh`), `uv run anomaly-detector --dry-run --days 7 [--classify]`, `uv run site-digest --dry-run --site <id>`, `uv run maintenance --dry-run [--site <id>] [--no-models]` |
 | Infrastructure | Terraform via azd | `terraform -chdir=infra fmt -recursive`, `terraform -chdir=infra validate` |
 
 - OpenAPI documents are generated from code and committed (`services/*/openapi.json`, `agents/device-analyst/openapi.json`); a test fails when they drift. API Management imports them.
