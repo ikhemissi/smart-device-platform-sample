@@ -350,6 +350,7 @@ flowchart LR
 | `DIGEST_SITES` | every site | Sites that get a daily digest (comma-separated) |
 | `DIGEST_METRICS` | `temperature,humidity,pressure,co2,illuminance,battery_voltage,battery_level` | Metrics summarised in digests |
 | `PORTAL_DIGESTS` | on when the digest job is deployed | `false` hides the Digest card |
+| `PORTAL_MAINTENANCE` | on when the maintenance job is deployed | `false` hides the Maintenance page and the device page's *Battery and maintenance* card |
 
 ## Operate
 

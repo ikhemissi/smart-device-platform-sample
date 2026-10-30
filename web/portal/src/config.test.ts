@@ -11,7 +11,7 @@ describe('runtime configuration', () => {
   it('switches optional features off when absent', async () => {
     serve(BASE)
 
-    expect(await loadConfig()).toEqual({ ...BASE, apiBaseUrl: 'https://api.test/api/v1', assistantEnabled: false, anomaliesEnabled: false, anomalySites: [], digestsEnabled: false })
+    expect(await loadConfig()).toEqual({ ...BASE, apiBaseUrl: 'https://api.test/api/v1', assistantEnabled: false, anomaliesEnabled: false, anomalySites: [], digestsEnabled: false, maintenanceEnabled: false })
   })
 
   it('reads anomaly detection and its sites', async () => {
@@ -24,5 +24,11 @@ describe('runtime configuration', () => {
     serve({ ...BASE, digestsEnabled: true })
 
     expect(await loadConfig()).toMatchObject({ digestsEnabled: true })
+  })
+
+  it('reads predictive maintenance', async () => {
+    serve({ ...BASE, maintenanceEnabled: true })
+
+    expect(await loadConfig()).toMatchObject({ maintenanceEnabled: true })
   })
 })

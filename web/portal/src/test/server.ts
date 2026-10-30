@@ -130,6 +130,14 @@ export function apiHandlers(me: CurrentUser, log: Request[] = requests, token?: 
       record(request)
       return HttpResponse.json([])
     }),
+    http.get(`${API}/devices/:id/maintenance`, ({ request, params }) => {
+      record(request)
+      return HttpResponse.json({ deviceId: params.id, enabled: false, assessment: null, item: null })
+    }),
+    http.get(`${API}/maintenance`, ({ request }) => {
+      record(request)
+      return HttpResponse.json([])
+    }),
     http.get(`${API}/devices/:id/series`, ({ request }) => {
       record(request)
       return HttpResponse.json(seriesResponse(new URL(request.url)))

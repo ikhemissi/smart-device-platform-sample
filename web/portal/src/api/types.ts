@@ -287,6 +287,76 @@ export interface AnomalyQuery {
   limit?: number
 }
 
+// --- Predictive maintenance (M9) ---------------------------------------------------------------------------------
+
+/** `open` and `planned` items are in the queue; `done` (by an Editor) and `resolved` (by the platform) close them. */
+export type MaintenanceStatus = 'open' | 'planned' | 'done' | 'resolved'
+
+/** Battery forecast computed by the maintenance job (snake_case, as stored). */
+export interface BatteryForecast {
+  metric: 'battery_voltage' | 'battery_level'
+  unit: string
+  level: number
+  /** Trend per day (negative while discharging); null with less than 24 hours of history. */
+  slope_per_day: number | null
+  /** Days until the cut-off; null when not discharging or without enough history. */
+  days_left: number | null
+  since: string
+  cutoff: number
+}
+
+/** A computed figure that crossed a rule, or (when none did) the battery forecast and the probability. */
+export interface MaintenanceReason {
+  rule: 'battery_days_left' | 'silent' | 'reporting_gaps' | 'rejected_messages' | 'battery_forecast' | 'probability'
+  value: number
+  threshold?: number
+  unit?: string
+  [detail: string]: unknown
+}
+
+export interface MaintenanceItem {
+  id: number
+  deviceId: string
+  deviceName: string | null
+  siteId: string
+  status: MaintenanceStatus
+  /** Probability of an intervention within 7 days. */
+  probability: number
+  reasons: MaintenanceReason[]
+  battery: BatteryForecast | null
+  workOrder: string | null
+  workOrderModel: string | null
+  workOrderAt: string | null
+  openedAt: string
+  updatedAt: string
+  resolvedAt: string | null
+  statusBy: string | null
+  statusAt: string | null
+  statusComment: string | null
+}
+
+export interface MaintenanceAssessment {
+  assessedAt: string
+  battery: BatteryForecast | null
+  signals: Record<string, unknown>
+  probability: number
+  decisionModel: string
+  decisionModelVersion: string
+}
+
+export interface DeviceMaintenance {
+  deviceId: string
+  /** Whether the device is assessed (maintenance on and its site configured). */
+  enabled: boolean
+  assessment: MaintenanceAssessment | null
+  item: MaintenanceItem | null
+}
+
+export interface MaintenanceQuery {
+  siteId?: string
+  status?: MaintenanceStatus[]
+}
+
 // --- Site digests (M8) -------------------------------------------------------------------------------------------
 
 /** A list of the figures: its size, and at most 20 items. */

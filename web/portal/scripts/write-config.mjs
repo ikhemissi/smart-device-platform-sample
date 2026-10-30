@@ -34,6 +34,9 @@ export function portalFiles(env) {
     // Site digests appear once the digest job is deployed (its name is empty when DIGEST_ENABLED=false;
     // PORTAL_DIGESTS=false hides them).
     digestsEnabled: env.PORTAL_DIGESTS ? env.PORTAL_DIGESTS === 'true' : Boolean(env.DIGEST_JOB_NAME),
+    // The maintenance queue appears once the maintenance job is deployed (its name is empty when
+    // MAINTENANCE_ENABLED=false; PORTAL_MAINTENANCE=false hides it).
+    maintenanceEnabled: env.PORTAL_MAINTENANCE ? env.PORTAL_MAINTENANCE === 'true' : Boolean(env.UPKEEP_JOB_NAME),
   }
   const csp = [
     "default-src 'self'",
