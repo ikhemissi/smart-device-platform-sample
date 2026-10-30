@@ -55,6 +55,15 @@ How to work on this repository. These rules come from how the demonstrator was b
 - Images are built remotely in Azure Container Registry by azd (`remoteBuild: true`).
 - **CI** (`.github/workflows/ci.yml`) runs on every push to `main`; keep it green and keep each job reproducible with local commands (README, *Continuous integration*). No secrets or cloud credentials in workflows; pin third-party actions to commit SHAs. Fix vulnerable dependencies rather than accepting them; an acceptance in `.trivyignore.yaml` needs the user's agreement, a justification and an expiry.
 
+## GitHub Copilot cloud agent
+
+Work can be split between the cloud agent (no Azure access) and a session with access to `sdp-dev`. Its environment comes from `.github/workflows/copilot-setup-steps.yml` (JDK 25, Node 24, uv, Terraform, OpenSpec CLI, dependencies and test images fetched in advance).
+
+- **Only the tasks marked [cloud agent]** in the change's `tasks.md`: implement them in order with the `openspec-apply-change` skill, verify each with the check it names, tick it, and commit it (conventional commit with the Copilot trailer) on the PR branch. Never tick a task marked **[Azure]**, and do not run `azd`, `az` or anything that needs credentials.
+- **Docker, not Podman**, in that environment: Testcontainers uses the runner's Docker (no `DOCKER_HOST`); run the offline Playwright suite as CI does (`docker run --rm --network=none -e CI=1 -v "$PWD:/work" -w /work mcr.microsoft.com/playwright:v<version>-noble npx playwright test` in `web/portal`).
+- **Models are mocked** in tests; live behaviour is checked by the [Azure] tasks. When the design is unclear or a task cannot be verified offline, say so in the PR instead of guessing, and leave the task unticked.
+- Keep the PR's CI green.
+
 ## Coding conventions
 
 - Precise, complete changes; no unrelated refactoring. Comment only what needs clarification.
