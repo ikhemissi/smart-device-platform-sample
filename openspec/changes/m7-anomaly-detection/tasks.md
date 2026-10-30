@@ -34,8 +34,8 @@
 
 ## 6. CI, documentation and demo
 
-- [ ] 6.1 CI: the detector's lint, tests and image build, and its image in the vulnerability scan; verify a green run on `main`
-- [ ] 6.2 README (capability, flow diagram, settings), detector README, AGENTS.md and implementation guidelines (§10); verify links and commands
+- [x] 6.1 CI: the detector's lint, tests and image build, and its image in the vulnerability scan; verify a green run on `main`
+- [x] 6.2 README (capability, flow diagram, settings), detector README, AGENTS.md and implementation guidelines (§10); verify links and commands
 - [ ] 6.3 Demo guide `docs/demo/m7-anomaly-detection.md`; verify a dry run follows it as written (with the user for the portal steps)
 
 ## Workflow follow-up

@@ -52,7 +52,7 @@ The confidence threshold (0.7) turns the probabilities into a status: **confirme
 1. Open the portal and sign in as an **Editor**. Select **Anomalies**.
 2. The default list shows the anomalies to act on (**confirmed** and **to review**) of the analysed sites, most recent first.
 3. Point at **story 1**: `paris-01-ruuvi5-001`, "Sensor fault · 98 %". The temperature jumped to 35 °C at once and held a constant value while the other devices of the site stayed normal. The explanation says so in a few sentences.
-4. Point at **story 2**: the three `ruuvi3` devices, "Real event · 72–77 %". The same gradual warm-up on three devices at once looks like the room really changed. One of them may be **To review**: the model was less sure, and the platform asks a person instead of guessing.
+4. Point at **story 2**: the three `ruuvi3` devices, "Real event" with confidences around 70–90 % (they vary from run to run). The same gradual warm-up on three devices at once looks like the room really changed. One of them may be **To review**: the model was less sure, and the platform asks a person instead of guessing.
 5. Open **Status** and add **Dismissed**: expected patterns, recorded but not listed by default.
 
 What decides between the two stories is the context the model receives: the readings' shape (constant value or gradual change with noise) and the same metric on the **other devices of the site** over the same minutes.
@@ -85,6 +85,8 @@ Open the **Assistant** and ask:
 - `sdp.anomaly.classify` holds the probability of each class (`sdp.anomaly.p.real_event`, …) and calls `/providers/microsoft/v1/systemone` (about 0.2–0.6 s);
 - `sdp.anomaly.explain` holds the token usage and calls the Responses API (about 2 s);
 - the request's properties count devices, candidates, anomalies created and extended, and decisions by status.
+
+**Failures are retried, never guessed.** If a call to the decision model fails (throttling, a transient authorization error), the anomaly shows as **Pending** and the next cycle classifies it, 5 minutes later; the failed call is visible in the cycle's trace. Nothing is classified without the model.
 
 **The thresholds come from the data.** A dry run replays the last days with the live logic, writes nothing and, without `--classify`, calls no model:
 
