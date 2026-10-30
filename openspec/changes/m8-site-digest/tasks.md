@@ -14,7 +14,7 @@
 
 ## 3. Platform API
 
-- [ ] 3.1 device-api: `GET /api/v1/sites/{siteId}/digest` and `POST /api/v1/sites/{siteId}/digest/requests` (design D6), OpenAPI regenerated; verify integration tests (latest digest, no digest yet, site not configured, feature off, pending request returned, 403 for Readers, 409) and the operations through API Management after provisioning; then a request served by the job within 10 minutes
+- [x] 3.1 device-api: `GET /api/v1/sites/{siteId}/digest` and `POST /api/v1/sites/{siteId}/digest/requests` (design D6), OpenAPI regenerated; verify integration tests (latest digest, no digest yet, site not configured, feature off, pending request returned, 403 for Readers, 409) and the operations through API Management after provisioning; then a request served by the job within 10 minutes
 
 ## 4. Portal
 
