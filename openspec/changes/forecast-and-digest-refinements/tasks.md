@@ -2,8 +2,8 @@
 
 ## 1. Battery forecast change point
 
-- [ ] 1.1 Add the change-point search to `maintenance/battery.py` (D1) with unit tests: steepening, small step over two hours, steady decline not split, whole-percent level staircase not split, noise not split, the last of two changes wins
-- [ ] 1.2 Dry run `maintenance --dry-run --no-models` on the three sites: healthy devices about -0.0015 V/day, paris-01-ruuvi5-003 about -0.035 V/day, lyon and marseille aging devices unchanged
+- [x] 1.1 Add the change-point search to `maintenance/battery.py` (D1) with unit tests: steepening, small step over two hours, steady decline not split, whole-percent level staircase not split, noise not split, the last of two changes wins
+- [x] 1.2 Dry run `maintenance --dry-run --no-models` on the three sites: healthy devices about -0.0015 V/day, paris-01-ruuvi5-003 about -0.035 V/day, lyon and marseille aging devices unchanged
 
 ## 2. Site digest
 

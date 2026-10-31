@@ -1,8 +1,9 @@
+import random
 from datetime import UTC, datetime, timedelta
 
 import pytest
 
-from anomaly_detector.maintenance.battery import LEVEL, VOLTAGE, HourlyBattery, forecast, segment
+from anomaly_detector.maintenance.battery import LEVEL, MIN_TREND_SPAN, VOLTAGE, HourlyBattery, forecast, segment
 
 NOW = datetime(2026, 10, 29, 12, 0, tzinfo=UTC)
 
@@ -101,3 +102,61 @@ def test_no_readings_and_old_readings():
     assert forecast([HourlyBattery(NOW - timedelta(days=20), 2.9)], VOLTAGE, NOW) is None
     with pytest.raises(ValueError):
         forecast([], "temperature", NOW)
+
+
+def test_steepening_starts_a_new_segment():
+    # An aging battery: 0.0015 V/day for 13 days, then 0.035 V/day for the last day, without a step.
+    slow = series(2.98, 0.0015, 13 * 24, end=NOW - timedelta(days=1))
+    fast = series(slow[-1].average - 0.035, 0.035, 24 - 1)
+    f = forecast(slow + fast, VOLTAGE, NOW)
+    assert abs(f.since - fast[0].at) <= timedelta(hours=1)
+    assert f.slope_per_day == pytest.approx(-0.035, abs=0.001)
+    assert f.days_left == pytest.approx((fast[-1].average - 2.5) / 0.035, abs=0.3)
+
+
+def test_small_step_over_two_hours_starts_a_new_segment():
+    # A 0.06 V step down, under the sudden-change threshold and spread over two hourly averages.
+    before = series(2.95, 0.0015, 10 * 24, end=NOW - timedelta(days=1, hours=2))
+    middle = [HourlyBattery(NOW - timedelta(days=1, hours=1), before[-1].average - 0.026)]
+    after = series(before[-1].average - 0.06, 0.0015, 24)
+    f = forecast(before + middle + after, VOLTAGE, NOW)
+    assert f.since >= middle[0].at
+    assert f.level == pytest.approx(after[-1].average, abs=0.001)
+    assert f.slope_per_day == pytest.approx(-0.0015, abs=0.0005)
+
+
+def test_steady_noisy_decline_is_not_split():
+    noise = random.Random(7)
+    points = [HourlyBattery(p.at, p.average + noise.gauss(0, 0.0003)) for p in series(2.95, 0.0015, 14 * 24 - 1)]
+    f = forecast(points, VOLTAGE, NOW)
+    assert f.since == points[0].at
+    assert f.slope_per_day == pytest.approx(-0.0015, abs=0.0003)
+
+
+def test_whole_percent_level_staircase_is_not_split():
+    points = [HourlyBattery(p.at, float(round(p.average))) for p in series(80.0, 0.5, 14 * 24 - 1)]
+    f = forecast(points, LEVEL, NOW)
+    assert f.since == points[0].at
+    assert f.slope_per_day == pytest.approx(-0.5, abs=0.1)
+
+
+def test_last_of_two_changes_wins():
+    first = series(2.95, 0.0015, 6 * 24, end=NOW - timedelta(days=4))
+    second = series(first[-1].average - 0.05, 0.0015, 3 * 24 - 1, end=NOW - timedelta(days=1))
+    third = series(second[-1].average - 0.035, 0.035, 24 - 1)
+    assert abs(segment(first + second + third, VOLTAGE)[0].at - third[0].at) <= timedelta(hours=1)
+
+
+def test_a_change_point_leaves_at_least_12_hours():
+    slow = series(2.98, 0.0015, 10 * 24, end=NOW - timedelta(hours=8))
+    fast = series(slow[-1].average - 0.035 * 8 / 24, 0.035, 8 - 1)
+    assert NOW - segment(slow + fast, VOLTAGE)[0].at >= MIN_TREND_SPAN
+
+
+def test_level_step_over_two_hours_starts_a_new_segment():
+    # A 2.7-point drop of a level spread over two hourly averages, under the 5-point sudden change.
+    before = series(88.0, 0.2, 10 * 24, end=NOW - timedelta(days=1, hours=2))
+    middle = [HourlyBattery(NOW - timedelta(days=1, hours=1), before[-1].average - 1.2)]
+    after = series(before[-1].average - 2.7, 0.2, 24)
+    f = forecast(before + middle + after, LEVEL, NOW)
+    assert f.level == pytest.approx(after[-1].average, abs=0.1)

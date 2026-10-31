@@ -19,13 +19,15 @@ The digest compares each configured metric's average over the last 24 hours with
 
 ### D1. Change point: best two-line split, repeated
 Within the segment after the last sudden change, the forecast looks for a change point:
-- for each split leaving at least 12 hours (`MIN_TREND_SPAN`) on each side, fit an ordinary least-squares line to each side;
-- the split is a candidate when the earlier line, extrapolated to the latest point, differs from the recent line there by more than the kind's `departure` (0.01 V, 2 points for a level);
-- the candidate with the smallest total squared error wins; the segment restarts there, and the search repeats on the rest until no candidate remains (the last change wins).
+- among the splits leaving at least 12 hours (`MIN_TREND_SPAN`) on each side, take the one whose two ordinary least-squares lines (one per side) have the smallest total squared error;
+- it is a change point when, at the latest point, the recent side's line differs from the line of the whole segment by more than the kind's `departure` (0.01 V, 1.5 points for a level): ignoring the change would misstate the level now;
+- the segment restarts there, and the search repeats on the rest until no change point remains (the last change wins).
 
 Sums are accumulated once per segment (prefix sums), so a split costs O(1): 336 hourly points per device stay cheap.
 
-Why: one rule covers the end-of-life knee, small steps and a step spread over two hours, without a model. The 12-hour minimum on the recent side matches the minimum span for a trend, so a change only takes effect when the new trend can be measured. 0.01 V is about 30 times the hourly noise and well under the smallest decline that matters (an aging battery loses 0.035 V a day); 2 points stay above the 1-point rounding steps of a level reported in whole percent, which a trend line follows anyway.
+Why: one rule covers the end-of-life knee, small steps and a step spread over two hours, without a model. Choosing the split first and testing it second keeps a skewed split (one that cuts through a step) from qualifying just because its recent line is skewed. Comparing with the whole segment's line, rather than extrapolating the earlier side, keeps a short earlier side's slope error from being magnified over days. The 12-hour minimum on each side matches the minimum span for a trend: a segment always covers at least 12 hours. 0.01 V is about 30 times the hourly noise in `sdp-dev` and well under the smallest decline that matters (an aging battery loses 0.035 V a day). For levels, 1.5 points stays above the rounding of a level reported in whole percent: in 330 simulated whole-percent series (0.05–4 points a day, 3–14 days, with noise), none was split.
+
+On 31 October's data, every healthy device's forecast went back to about -0.0015 V/day (the simulator's rate), paris-01-ruuvi5-003 to -0.035 V/day (11.7 days left), and the aging devices of lyon-01 and marseille-01 were unchanged.
 
 Alternatives: a lower sudden-change threshold (misses knees, splits noise on real devices), a ratio-of-slopes rule (ignores small steps, unstable when the earlier slope is near zero), a statistical test (harder to explain for the same result on this data).
 
