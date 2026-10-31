@@ -10,12 +10,6 @@ from .battery import HISTORY, METRICS
 from .signals import PREVIOUS, RECENT, MaintenanceDevice
 
 
-def sites(conn: psycopg.Connection, configured: list[str]) -> list[str]:
-    """The assessed sites: the configured ones that exist, or every site."""
-    known = [r["site_id"] for r in conn.execute("SELECT site_id FROM sdp.sites ORDER BY site_id").fetchall()]
-    return [s for s in known if s in configured] if configured else known
-
-
 def devices(conn: psycopg.Connection, sites: list[str]) -> list[MaintenanceDevice]:
     rows = conn.execute(
         """SELECT device_id, site_id, display_name, last_payload_format AS payload_format, last_seen_at

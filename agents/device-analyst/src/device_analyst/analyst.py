@@ -99,13 +99,7 @@ class Analyst:
                 for content in update.contents:
                     if content.type == "text" and content.text and not _is_aggregate(content):
                         yield Event("delta", {"text": content.text})
-                    elif (
-                        content.type == "function_call"
-                        and content.call_id
-                        and content.name
-                        and content.call_id not in announced
-                        and _arguments_complete(content)
-                    ):
+                    elif _is_complete_call(content) and content.call_id not in announced:
                         announced.add(content.call_id)
                         yield Event("tool", {"name": content.name, "arguments": _arguments(content)})
             response = await stream.get_final_response()
@@ -122,10 +116,24 @@ class Analyst:
             turn.reset(token)
 
 
+def _raw_type(content: Content) -> str:
+    """The type of the Responses API event behind the content (e.g. `response.output_text.done`)."""
+    return getattr(content.raw_representation, "type", "") or ""
+
+
 def _is_aggregate(content: Content) -> bool:
     """The Responses API repeats the full text when an output item is done, after its deltas."""
-    raw_type = getattr(content.raw_representation, "type", "") or ""
-    return raw_type.endswith(".done")
+    return _raw_type(content).endswith(".done")
+
+
+def _is_complete_call(content: Content) -> bool:
+    """A function call whose arguments have fully arrived (not a streamed fragment of them)."""
+    return (
+        content.type == "function_call"
+        and bool(content.call_id)
+        and bool(content.name)
+        and _arguments_complete(content)
+    )
 
 
 def _arguments(content: Content) -> dict[str, Any]:
@@ -139,8 +147,7 @@ def _arguments(content: Content) -> dict[str, Any]:
 
 
 def _arguments_complete(content: Content) -> bool:
-    raw_type = getattr(content.raw_representation, "type", "") or ""
-    if raw_type.endswith(".delta"):
+    if _raw_type(content).endswith(".delta"):
         return False
     arguments = content.arguments
     if isinstance(arguments, str):

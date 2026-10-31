@@ -7,6 +7,7 @@ from typing import Any
 import psycopg
 from psycopg.types.json import Jsonb
 
+from .. import db
 from . import data
 from .brief import Brief
 from .config import DigestSettings
@@ -20,7 +21,7 @@ class PgSource:
     settings: DigestSettings
 
     def sites(self) -> list[str]:
-        return data.sites(self.conn, self.settings.sites)
+        return db.configured_sites(self.conn, self.settings.sites)
 
     def figures(self, site_id: str, window: Window) -> dict[str, Any]:
         loaded = data.load(self.conn, site_id, self.settings.metrics, window, self.settings.assesses(site_id))

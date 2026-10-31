@@ -7,13 +7,13 @@ import psycopg
 from azure.core.credentials import TokenCredential
 from psycopg.rows import dict_row
 
-from .config import Settings
+from .config import JobSettings
 from .detection import HourlyRollup, Reading
 
 POSTGRES_SCOPE = "https://ossrdbms-aad.database.windows.net/.default"
 
 
-def connect(settings: Settings, credential: TokenCredential) -> psycopg.Connection:
+def connect(settings: JobSettings, credential: TokenCredential) -> psycopg.Connection:
     token = credential.get_token(POSTGRES_SCOPE).token
     return psycopg.connect(
         host=settings.db_host,
@@ -28,6 +28,12 @@ def connect(settings: Settings, credential: TokenCredential) -> psycopg.Connecti
         # Each write stands alone: what a cycle recorded is kept even if a later step fails.
         autocommit=True,
     )
+
+
+def configured_sites(conn: psycopg.Connection, configured: list[str]) -> list[str]:
+    """The configured sites that exist or, when none is configured, every site."""
+    known = [r["site_id"] for r in conn.execute("SELECT site_id FROM sdp.sites ORDER BY site_id").fetchall()]
+    return [s for s in known if s in configured] if configured else known
 
 
 @dataclass(frozen=True)

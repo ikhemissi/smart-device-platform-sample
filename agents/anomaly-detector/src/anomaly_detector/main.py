@@ -8,9 +8,9 @@ import sys
 import time
 from datetime import UTC, datetime, timedelta
 
-from azure.identity import DefaultAzureCredential, get_bearer_token_provider
+from azure.core.credentials import TokenCredential
 
-from . import db, telemetry
+from . import db, jobs, telemetry
 from .config import Settings
 from .cycle import CycleResult, Detector, traced_cycle
 from .decision import Classification, Classifier, DecisionClient
@@ -20,9 +20,8 @@ from .replay import ReplaySource, dry_run
 
 log = logging.getLogger("anomaly_detector")
 
-COGNITIVE_SCOPE = "https://cognitiveservices.azure.com/.default"
-# Locally, credentials come from developer tools (Azure CLI): allow more than the default 10 s on a busy machine.
-DEVELOPER_TOOL_TIMEOUT = 60
+# Dry runs classify in bursts: requests per minute allowed by the decision deployment.
+DRY_RUN_CLASSIFICATIONS_PER_MINUTE = 25
 
 
 def _parse(argv: list[str] | None) -> argparse.Namespace:
@@ -40,7 +39,9 @@ class _Throttled:
     """Dry runs classify in bursts: stay under the deployment's requests per minute."""
 
     def __init__(self, classifier: Classifier, per_minute: int) -> None:
-        self.classifier, self.interval, self.last = classifier, 60 / per_minute, 0.0
+        self.classifier = classifier
+        self.interval = 60 / per_minute
+        self.last = 0.0
 
     def classify(self, state: dict) -> Classification:
         time.sleep(max(0.0, self.last + self.interval - time.monotonic()))
@@ -48,35 +49,48 @@ class _Throttled:
         return self.classifier.classify(state)
 
 
+def _settings(args: argparse.Namespace) -> Settings:
+    """The settings, with the deviation and confidence given on the command line instead of the environment's."""
+    overrides = {"deviation": args.deviation, "confidence": args.confidence}
+    given = {name: value for name, value in overrides.items() if value is not None}
+    return Settings(**{Settings.model_fields[name].validation_alias: value for name, value in given.items()})
+
+
 def run(argv: list[str] | None = None) -> int:
     args = _parse(argv)
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
-    logging.getLogger("azure").setLevel(logging.WARNING)
-    logging.getLogger("httpx").setLevel(logging.WARNING)
-    overrides = {k: v for k, v in {"deviation": args.deviation, "confidence": args.confidence}.items() if v is not None}
-    settings = Settings(**{Settings.model_fields[k].validation_alias: v for k, v in overrides.items()})
-    credential = DefaultAzureCredential(process_timeout=DEVELOPER_TOOL_TIMEOUT)
-    token = get_bearer_token_provider(credential, COGNITIVE_SCOPE)
+    jobs.configure_logging()
+    settings = _settings(args)
+    credential = jobs.credential()
+    token = jobs.model_token(credential)
     classifier = DecisionClient(settings.decision_endpoint, settings.decision_deployment, token)
     if args.dry_run:
-        return _dry_run(args, settings, credential, _Throttled(classifier, 25) if args.classify else None)
+        throttled = _Throttled(classifier, DRY_RUN_CLASSIFICATIONS_PER_MINUTE) if args.classify else None
+        return _dry_run(args, settings, credential, throttled)
 
     telemetry.configure(settings, credential)
     explainer = Explainer(settings.openai_endpoint, settings.model_deployment, token)
 
     def execute() -> CycleResult:
         with db.connect(settings, credential) as conn:
+            source = PgSource(conn, settings)
             store = PgStore(conn, settings.sites)
-            return Detector(settings, PgSource(conn, settings), store, classifier, explainer).run(datetime.now(UTC))
+            return Detector(settings, source, store, classifier, explainer).run(datetime.now(UTC))
 
     try:
         r = traced_cycle(settings.sites, execute)
         log.info(
             "Cycle completed: devices=%d assessed=%d candidates=%d created=%d extended=%d retried=%d decisions=%s "
             "explained=%d errors=%d",
-            r.devices, r.assessed, r.candidates, r.created, r.extended, r.retried, dict(r.decisions), r.explained,
+            r.devices,
+            r.assessed,
+            r.candidates,
+            r.created,
+            r.extended,
+            r.retried,
+            dict(r.decisions),
+            r.explained,
             r.errors,
-        )  # fmt: skip
+        )
         return 0
     except Exception:
         log.exception("Cycle failed")
@@ -85,12 +99,14 @@ def run(argv: list[str] | None = None) -> int:
         telemetry.flush()
 
 
-def _dry_run(args: argparse.Namespace, settings: Settings, credential, classifier: Classifier | None) -> int:
-    end = datetime.now(UTC).replace(second=0, microsecond=0)
-    end -= timedelta(minutes=end.minute % 5)
+def _dry_run(
+    args: argparse.Namespace, settings: Settings, credential: TokenCredential, classifier: Classifier | None
+) -> int:
+    end = _last_cycle_time(datetime.now(UTC))
     start = end - timedelta(days=args.days)
-    log.info("Dry run %s → %s, sites=%s deviation=%s", start.isoformat(), end.isoformat(), settings.sites,
-             settings.deviation)  # fmt: skip
+    log.info(
+        "Dry run %s → %s, sites=%s deviation=%s", start.isoformat(), end.isoformat(), settings.sites, settings.deviation
+    )
     with db.connect(settings, credential) as conn:
         source = ReplaySource.load(conn, settings, start, end)
     if args.output:
@@ -98,9 +114,20 @@ def _dry_run(args: argparse.Namespace, settings: Settings, credential, classifie
             per_day = dry_run(settings, source, start, end, classifier, output)
     else:
         per_day = dry_run(settings, source, start, end, classifier)
+    _print_counts(per_day)
+    return 0
+
+
+def _last_cycle_time(now: datetime) -> datetime:
+    """The start of the current 5-minute cycle."""
+    end = now.replace(second=0, microsecond=0)
+    return end - timedelta(minutes=end.minute % 5)
+
+
+def _print_counts(per_day: dict) -> None:
+    """Tab-separated counts, one line per day."""
     columns = sorted({key for counts in per_day.values() for key in counts})
     print("day", *columns, sep="\t")
     for day in sorted(per_day):
         print(day, *(per_day[day][c] for c in columns), sep="\t")
     sys.stdout.flush()
-    return 0

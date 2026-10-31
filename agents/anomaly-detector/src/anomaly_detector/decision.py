@@ -52,6 +52,24 @@ class Classifier(Protocol):
     def classify(self, state: dict[str, Any]) -> Classification: ...
 
 
+def post_question(
+    client: httpx.Client, endpoint: str, token: Callable[[], str], body: dict[str, Any]
+) -> dict[str, Any]:
+    """The decision API's answer to `body` (model, state and questions). Raises httpx.HTTPError when the call fails and
+    ValueError when the answer is not JSON."""
+    response = client.post(
+        f"{endpoint.rstrip('/')}/providers/microsoft/v1/systemone",
+        json=body,
+        headers={"Authorization": f"Bearer {token()}"},
+    )
+    response.raise_for_status()
+    return response.json()
+
+
+def input_tokens(payload: dict[str, Any]) -> int:
+    return payload.get("usage", {}).get("input_tokens", 0)
+
+
 @dataclass
 class DecisionClient:
     endpoint: str
@@ -66,20 +84,12 @@ class DecisionClient:
             "questions": {QUESTION: {"type": "choice", "instructions": INSTRUCTIONS, "criteria": OPTIONS}},
         }
         try:
-            response = self.client.post(
-                f"{self.endpoint.rstrip('/')}/providers/microsoft/v1/systemone",
-                json=body,
-                headers={"Authorization": f"Bearer {self.token()}"},
-            )
-            response.raise_for_status()
-            payload = response.json()
+            payload = post_question(self.client, self.endpoint, self.token, body)
             answer = payload["answers"][QUESTION]
             probabilities = {option: float(answer["probabilities"][option]) for option in OPTIONS}
         except (httpx.HTTPError, ValueError, KeyError, TypeError) as error:
             raise DecisionError(f"decision API: {error}") from error
-        return Classification(
-            probabilities, payload.get("model", self.deployment), payload.get("usage", {}).get("input_tokens", 0)
-        )
+        return Classification(probabilities, payload.get("model", self.deployment), input_tokens(payload))
 
 
 @dataclass(frozen=True)

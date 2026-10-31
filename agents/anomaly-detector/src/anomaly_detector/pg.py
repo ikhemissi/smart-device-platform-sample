@@ -55,8 +55,10 @@ class PgStore:
         values = {name: getattr(anomaly, name) for name in COLUMNS if name != "id"}
         values["state"] = Jsonb(values["state"])
         values["probabilities"] = Jsonb(values["probabilities"]) if values["probabilities"] is not None else None
+        columns = ", ".join(values)
+        placeholders = ", ".join(["%s"] * len(values))
         anomaly.id = self.conn.execute(
-            f"INSERT INTO sdp.anomalies ({', '.join(values)}) VALUES ({', '.join(['%s'] * len(values))}) RETURNING id",
+            f"INSERT INTO sdp.anomalies ({columns}) VALUES ({placeholders}) RETURNING id",
             list(values.values()),
         ).fetchone()["id"]
         return anomaly
@@ -77,9 +79,15 @@ class PgStore:
                       score = CASE WHEN abs(%(score)s) > abs(x.score) THEN %(score)s ELSE x.score END,
                       updated_at = now()
                 WHERE id = %(id)s""",
-            {"ended_at": a.ended_at, "min": a.observed_min, "max": a.observed_max, "last": a.observed_last,
-             "score": candidate.score, "id": anomaly.id},
-        )  # fmt: skip
+            {
+                "ended_at": a.ended_at,
+                "min": a.observed_min,
+                "max": a.observed_max,
+                "last": a.observed_last,
+                "score": candidate.score,
+                "id": anomaly.id,
+            },
+        )
         anomaly.ended_at = max(anomaly.ended_at, a.ended_at)
 
     def unfinished(self, limit: int) -> list[Anomaly]:
@@ -97,9 +105,16 @@ class PgStore:
             """UPDATE sdp.anomalies SET decision = %s, classification = %s, probabilities = %s,
                       confidence_threshold = %s, decision_model = %s, decision_model_version = %s, updated_at = now()
                 WHERE id = %s""",
-            (anomaly.decision, anomaly.classification, Jsonb(anomaly.probabilities), anomaly.confidence_threshold,
-             anomaly.decision_model, anomaly.decision_model_version, anomaly.id),
-        )  # fmt: skip
+            (
+                anomaly.decision,
+                anomaly.classification,
+                Jsonb(anomaly.probabilities),
+                anomaly.confidence_threshold,
+                anomaly.decision_model,
+                anomaly.decision_model_version,
+                anomaly.id,
+            ),
+        )
 
     def record_explanation(self, anomaly: Anomaly) -> None:
         self.conn.execute(

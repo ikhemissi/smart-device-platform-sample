@@ -1,7 +1,6 @@
 """The digest's brief (M8 design D4): a few sentences written by the language model from the figures only, and a check
 that every number it states can be found in those figures."""
 
-import json
 import logging
 import re
 from collections.abc import Callable, Iterator
@@ -12,6 +11,7 @@ from typing import Any
 import httpx
 import openai
 
+from ..chat import chat_client, respond, set_request_attributes, set_usage_attributes
 from ..telemetry import tracer
 
 log = logging.getLogger(__name__)
@@ -55,46 +55,34 @@ class Briefer:
     client: openai.OpenAI = field(init=False)
 
     def __post_init__(self) -> None:
-        self.client = openai.OpenAI(
-            base_url=f"{self.openai_endpoint.rstrip('/')}/openai/v1/",
-            api_key=self.token,
-            timeout=90,
-            max_retries=1,
-            http_client=self.http_client,
-        )
+        self.client = chat_client(self.openai_endpoint, self.token, timeout=90, http_client=self.http_client)
 
     def write(self, figures: dict[str, Any]) -> Brief | None:
         """None when the model fails: the digest keeps its figures and a later run adds the brief."""
         with tracer.start_as_current_span("sdp.digest.brief") as span:
-            span.set_attribute("sdp.digest.site", figures["site"]["id"])
-            span.set_attribute("gen_ai.operation.name", "responses")
-            span.set_attribute("gen_ai.request.model", self.deployment)
+            site_id = figures["site"]["id"]
+            span.set_attribute("sdp.digest.site", site_id)
+            set_request_attributes(span, self.deployment)
             try:
-                response = self.client.responses.create(
-                    model=self.deployment,
-                    instructions=INSTRUCTIONS,
-                    input=json.dumps(figures, ensure_ascii=False),
-                    reasoning={"effort": self.reasoning_effort},
-                    max_output_tokens=2000,
-                    store=False,
+                response = respond(
+                    self.client, self.deployment, INSTRUCTIONS, figures, self.reasoning_effort, max_output_tokens=2000
                 )
             except openai.OpenAIError as error:
-                log.warning("Brief failed for %s, digest kept without brief: %s", figures["site"]["id"], error)
+                log.warning("Brief failed for %s, digest kept without brief: %s", site_id, error)
                 span.record_exception(error)
                 return None
             text = response.output_text.strip()
             usage = response.usage
-            if usage:
-                span.set_attribute("gen_ai.usage.input_tokens", usage.input_tokens)
-                span.set_attribute("gen_ai.usage.output_tokens", usage.output_tokens)
+            set_usage_attributes(span, usage)
             if not text:
-                log.warning("Brief failed for %s: empty answer (status %s)", figures["site"]["id"], response.status)
+                log.warning("Brief failed for %s: empty answer (status %s)", site_id, response.status)
                 return None
             unsupported = unsupported_numbers(text, figures)
             span.set_attribute("sdp.digest.unsupported_numbers", len(unsupported))
             if unsupported:
-                log.warning("Brief of %s states numbers not in its figures: %s", figures["site"]["id"], unsupported)
-            return Brief(text, self.deployment, usage.input_tokens if usage else 0, usage.output_tokens if usage else 0)
+                log.warning("Brief of %s states numbers not in its figures: %s", site_id, unsupported)
+            input_tokens, output_tokens = (usage.input_tokens, usage.output_tokens) if usage else (0, 0)
+            return Brief(text, self.deployment, input_tokens, output_tokens)
 
 
 def _values(node: Any) -> Iterator[float]:

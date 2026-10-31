@@ -68,11 +68,9 @@ def create_app(
     async def invalid(request: Request, error: RequestValidationError) -> JSONResponse:
         errors: dict[str, list[str]] = {}
         for e in error.errors():
-            errors.setdefault(".".join(str(p) for p in e["loc"][1:]) or "body", []).append(e["msg"])
-        response = problem_response(request, ProblemError(400, "Bad Request", "The request is invalid."))
-        body = json.loads(response.body)
-        body["errors"] = errors
-        return JSONResponse(body, status_code=400, media_type="application/problem+json")
+            field = ".".join(str(part) for part in e["loc"][1:]) or "body"
+            errors.setdefault(field, []).append(e["msg"])
+        return problem_response(request, ProblemError(400, "Bad Request", "The request is invalid."), errors=errors)
 
     @app.get("/health/live", include_in_schema=False)
     async def live() -> dict[str, str]:
@@ -96,13 +94,13 @@ def create_app(
     async def read(request: Request, conversation_id: str, user: CurrentUser) -> dict[str, Any]:
         conversation = await request.app.state.store.get(conversation_id, user.object_id)
         if conversation is None:
-            raise not_found(f"Conversation '{conversation_id}' does not exist or has expired.")
+            raise conversation_not_found(conversation_id)
         return {"id": conversation.id, "createdAt": conversation.created_at, "messages": conversation.transcript()}
 
     @app.delete(PREFIX + "/conversations/{conversation_id}", status_code=204, operation_id="deleteAgentConversation")
     async def delete(request: Request, conversation_id: str, user: CurrentUser) -> Response:
         if not await request.app.state.store.delete(conversation_id, user.object_id):
-            raise not_found(f"Conversation '{conversation_id}' does not exist or has expired.")
+            raise conversation_not_found(conversation_id)
         return Response(status_code=204)
 
     @app.post(PREFIX + "/conversations/{conversation_id}/messages", operation_id="sendAgentMessage")
@@ -110,17 +108,18 @@ def create_app(
         request: Request, conversation_id: str, body: MessageRequest, user: CurrentUser
     ) -> EventSourceResponse:
         store: ConversationStore = request.app.state.store
-        wait = await store.allow_message(user.object_id, request.app.state.messages_per_minute)
+        per_minute = request.app.state.messages_per_minute
+        wait = await store.allow_message(user.object_id, per_minute)
         if wait is not None:
             raise ProblemError(
                 429,
                 "Too Many Requests",
-                f"At most {request.app.state.messages_per_minute} messages per minute; retry in {wait} s.",
+                f"At most {per_minute} messages per minute; retry in {wait} s.",
                 headers={"Retry-After": str(wait)},
             )
         conversation = await store.get(conversation_id, user.object_id)
         if conversation is None:
-            raise not_found(f"Conversation '{conversation_id}' does not exist or has expired.")
+            raise conversation_not_found(conversation_id)
         try:
             await store.lock(conversation_id)
         except ConversationBusyError as e:
@@ -147,7 +146,6 @@ def create_app(
             span_context = trace.use_span(span, end_on_exit=False)
             span_context.__enter__()
             try:
-                result: TurnResult | None = None
                 async with asyncio.timeout(request.app.state.turn_timeout_seconds):
                     async for event in request.app.state.analyst.run(conversation.history(), body.content, device_id):
                         if event.type == "delta" and not first_text:
@@ -156,18 +154,8 @@ def create_app(
                         elif event.type == "tool":
                             tool_calls += 1
                         if event.result is not None:
-                            result = event.result
-                            await store.append(
-                                conversation,
-                                Turn(
-                                    question=body.content,
-                                    answer=result.text,
-                                    asked_at=asked_at,
-                                    citations=result.citations,
-                                    device_id=device_id,
-                                    messages=[m.to_dict() for m in result.messages],
-                                ),
-                            )
+                            turn = _turn(body.content, asked_at, device_id, event.result)
+                            await store.append(conversation, turn)
                             outcome = "answered"
                             yield sse("done", {"conversationId": conversation_id, **event.data})
                         else:
@@ -194,6 +182,22 @@ def create_app(
         return EventSourceResponse(events(), ping=15, headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
 
     return app
+
+
+def conversation_not_found(conversation_id: str) -> ProblemError:
+    return not_found(f"Conversation '{conversation_id}' does not exist or has expired.")
+
+
+def _turn(question: str, asked_at: str, device_id: str | None, result: TurnResult) -> Turn:
+    """The answered turn as kept in the conversation."""
+    return Turn(
+        question=question,
+        answer=result.text,
+        asked_at=asked_at,
+        citations=result.citations,
+        device_id=device_id,
+        messages=[m.to_dict() for m in result.messages],
+    )
 
 
 def pseudonym(object_id: str) -> str:

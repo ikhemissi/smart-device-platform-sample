@@ -8,6 +8,7 @@ from typing import Any
 import psycopg
 from psycopg.types.json import Jsonb
 
+from .. import db
 from . import data
 from .lifecycle import QueueItem
 from .models import Probability, WorkOrder
@@ -21,7 +22,7 @@ class PgSource:
     configured_sites: list[str]
 
     def inputs(self, now: datetime) -> list[DeviceInput]:
-        sites = data.sites(self.conn, self.configured_sites)
+        sites = db.configured_sites(self.conn, self.configured_sites)
         if not sites:
             return []
         devices = data.devices(self.conn, sites)
@@ -32,6 +33,11 @@ class PgSource:
             DeviceInput(d, device_forecast(series.get(d.device_id), now), signals(d, periods, rejected, now))
             for d in devices
         ]
+
+
+def _battery_jsonb(entry: DeviceInput) -> Jsonb | None:
+    battery = entry.battery_json()
+    return Jsonb(battery) if battery is not None else None
 
 
 @dataclass
@@ -66,7 +72,7 @@ class PgStore:
                 entry.device.device_id,
                 entry.device.site_id,
                 now,
-                Jsonb(entry.battery.as_json()) if entry.battery else None,
+                _battery_jsonb(entry),
                 Jsonb(entry.signals.as_json()),
                 probability.value,
                 probability.model,
@@ -91,7 +97,7 @@ class PgStore:
                 entry.device.site_id,
                 probability,
                 Jsonb(reasons),
-                Jsonb(entry.battery.as_json()) if entry.battery else None,
+                _battery_jsonb(entry),
                 work_order.text if work_order else None,
                 work_order.model if work_order else None,
                 now if work_order else None,
@@ -120,7 +126,7 @@ class PgStore:
             (
                 probability,
                 Jsonb(reasons),
-                Jsonb(entry.battery.as_json()) if entry.battery else None,
+                _battery_jsonb(entry),
                 now,
                 work_order.text if work_order else None,
                 work_order.model if work_order else None,
@@ -155,7 +161,7 @@ class DryRunStore:
         self.writes.append(
             {
                 "assessment": entry.device.device_id,
-                "battery": entry.battery.as_json() if entry.battery else None,
+                "battery": entry.battery_json(),
                 "signals": entry.signals.as_json(),
                 "probability": round(probability.value, 3),
             }

@@ -44,6 +44,16 @@ def _recorder() -> TurnRecorder:
     return recorder
 
 
+def _cite_site(site_id: str) -> None:
+    _recorder().cite({"kind": "site", "siteId": site_id})
+
+
+def _cite_device(
+    device_id: str, metrics: list[str] | None = None, start: str | None = None, end: str | None = None
+) -> None:
+    _recorder().cite({"kind": "device", "deviceId": device_id, "metrics": metrics, "from": start, "to": end})
+
+
 def compact(value: Any, digits: int = 3) -> Any:
     """Rounds floats and drops nulls, recursively."""
     if isinstance(value, float):
@@ -164,7 +174,7 @@ def build_tools(
             return error(e)
         for site in status:
             if site_id:
-                _recorder().cite({"kind": "site", "siteId": site["siteId"]})
+                _cite_site(site["siteId"])
             site["silentDevices"] = bounded(site.get("silentDevices", []), 100, site.get("silent"))
         return as_data(status)
 
@@ -189,7 +199,7 @@ def build_tools(
         except ApiError as e:
             return error(e)
         if site_id:
-            _recorder().cite({"kind": "site", "siteId": site_id})
+            _cite_site(site_id)
         summary["groups"] = bounded(summary["groups"])
         return as_data(summary)
 
@@ -207,7 +217,7 @@ def build_tools(
         except ApiError as e:
             return error(e)
         if site_id:
-            _recorder().cite({"kind": "site", "siteId": site_id})
+            _cite_site(site_id)
         return as_data(bounded(page["items"], total=page.get("total")))
 
     @tool(
@@ -220,7 +230,7 @@ def build_tools(
             metrics = await call(f"/devices/{segment(device_id)}/metrics")
         except ApiError as e:
             return error(e)
-        _recorder().cite({"kind": "device", "deviceId": device_id})
+        _cite_device(device_id)
         device["metrics"] = [{"metric": m["metric"], "unit": m.get("unit")} for m in metrics]
         return as_data(device)
 
@@ -235,7 +245,7 @@ def build_tools(
             )
         except ApiError as e:
             return error(e)
-        _recorder().cite({"kind": "device", "deviceId": device_id})
+        _cite_device(device_id)
         latest = [{"measuredAt": m["measuredAt"], "metrics": m["metrics"]} for m in measurements]
         return as_data({"deviceId": device_id, "measurements": latest})
 
@@ -259,9 +269,7 @@ def build_tools(
             )
         except ApiError as e:
             return error(e)
-        _recorder().cite(
-            {"kind": "device", "deviceId": device_id, "metrics": metrics, "from": iso(start), "to": iso(end)}
-        )
+        _cite_device(device_id, metrics, iso(start), iso(end))
         return as_data(
             {
                 "deviceId": device_id,
@@ -295,7 +303,7 @@ def build_tools(
         except ApiError as e:
             return error(e)
         if device_id:
-            _recorder().cite({"kind": "device", "deviceId": device_id})
+            _cite_device(device_id)
         return as_data(bounded([{k: v for k, v in a.items() if k != "notifications"} for a in alerts]))
 
     @tool(description="Alert thresholds configured for a device (metric, min and/or max).")
@@ -335,16 +343,10 @@ def build_tools(
             return error(e)
         items = []
         for a in found:
-            _recorder().cite(
-                {"kind": "device", "deviceId": a["deviceId"], "metrics": [a["metric"]], "from": a["startedAt"],
-                 "to": a["endedAt"]}
-            )  # fmt: skip
-            item = {k: a.get(k) for k in ANOMALY_FIELDS}
-            if item["review"]:
-                item["review"] = {k: item["review"].get(k) for k in ("verdict", "reviewedBy", "comment")}
-            items.append(item)
+            _cite_device(a["deviceId"], [a["metric"]], a["startedAt"], a["endedAt"])
+            items.append(_anomaly_item(a))
         if site_id and not items:
-            _recorder().cite({"kind": "site", "siteId": site_id})
+            _cite_site(site_id)
         return as_data({"from": iso(start), "to": iso(end), **bounded(items)})
 
     @tool(
@@ -358,7 +360,7 @@ def build_tools(
             result = await call(f"/sites/{segment(site_id)}/digest")
         except ApiError as e:
             return error(e)
-        _recorder().cite({"kind": "site", "siteId": site_id})
+        _cite_site(site_id)
         digest = result.get("digest")
         if not result.get("enabled"):
             return as_data({"siteId": site_id, "digest": None, "note": "this site has no digests in this environment"})
@@ -399,13 +401,10 @@ def build_tools(
         items = []
         for m in found:
             battery = m.get("battery")
-            metrics = [battery["metric"]] if battery else []
-            _recorder().cite({"kind": "device", "deviceId": m["deviceId"], "metrics": metrics})
-            item = {k: m.get(k) for k in MAINTENANCE_FIELDS}
-            item["battery"] = {k: battery.get(k) for k in BATTERY_FIELDS} if battery else None
-            items.append(item)
+            _cite_device(m["deviceId"], [battery["metric"]] if battery else None)
+            items.append(_maintenance_item(m))
         if site_id and not items:
-            _recorder().cite({"kind": "site", "siteId": site_id})
+            _cite_site(site_id)
         return as_data({"status": statuses.split(","), **bounded(items)})
 
     return [
@@ -422,6 +421,20 @@ def build_tools(
         *([get_site_digest] if digests else []),
         *([list_maintenance] if maintenance else []),
     ]
+
+
+def _anomaly_item(anomaly: dict[str, Any]) -> dict[str, Any]:
+    item = {k: anomaly.get(k) for k in ANOMALY_FIELDS}
+    if item["review"]:
+        item["review"] = {k: item["review"].get(k) for k in ("verdict", "reviewedBy", "comment")}
+    return item
+
+
+def _maintenance_item(maintenance: dict[str, Any]) -> dict[str, Any]:
+    item = {k: maintenance.get(k) for k in MAINTENANCE_FIELDS}
+    battery = maintenance.get("battery")
+    item["battery"] = {k: battery.get(k) for k in BATTERY_FIELDS} if battery else None
+    return item
 
 
 def _summarise(series: dict[str, Any]) -> dict[str, Any]:

@@ -1,5 +1,7 @@
 """RFC 9457 problem details, the error format of every platform API."""
 
+from typing import Any
+
 from fastapi import Request
 from fastapi.responses import JSONResponse
 
@@ -13,10 +15,17 @@ class ProblemError(Exception):
         self.headers = headers
 
 
-def problem_response(request: Request, error: ProblemError) -> JSONResponse:
-    body = {"type": "about:blank", "title": error.title, "status": error.status, "instance": request.url.path}
+def problem_response(request: Request, error: ProblemError, **extensions: Any) -> JSONResponse:
+    """`extensions`: additional members of the problem, e.g. the validation `errors`."""
+    body: dict[str, Any] = {
+        "type": "about:blank",
+        "title": error.title,
+        "status": error.status,
+        "instance": request.url.path,
+    }
     if error.detail:
         body["detail"] = error.detail
+    body |= extensions
     return JSONResponse(body, status_code=error.status, media_type="application/problem+json", headers=error.headers)
 
 

@@ -40,8 +40,9 @@ class Conversation:
     def history(self) -> list[Message]:
         """Model context: full messages of the latest turns, question and answer only for older ones."""
         messages: list[Message] = []
+        first_with_tools = len(self.turns) - TURNS_WITH_TOOLS
         for index, t in enumerate(self.turns):
-            if index >= len(self.turns) - TURNS_WITH_TOOLS and t.messages:
+            if index >= first_with_tools and t.messages:
                 messages.extend(Message.from_dict(m) for m in t.messages)
             else:
                 messages.append(Message("user", [t.question]))
@@ -83,7 +84,7 @@ class ConversationStore:
         self._max_turns = max(1, max_messages // 2)
 
     async def create(self, owner: str) -> Conversation:
-        conversation = Conversation(id=str(uuid.uuid4()), owner=owner, created_at=_now())
+        conversation = Conversation(id=str(uuid.uuid4()), owner=owner, created_at=now_iso())
         await self._save(conversation)
         return conversation
 
@@ -91,7 +92,7 @@ class ConversationStore:
         """The conversation, or None when it does not exist, has expired or belongs to someone else."""
         if not _is_id(conversation_id):
             return None
-        raw = await self._redis.get(KEY_PREFIX + conversation_id)
+        raw = await self._redis.get(_key(conversation_id))
         if raw is None:
             return None
         conversation = Conversation.from_json(raw)
@@ -105,15 +106,15 @@ class ConversationStore:
     async def delete(self, conversation_id: str, owner: str) -> bool:
         if await self.get(conversation_id, owner) is None:
             return False
-        await self._redis.delete(KEY_PREFIX + conversation_id, KEY_PREFIX + conversation_id + ":lock")
+        await self._redis.delete(_key(conversation_id), _lock_key(conversation_id))
         return True
 
     async def lock(self, conversation_id: str) -> None:
-        if not await self._redis.set(KEY_PREFIX + conversation_id + ":lock", "1", nx=True, ex=LOCK_SECONDS):
+        if not await self._redis.set(_lock_key(conversation_id), "1", nx=True, ex=LOCK_SECONDS):
             raise ConversationBusyError(conversation_id)
 
     async def unlock(self, conversation_id: str) -> None:
-        await self._redis.delete(KEY_PREFIX + conversation_id + ":lock")
+        await self._redis.delete(_lock_key(conversation_id))
 
     async def allow_message(self, owner: str, per_minute: int) -> int | None:
         """Counts a message of `owner` in a sliding one-minute window shared by all replicas; returns None when allowed,
@@ -126,7 +127,10 @@ class ConversationStore:
             count = (await pipe.execute())[1]
         if count >= per_minute:
             oldest = await self._redis.zrange(key, 0, 0, withscores=True)
-            return max(1, int(60 - (now - oldest[0][1])) + 1) if oldest else 60
+            if not oldest:
+                return 60
+            oldest_at = oldest[0][1]
+            return max(1, int(60 - (now - oldest_at)) + 1)
         async with self._redis.pipeline(transaction=True) as pipe:
             pipe.zadd(key, {uuid.uuid4().hex: now})
             pipe.expire(key, 120)
@@ -138,11 +142,19 @@ class ConversationStore:
 
     async def _save(self, conversation: Conversation) -> None:
         # Sliding expiry: every new message restarts the hour.
-        await self._redis.set(KEY_PREFIX + conversation.id, conversation.to_json(), ex=self._ttl)
+        await self._redis.set(_key(conversation.id), conversation.to_json(), ex=self._ttl)
 
 
-def _now() -> str:
+def now_iso() -> str:
     return datetime.now(UTC).isoformat(timespec="seconds").replace("+00:00", "Z")
+
+
+def _key(conversation_id: str) -> str:
+    return KEY_PREFIX + conversation_id
+
+
+def _lock_key(conversation_id: str) -> str:
+    return _key(conversation_id) + ":lock"
 
 
 def _is_id(value: str) -> bool:
@@ -150,7 +162,3 @@ def _is_id(value: str) -> bool:
         return str(uuid.UUID(value)) == value
     except ValueError:
         return False
-
-
-def now_iso() -> str:
-    return _now()

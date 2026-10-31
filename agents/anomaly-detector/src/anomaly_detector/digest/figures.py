@@ -129,74 +129,85 @@ def _maintenance(items: list[dict[str, Any]]) -> dict[str, Any]:
     }
 
 
+def _devices(devices: list[DeviceRow], at: datetime) -> dict[str, Any]:
+    silent = sorted((d for d in devices if at - d.last_seen_at > SILENCE), key=lambda d: d.last_seen_at)
+    return {
+        "total": len(devices),
+        "reporting": len(devices) - len(silent),
+        "silent": _bounded(
+            [{"deviceId": d.device_id, "name": d.display_name, "lastSeenAt": _iso(d.last_seen_at)} for d in silent]
+        ),
+    }
+
+
+def _alerts(alerts: list[dict[str, Any]], open_now: int) -> dict[str, Any]:
+    items = [
+        {
+            "deviceId": a["deviceId"],
+            "metric": a["metric"],
+            "direction": a["direction"].lower(),
+            "status": a["status"].lower(),
+            "openedAt": _iso(a["openedAt"]),
+            "closedAt": _iso(a.get("closedAt")),
+            "worstValue": _round(float(a["worstValue"])),
+        }
+        for a in alerts
+    ]
+    return {"openNow": open_now, **_bounded(items)}
+
+
+def _anomalies(anomalies: list[dict[str, Any]]) -> dict[str, Any]:
+    by_status = Counter(a["status"] for a in anomalies)
+    by_classification = Counter(a["classification"] or "pending" for a in anomalies)
+    # Dismissed ones are counted, not listed: they are expected patterns.
+    items = [
+        {
+            "deviceId": a["deviceId"],
+            "metric": a["metric"],
+            "kind": a["kind"],
+            "status": a["status"],
+            "classification": a["classification"],
+            "confidencePercent": round(100 * a["confidence"]) if a["confidence"] is not None else None,
+            "startedAt": _iso(a["startedAt"]),
+            "endedAt": _iso(a["endedAt"]),
+        }
+        for a in anomalies
+        if a["status"] != "dismissed"
+    ]
+    return {
+        "byStatus": dict(sorted(by_status.items())),
+        "byClassification": dict(sorted(by_classification.items())),
+        **_bounded(items),
+    }
+
+
+def _certificates(certificates: list[dict[str, Any]], at: datetime) -> dict[str, Any]:
+    expiring = [c for c in certificates if c["notAfter"] - at <= CERTIFICATE_WARNING]
+    return {
+        "expiringWithin30Days": [
+            {
+                "slot": c["slot"],
+                "subject": c["subject"],
+                "notAfter": _iso(c["notAfter"]),
+                "daysLeft": max(0, (c["notAfter"] - at).days),
+            }
+            for c in sorted(expiring, key=lambda c: c["notAfter"])
+        ]
+    }
+
+
 def compute(data: SiteData, window: Window) -> dict[str, Any]:
     at = window.generated_at
-    silent = sorted((d for d in data.devices if at - d.last_seen_at > SILENCE), key=lambda d: d.last_seen_at)
-    anomaly_status = Counter(a["status"] for a in data.anomalies)
-    anomaly_classes = Counter(a["classification"] or "pending" for a in data.anomalies)
-    expiring = [c for c in data.certificates if c["notAfter"] - at <= CERTIFICATE_WARNING]
     figures: dict[str, Any] = {
         "site": {"id": data.site_id, "name": data.site_name},
         "period": {"from": _iso(window.period_from), "to": _iso(at)},
         "comparison": {"from": _iso(window.comparison_from), "to": _iso(window.period_from)},
-        "devices": {
-            "total": len(data.devices),
-            "reporting": len(data.devices) - len(silent),
-            "silent": _bounded(
-                [{"deviceId": d.device_id, "name": d.display_name, "lastSeenAt": _iso(d.last_seen_at)} for d in silent]
-            ),
-        },
+        "devices": _devices(data.devices, at),
         "metrics": _metrics(data.metrics, data.units),
-        "alerts": {
-            "openNow": data.open_alerts,
-            **_bounded(
-                [
-                    {
-                        "deviceId": a["deviceId"],
-                        "metric": a["metric"],
-                        "direction": a["direction"].lower(),
-                        "status": a["status"].lower(),
-                        "openedAt": _iso(a["openedAt"]),
-                        "closedAt": _iso(a.get("closedAt")),
-                        "worstValue": _round(float(a["worstValue"])),
-                    }
-                    for a in data.alerts
-                ]
-            ),
-        },
-        "anomalies": {
-            "byStatus": dict(sorted(anomaly_status.items())),
-            "byClassification": dict(sorted(anomaly_classes.items())),
-            # Dismissed ones are counted, not listed: they are expected patterns.
-            **_bounded(
-                [
-                    {
-                        "deviceId": a["deviceId"],
-                        "metric": a["metric"],
-                        "kind": a["kind"],
-                        "status": a["status"],
-                        "classification": a["classification"],
-                        "confidencePercent": round(100 * a["confidence"]) if a["confidence"] is not None else None,
-                        "startedAt": _iso(a["startedAt"]),
-                        "endedAt": _iso(a["endedAt"]),
-                    }
-                    for a in data.anomalies
-                    if a["status"] != "dismissed"
-                ]
-            ),
-        },
+        "alerts": _alerts(data.alerts, data.open_alerts),
+        "anomalies": _anomalies(data.anomalies),
         "rejectedMessages": {"total": sum(data.rejected.values()), "byReason": dict(sorted(data.rejected.items()))},
-        "certificates": {
-            "expiringWithin30Days": [
-                {
-                    "slot": c["slot"],
-                    "subject": c["subject"],
-                    "notAfter": _iso(c["notAfter"]),
-                    "daysLeft": max(0, (c["notAfter"] - at).days),
-                }
-                for c in sorted(expiring, key=lambda c: c["notAfter"])
-            ]
-        },
+        "certificates": _certificates(data.certificates, at),
     }
     if data.maintenance is not None:
         figures["maintenance"] = _maintenance(data.maintenance)

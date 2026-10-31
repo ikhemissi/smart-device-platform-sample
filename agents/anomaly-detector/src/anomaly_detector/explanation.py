@@ -1,6 +1,5 @@
 """Explanations by the chat model (M7 design D4): for confirmed anomalies only, from the decision's data only."""
 
-import json
 import logging
 from collections.abc import Callable
 from dataclasses import dataclass, field
@@ -9,6 +8,7 @@ from typing import Any
 import httpx
 import openai
 
+from .chat import chat_client, respond, set_request_attributes, set_usage_attributes
 from .decision import Classification
 from .telemetry import tracer
 
@@ -46,37 +46,23 @@ class Explainer:
     client: openai.OpenAI = field(init=False)
 
     def __post_init__(self) -> None:
-        self.client = openai.OpenAI(
-            base_url=f"{self.openai_endpoint.rstrip('/')}/openai/v1/",
-            api_key=self.token,
-            timeout=60,
-            max_retries=1,
-            http_client=self.http_client,
-        )
+        self.client = chat_client(self.openai_endpoint, self.token, timeout=60, http_client=self.http_client)
 
     def explain(self, state: dict[str, Any], classification: Classification) -> Explanation | None:
         """None when the model fails: the anomaly stays confirmed without explanation and the next cycle retries."""
         label, probability = classification.top
         data = {"anomaly": state, "classification": LABELS[label], "probability": round(probability, 3)}
         with tracer.start_as_current_span("sdp.anomaly.explain") as span:
-            span.set_attribute("gen_ai.operation.name", "responses")
-            span.set_attribute("gen_ai.request.model", self.deployment)
+            set_request_attributes(span, self.deployment)
             try:
-                response = self.client.responses.create(
-                    model=self.deployment,
-                    instructions=INSTRUCTIONS,
-                    input=json.dumps(data, ensure_ascii=False),
-                    reasoning={"effort": self.reasoning_effort},
-                    max_output_tokens=1500,
-                    store=False,
+                response = respond(
+                    self.client, self.deployment, INSTRUCTIONS, data, self.reasoning_effort, max_output_tokens=1500
                 )
             except openai.OpenAIError as error:
                 log.warning("Explanation failed, anomaly left without explanation: %s", error)
                 span.record_exception(error)
                 return None
-            if response.usage:
-                span.set_attribute("gen_ai.usage.input_tokens", response.usage.input_tokens)
-                span.set_attribute("gen_ai.usage.output_tokens", response.usage.output_tokens)
+            set_usage_attributes(span, response.usage)
             text = response.output_text.strip()
             if not text:
                 log.warning("Explanation failed: empty answer (status %s)", response.status)

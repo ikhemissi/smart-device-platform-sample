@@ -26,27 +26,67 @@ class QueueItem:
 def reasons(battery: Forecast | None, signals: Signals, probability: float) -> list[dict[str, Any]]:
     """The computed figures that cross a rule, with their values; when none does, the battery forecast and the
     probability."""
+    return _crossed_rules(battery, signals) or _fallback_reasons(battery, probability)
+
+
+def _crossed_rules(battery: Forecast | None, signals: Signals) -> list[dict[str, Any]]:
     found: list[dict[str, Any]] = []
     if battery is not None and battery.days_left is not None and battery.days_left <= DAYS_LEFT:
-        found.append({"rule": "battery_days_left", "value": battery.days_left, "threshold": DAYS_LEFT, "unit": "days",
-                      "level": battery.level, "level_unit": battery.unit})  # fmt: skip
+        found.append(
+            {
+                "rule": "battery_days_left",
+                "value": battery.days_left,
+                "threshold": DAYS_LEFT,
+                "unit": "days",
+                "level": battery.level,
+                "level_unit": battery.unit,
+            }
+        )
     if signals.minutes_since_last is not None and signals.minutes_since_last > SILENT_MINUTES:
-        found.append({"rule": "silent", "value": round(signals.minutes_since_last, 1), "threshold": SILENT_MINUTES,
-                      "unit": "minutes"})  # fmt: skip
+        found.append(
+            {
+                "rule": "silent",
+                "value": round(signals.minutes_since_last, 1),
+                "threshold": SILENT_MINUTES,
+                "unit": "minutes",
+            }
+        )
     ratio = signals.gap_ratio
     if ratio is not None and ratio >= GAP_RATIO:
-        found.append({"rule": "reporting_gaps", "value": round(ratio, 1), "threshold": GAP_RATIO,
-                      "unit": "times the usual interval", "longest_gap_s": round(signals.last_24h.longest_gap_s, 1),
-                      "usual_interval_s": round(signals.previous_7d.median_interval_s, 1)})  # fmt: skip
+        found.append(
+            {
+                "rule": "reporting_gaps",
+                "value": round(ratio, 1),
+                "threshold": GAP_RATIO,
+                "unit": "times the usual interval",
+                "longest_gap_s": round(signals.last_24h.longest_gap_s, 1),
+                "usual_interval_s": round(signals.previous_7d.median_interval_s, 1),
+            }
+        )
     if signals.rejected_24h >= REJECTED:
-        found.append({"rule": "rejected_messages", "value": signals.rejected_24h, "threshold": REJECTED,
-                      "unit": "messages in 24 hours"})  # fmt: skip
-    if found:
-        return found
+        found.append(
+            {
+                "rule": "rejected_messages",
+                "value": signals.rejected_24h,
+                "threshold": REJECTED,
+                "unit": "messages in 24 hours",
+            }
+        )
+    return found
+
+
+def _fallback_reasons(battery: Forecast | None, probability: float) -> list[dict[str, Any]]:
     fallback: list[dict[str, Any]] = []
     if battery is not None:
-        fallback.append({"rule": "battery_forecast", "value": battery.level, "unit": battery.unit,
-                         "days_left": battery.days_left, "slope_per_day": battery.slope_per_day})  # fmt: skip
+        fallback.append(
+            {
+                "rule": "battery_forecast",
+                "value": battery.level,
+                "unit": battery.unit,
+                "days_left": battery.days_left,
+                "slope_per_day": battery.slope_per_day,
+            }
+        )
     fallback.append({"rule": "probability", "value": round(probability, 3)})
     return fallback
 

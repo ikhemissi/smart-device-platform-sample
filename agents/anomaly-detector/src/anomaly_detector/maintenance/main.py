@@ -9,20 +9,16 @@ import logging
 from datetime import UTC, datetime
 from typing import Any
 
-from azure.identity import DefaultAzureCredential, get_bearer_token_provider
+import psycopg
 
-from .. import db, telemetry
+from .. import db, jobs, telemetry
 from .config import MaintenanceSettings
 from .lifecycle import reasons
-from .models import InterventionClient, WorkOrderWriter
+from .models import Assesses, InterventionClient, WorkOrderWriter, WritesWorkOrders
 from .run import MaintenanceRun, RunResult, traced_run
 from .store import DryRunStore, PgSource, PgStore
 
 log = logging.getLogger("maintenance")
-
-COGNITIVE_SCOPE = "https://cognitiveservices.azure.com/.default"
-# Locally, credentials come from developer tools (Azure CLI): allow more than the default 10 s on a busy machine.
-DEVELOPER_TOOL_TIMEOUT = 60
 
 
 def _parse(argv: list[str] | None) -> argparse.Namespace:
@@ -42,12 +38,10 @@ def _print(value: Any) -> None:
 
 def run(argv: list[str] | None = None) -> int:
     args = _parse(argv)
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
-    logging.getLogger("azure").setLevel(logging.WARNING)
-    logging.getLogger("httpx").setLevel(logging.WARNING)
+    jobs.configure_logging()
     settings = MaintenanceSettings()
-    credential = DefaultAzureCredential(process_timeout=DEVELOPER_TOOL_TIMEOUT)
-    token = get_bearer_token_provider(credential, COGNITIVE_SCOPE)
+    credential = jobs.credential()
+    token = jobs.model_token(credential)
     assessor = InterventionClient(settings.decision_endpoint, settings.decision_deployment, token)
     writer = WorkOrderWriter(settings.openai_endpoint, settings.model_deployment, token)
     now = datetime.now(UTC)
@@ -57,14 +51,10 @@ def run(argv: list[str] | None = None) -> int:
         with db.connect(settings, credential) as conn:
             source = PgSource(conn, sites)
             if args.no_models:
-                _print([{"device": e.device.device_id, "battery": e.battery.as_json() if e.battery else None,
-                         "signals": e.signals.as_json(), "reasons_if_queued": reasons(e.battery, e.signals, 1.0)}
-                        for e in source.inputs(now)])  # fmt: skip
+                _print(_inputs(source, now))
                 return 0
-            store = DryRunStore(PgStore(conn))
-            result = MaintenanceRun(source, store, assessor, writer, settings.confidence).run(now)
-        _print({"assessments": store.writes, "queue_changes": result.changes,
-                "counts": {k: v for k, v in vars(result).items() if k != "changes"}})  # fmt: skip
+            output = _dry_run(conn, source, assessor, writer, settings.confidence, now)
+        _print(output)
         return 0
 
     telemetry.configure(settings, credential)
@@ -75,12 +65,48 @@ def run(argv: list[str] | None = None) -> int:
 
     try:
         r = traced_run(execute)
-        log.info("Maintenance run completed: devices=%d assessed=%d opened=%d updated=%d resolved=%d work_orders=%d "
-                 "errors=%d", r.devices, r.assessed, r.opened, r.updated, r.resolved, r.work_orders,
-                 r.errors)  # fmt: skip
+        log.info(
+            "Maintenance run completed: devices=%d assessed=%d opened=%d updated=%d resolved=%d work_orders=%d "
+            "errors=%d",
+            r.devices,
+            r.assessed,
+            r.opened,
+            r.updated,
+            r.resolved,
+            r.work_orders,
+            r.errors,
+        )
         return 0
     except Exception:
         log.exception("Maintenance run failed")
         return 1
     finally:
         telemetry.flush()
+
+
+def _inputs(source: PgSource, now: datetime) -> list[dict[str, Any]]:
+    """`--no-models`: the forecasts, the signals and the reasons each device would be queued with."""
+    return [
+        {
+            "device": e.device.device_id,
+            "battery": e.battery_json(),
+            "signals": e.signals.as_json(),
+            "reasons_if_queued": reasons(e.battery, e.signals, 1.0),
+        }
+        for e in source.inputs(now)
+    ]
+
+
+def _dry_run(
+    conn: psycopg.Connection,
+    source: PgSource,
+    assessor: Assesses,
+    writer: WritesWorkOrders,
+    confidence: float,
+    now: datetime,
+) -> dict[str, Any]:
+    """A run with the models that writes nothing: the assessments it would save and the queue changes it would make."""
+    store = DryRunStore(PgStore(conn))
+    result = MaintenanceRun(source, store, assessor, writer, confidence).run(now)
+    counts = {k: v for k, v in vars(result).items() if k != "changes"}
+    return {"assessments": store.writes, "queue_changes": result.changes, "counts": counts}

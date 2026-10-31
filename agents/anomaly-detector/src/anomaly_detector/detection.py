@@ -100,27 +100,32 @@ class Candidate:
 
 
 def build_baselines(rollups: Iterable[HourlyRollup]) -> dict[tuple[str, str], Baseline]:
+    """The baseline of each device and metric with at least 3 full days of hourly rollups."""
     by_series: dict[tuple[str, str], list[HourlyRollup]] = defaultdict(list)
     for r in rollups:
         by_series[(r.device_id, r.metric)].append(r)
     baselines = {}
     for key, rows in by_series.items():
         days = len({r.hour for r in rows}) // 24  # full days of hourly rollups, wherever they start
-        if days < MIN_BASELINE_DAYS:
-            continue
-        by_hour: dict[int, list[HourlyRollup]] = defaultdict(list)
-        for r in rows:
-            by_hour[r.hour.hour].append(r)
-        usual = {h: fmean(r.average for r in hour_rows) for h, hour_rows in by_hour.items()}
-        varies = {h: median(r.max_value - r.min_value for r in hour_rows) > 0 for h, hour_rows in by_hour.items()}
-        ranges = {
-            h: (median(r.min_value for r in hour_rows), median(r.max_value for r in hour_rows))
-            for h, hour_rows in by_hour.items()
-        }
-        mad = median(abs(r.average - usual[r.hour.hour]) for r in rows)
-        floor = SPREAD_FLOORS.get(key[1], DEFAULT_SPREAD_FLOOR)
-        baselines[key] = Baseline(usual, varies, max(MAD_SCALE * mad, floor), days, ranges)
+        if days >= MIN_BASELINE_DAYS:
+            _, metric = key
+            baselines[key] = _baseline(metric, rows, days)
     return baselines
+
+
+def _baseline(metric: str, rows: list[HourlyRollup], days: int) -> Baseline:
+    by_hour: dict[int, list[HourlyRollup]] = defaultdict(list)
+    for r in rows:
+        by_hour[r.hour.hour].append(r)
+    usual = {h: fmean(r.average for r in hour_rows) for h, hour_rows in by_hour.items()}
+    varies = {h: median(r.max_value - r.min_value for r in hour_rows) > 0 for h, hour_rows in by_hour.items()}
+    ranges = {
+        h: (median(r.min_value for r in hour_rows), median(r.max_value for r in hour_rows))
+        for h, hour_rows in by_hour.items()
+    }
+    mad = median(abs(r.average - usual[r.hour.hour]) for r in rows)
+    spread = max(MAD_SCALE * mad, SPREAD_FLOORS.get(metric, DEFAULT_SPREAD_FLOOR))
+    return Baseline(usual, varies, spread, days, ranges)
 
 
 def assess(readings: Sequence[Reading], baseline: Baseline) -> Assessment | None:
@@ -133,7 +138,14 @@ def assess(readings: Sequence[Reading], baseline: Baseline) -> Assessment | None
     residual = fmean(v - u for v, u in zip(values, usual, strict=True))
     steps = [abs(b - a) for a, b in pairwise(values)]
     first, last = readings[0], readings[-1]
-    ranges = [baseline.range_by_hour[h] for h in {r.measured_at.hour for r in readings} if h in baseline.range_by_hour]
+    hours = {r.measured_at.hour for r in readings}
+    ranges = [baseline.range_by_hour[h] for h in hours if h in baseline.range_by_hour]
+    # Stuck on one value while the metric usually varies at these hours.
+    flat = (
+        len(values) >= MIN_FLAT_READINGS
+        and min(values) == max(values)
+        and all(baseline.varies_by_hour.get(r.measured_at.hour, False) for r in readings)
+    )
     return Assessment(
         device_id=first.device_id,
         metric=first.metric,
@@ -148,9 +160,7 @@ def assess(readings: Sequence[Reading], baseline: Baseline) -> Assessment | None
         spread=baseline.spread,
         score=residual / baseline.spread,
         max_step=max(steps, default=0.0),
-        flat=len(values) >= MIN_FLAT_READINGS
-        and min(values) == max(values)
-        and all(baseline.varies_by_hour.get(r.measured_at.hour, False) for r in readings),
+        flat=flat,
         usual_min=min((lo for lo, _ in ranges), default=None),
         usual_max=max((hi for _, hi in ranges), default=None),
     )

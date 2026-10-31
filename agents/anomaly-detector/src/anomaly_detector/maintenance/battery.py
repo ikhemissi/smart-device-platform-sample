@@ -143,10 +143,18 @@ def forecast(points: Sequence[HourlyBattery], metric: str, now: datetime) -> For
     current = segment(ordered, metric)
     since = current[0].at
     if current[-1].at - since < MIN_TREND_SPAN:
-        return Forecast(metric, kind.unit, round(current[-1].average, kind.decimals), None, None, since, kind.cutoff)
+        latest = round(current[-1].average, kind.decimals)
+        return Forecast(metric, kind.unit, latest, slope_per_day=None, days_left=None, since=since, cutoff=kind.cutoff)
     level, slope = _weighted_fit(current, now)
     days_left = None
     if slope < -kind.min_decline_per_day:
         days_left = round(max(0.0, (level - kind.cutoff) / -slope), 1)
-    return Forecast(metric, kind.unit, round(level, kind.decimals), round(slope, kind.decimals + 2), days_left, since,
-                    kind.cutoff)  # fmt: skip
+    return Forecast(
+        metric,
+        kind.unit,
+        level=round(level, kind.decimals),
+        slope_per_day=round(slope, kind.decimals + 2),
+        days_left=days_left,
+        since=since,
+        cutoff=kind.cutoff,
+    )

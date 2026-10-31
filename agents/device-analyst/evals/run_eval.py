@@ -154,6 +154,26 @@ async def replay(tools: dict[str, Any], calls: list[dict[str, Any]]) -> str:
     return "\n".join(parts) or "No data was retrieved."
 
 
+async def new_conversation(client: httpx.AsyncClient, token: str) -> str:
+    created = await client.post("/agent/conversations", headers={"Authorization": f"Bearer {token}"})
+    created.raise_for_status()
+    return created.json()["id"]
+
+
+def judged_conversation(
+    question: dict[str, Any], started_at: str, history: list[dict[str, str]]
+) -> list[dict[str, str]]:
+    """The conversation as the agent saw it, for the tool-call judge: instructions, per-turn context, earlier turns."""
+    situation = f"Current time: {started_at}."
+    if question.get("device_id"):
+        situation += f" The user is viewing the page of device {question['device_id']}."
+    return [
+        {"role": "system", "content": f"{INSTRUCTIONS}\n{situation}"},
+        *history,
+        {"role": "user", "content": question["query"]},
+    ]
+
+
 async def collect(questions: list[dict[str, Any]], settings: Settings) -> list[dict[str, Any]]:
     scope = f"{settings.api_audiences[0]}/.default"
     token = CREDENTIAL.get_token(scope).token
@@ -168,9 +188,7 @@ async def collect(questions: list[dict[str, Any]], settings: Settings) -> list[d
             if parent and parent in conversations:
                 conversation = conversations[parent]
             else:
-                created = await client.post("/agent/conversations", headers={"Authorization": f"Bearer {token}"})
-                created.raise_for_status()
-                conversation = created.json()["id"]
+                conversation = await new_conversation(client, token)
             conversations[question["id"]] = conversation
             started_at = datetime.now(UTC).isoformat(timespec="seconds")
             answer = await ask(client, token, conversation, question)
@@ -183,16 +201,8 @@ async def collect(questions: list[dict[str, Any]], settings: Settings) -> list[d
                 **answer,
                 "retrieved": context,
             }
-            # The tool-call judge sees the conversation as the agent did: instructions, per-turn context, earlier turns.
-            situation = f"Current time: {started_at}."
-            if question.get("device_id"):
-                situation += f" The user is viewing the page of device {question['device_id']}."
             history = transcripts.get(parent, []) if parent else []
-            row["conversation"] = [
-                {"role": "system", "content": f"{INSTRUCTIONS}\n{situation}"},
-                *history,
-                {"role": "user", "content": question["query"]},
-            ]
+            row["conversation"] = judged_conversation(question, started_at, history)
             transcripts[question["id"]] = [
                 *row["conversation"][1:],
                 {"role": "assistant", "content": answer["response"]},
@@ -246,8 +256,10 @@ class ChecksEvaluator:
             first_text_seconds is not None and first_text_seconds <= FIRST_TEXT_TARGET_SECONDS
         )
         failed = [name for name, ok in checks.items() if not ok]
+        # Latency is reported on its own: a slow but correct answer still passes.
+        failed_except_latency = [name for name in failed if name != "first_text_within_5s"]
         return {
-            "passed": 0.0 if [f for f in failed if f != "first_text_within_5s"] else 1.0,
+            "passed": 0.0 if failed_except_latency else 1.0,
             "first_text_within_5s": 1.0 if checks["first_text_within_5s"] else 0.0,
             "failed_checks": ",".join(failed),
         }
@@ -318,15 +330,7 @@ def run_evaluation(data: Path, settings: Settings, skip_judges: bool) -> dict[st
                 }
             },
         }
-        rows = [json.loads(line) for line in data.read_text().splitlines()]
-        with data.open("w") as f:
-            for row in rows:
-                # Groundedness is judged against everything the agent was given: its instructions, the per-turn
-                # situation (current time, device context) and the data its tools returned.
-                context = f"{row['conversation'][0]['content']}\n\nData retrieved by the tools:\n{row['retrieved']}"
-                f.write(
-                    json.dumps(row | {"tool_definitions": definitions, "context": context}, ensure_ascii=False) + "\n"
-                )
+        add_judge_inputs(data, definitions)
     return evaluate(
         data=str(data),
         evaluators=evaluators,
@@ -334,6 +338,17 @@ def run_evaluation(data: Path, settings: Settings, skip_judges: bool) -> dict[st
         evaluation_name="device-analyst",
         output_path=str(RESULTS / "evaluation.json"),
     )
+
+
+def add_judge_inputs(data: Path, definitions: list[dict[str, Any]]) -> None:
+    """Adds to every collected row the tool definitions and the context the judges need."""
+    rows = [json.loads(line) for line in data.read_text().splitlines()]
+    with data.open("w") as f:
+        for row in rows:
+            # Groundedness is judged against everything the agent was given: its instructions, the per-turn
+            # situation (current time, device context) and the data its tools returned.
+            context = f"{row['conversation'][0]['content']}\n\nData retrieved by the tools:\n{row['retrieved']}"
+            f.write(json.dumps(row | {"tool_definitions": definitions, "context": context}, ensure_ascii=False) + "\n")
 
 
 def summarise(rows: list[dict[str, Any]], result: dict[str, Any]) -> dict[str, Any]:

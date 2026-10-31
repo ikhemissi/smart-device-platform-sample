@@ -10,12 +10,6 @@ from .. import db
 from .figures import DeviceRow, MetricRow, SiteData, Window
 
 
-def sites(conn: psycopg.Connection, configured: list[str]) -> list[str]:
-    """The sites that get a digest: the configured ones that exist, or every site."""
-    known = [r["site_id"] for r in conn.execute("SELECT site_id FROM sdp.sites ORDER BY site_id").fetchall()]
-    return [s for s in known if s in configured] if configured else known
-
-
 def load(
     conn: psycopg.Connection, site_id: str, metrics: list[str], window: Window, maintenance: bool = False
 ) -> SiteData:
@@ -28,9 +22,7 @@ def load(
         metrics=_metrics(conn, site_id, metrics, window),
         units=db.metric_units(conn),
         alerts=_alerts(conn, site_id, window),
-        open_alerts=conn.execute(
-            "SELECT count(*) AS n FROM sdp.alert_events WHERE site_id = %s AND status = 'OPEN'", (site_id,)
-        ).fetchone()["n"],
+        open_alerts=_open_alerts(conn, site_id),
         anomalies=_anomalies(conn, site_id, window),
         rejected=_rejected(conn, site_id, window),
         certificates=_certificates(conn, site_id),
@@ -53,7 +45,14 @@ def _alerts(conn: psycopg.Connection, site_id: str, window: Window) -> list[dict
         (site_id, window.period_from, window.generated_at),
     ).fetchall()
     keys = {"device_id": "deviceId", "opened_at": "openedAt", "closed_at": "closedAt", "worst_value": "worstValue"}
-    return [{keys.get(k, k): v for k, v in r.items()} for r in rows]
+    return _renamed(rows, keys)
+
+
+def _open_alerts(conn: psycopg.Connection, site_id: str) -> int:
+    """Alerts open at generation time, whenever they opened."""
+    return conn.execute(
+        "SELECT count(*) AS n FROM sdp.alert_events WHERE site_id = %s AND status = 'OPEN'", (site_id,)
+    ).fetchone()["n"]
 
 
 def _anomalies(conn: psycopg.Connection, site_id: str, window: Window) -> list[dict[str, Any]]:
@@ -66,6 +65,11 @@ def _anomalies(conn: psycopg.Connection, site_id: str, window: Window) -> list[d
         (site_id, window.generated_at, window.period_from),
     ).fetchall()
     keys = {"device_id": "deviceId", "started_at": "startedAt", "ended_at": "endedAt"}
+    return _renamed(rows, keys)
+
+
+def _renamed(rows: list[dict[str, Any]], keys: dict[str, str]) -> list[dict[str, Any]]:
+    """The rows with their columns renamed as in `keys` (the others unchanged)."""
     return [{keys.get(k, k): v for k, v in r.items()} for r in rows]
 
 

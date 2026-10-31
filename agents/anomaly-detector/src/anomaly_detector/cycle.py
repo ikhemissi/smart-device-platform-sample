@@ -10,14 +10,14 @@ from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from typing import Any, Protocol
 
-from opentelemetry.trace import SpanKind, Status, StatusCode
+from opentelemetry.trace import Status, StatusCode
 
 from .config import Settings
 from .db import Device
 from .decision import Classification, Classifier, build_state, decide
 from .detection import Baseline, Candidate, Reading, continues, detect
 from .explanation import Explanation
-from .telemetry import tracer
+from .telemetry import job_span
 
 log = logging.getLogger(__name__)
 
@@ -56,9 +56,21 @@ class Anomaly:
     def from_candidate(cls, candidate: Candidate, site_id: str, state: dict[str, Any]) -> "Anomaly":
         a = candidate.assessment
         return cls(
-            a.device_id, site_id, a.metric, candidate.kind, a.started_at, a.ended_at, a.observed_min, a.observed_max,
-            a.observed_mean, a.observed_last, a.usual_value, a.spread, candidate.score, state,
-        )  # fmt: skip
+            device_id=a.device_id,
+            site_id=site_id,
+            metric=a.metric,
+            kind=candidate.kind,
+            started_at=a.started_at,
+            ended_at=a.ended_at,
+            observed_min=a.observed_min,
+            observed_max=a.observed_max,
+            observed_mean=a.observed_mean,
+            observed_last=a.observed_last,
+            usual_value=a.usual_value,
+            spread=a.spread,
+            score=candidate.score,
+            state=state,
+        )
 
 
 class Source(Protocol):
@@ -113,11 +125,8 @@ class Detector:
         result.devices, result.assessed, result.candidates = len(devices), len(assessments), len(candidates)
 
         recent = self.store.recent(now - RECENT)
-        latest: dict[tuple[str, str], Anomaly] = {}
-        for anomaly in sorted(recent, key=lambda a: a.ended_at):
-            latest[(anomaly.device_id, anomaly.metric)] = anomaly
-
-        handled: set[int] = set()
+        latest = _latest_by_series(recent)
+        created: set[int] = set()
         for candidate in candidates:
             a = candidate.assessment
             episode = latest.get((a.device_id, a.metric))
@@ -125,37 +134,46 @@ class Detector:
                 self.store.extend(episode, candidate)
                 result.extended += 1
                 continue
-            open_anomalies = [
-                {
-                    "metric": o.metric,
-                    "kind": o.kind,
-                    "since": o.started_at.isoformat(),
-                    "classification": o.classification,
-                }
-                for o in recent
-                if o.device_id == a.device_id and o.metric != a.metric
-            ]
-            device = devices[a.device_id]
-            site_devices = [d.device_id for d in devices.values() if d.site_id == device.site_id]
-            state = build_state(candidate, device, units.get(a.metric, ""), site_devices, open_anomalies)
-            anomaly = self.store.add(Anomaly.from_candidate(candidate, device.site_id, state))
+            anomaly = self._create(candidate, devices, units, recent, result)
             latest[(a.device_id, a.metric)] = anomaly
-            result.created += 1
-            result.kinds[candidate.kind] += 1
             if anomaly.id is not None:
-                handled.add(anomaly.id)
+                created.add(anomaly.id)
             self._classify(anomaly, result)
 
         if self.classifier is not None:
-            for anomaly in self.store.unfinished(MAX_RETRIES_PER_CYCLE):
-                if anomaly.id in handled:
-                    continue
-                result.retried += 1
-                if anomaly.decision == "pending":
-                    self._classify(anomaly, result)
-                elif anomaly.decision == "confirmed" and anomaly.explanation is None and anomaly.probabilities:
-                    self._explain(anomaly, Classification(anomaly.probabilities, anomaly.decision_model or ""), result)
+            self._retry_unfinished(created, result)
         return result
+
+    def _create(
+        self,
+        candidate: Candidate,
+        devices: dict[str, Device],
+        units: dict[str, str],
+        recent: list[Anomaly],
+        result: CycleResult,
+    ) -> Anomaly:
+        """A new episode, stored with the state the models will see."""
+        a = candidate.assessment
+        device = devices[a.device_id]
+        site_devices = [d.device_id for d in devices.values() if d.site_id == device.site_id]
+        open_anomalies = _other_open_anomalies(recent, a.device_id, a.metric)
+        state = build_state(candidate, device, units.get(a.metric, ""), site_devices, open_anomalies)
+        anomaly = self.store.add(Anomaly.from_candidate(candidate, device.site_id, state))
+        result.created += 1
+        result.kinds[candidate.kind] += 1
+        return anomaly
+
+    def _retry_unfinished(self, created: set[int], result: CycleResult) -> None:
+        """What previous cycles left unfinished: a pending classification or a missing explanation."""
+        for anomaly in self.store.unfinished(MAX_RETRIES_PER_CYCLE):
+            if anomaly.id in created:
+                continue
+            result.retried += 1
+            if anomaly.decision == "pending":
+                self._classify(anomaly, result)
+            elif anomaly.decision == "confirmed" and anomaly.explanation is None and anomaly.probabilities:
+                classification = Classification(anomaly.probabilities, anomaly.decision_model or "")
+                self._explain(anomaly, classification, result)
 
     def _classify(self, anomaly: Anomaly, result: CycleResult) -> None:
         if self.classifier is None:
@@ -187,18 +205,33 @@ class Detector:
         result.explained += 1
 
 
+def _latest_by_series(anomalies: list[Anomaly]) -> dict[tuple[str, str], Anomaly]:
+    """The most recently ended anomaly of each device and metric."""
+    latest: dict[tuple[str, str], Anomaly] = {}
+    for anomaly in sorted(anomalies, key=lambda a: a.ended_at):
+        latest[(anomaly.device_id, anomaly.metric)] = anomaly
+    return latest
+
+
+def _other_open_anomalies(recent: list[Anomaly], device_id: str, metric: str) -> list[dict[str, Any]]:
+    """The device's recent anomalies on its other metrics, as context for the models."""
+    return [
+        {"metric": o.metric, "kind": o.kind, "since": o.started_at.isoformat(), "classification": o.classification}
+        for o in recent
+        if o.device_id == device_id and o.metric != metric
+    ]
+
+
+COUNTS = ("devices", "assessed", "candidates", "created", "extended", "retried", "explained", "errors")
+
+
 def traced_cycle(sites: list[str], execute: Callable[[], CycleResult]) -> CycleResult:
     """A live cycle as one Application Insights request (SERVER span), with its counts as attributes. `execute` connects
     and runs the cycle, so a database or model failure at any step shows as a failed request."""
-    with tracer.start_as_current_span("sdp.anomaly.cycle", kind=SpanKind.SERVER) as span:
+    with job_span("sdp.anomaly.cycle") as span:
         span.set_attribute("sdp.anomaly.sites", sites)
-        try:
-            result = execute()
-        except Exception as error:
-            span.record_exception(error)
-            span.set_status(Status(StatusCode.ERROR, type(error).__name__))
-            raise
-        for name in ("devices", "assessed", "candidates", "created", "extended", "retried", "explained", "errors"):
+        result = execute()
+        for name in COUNTS:
             span.set_attribute(f"sdp.anomaly.{name}", getattr(result, name))
         for status, count in result.decisions.items():
             span.set_attribute(f"sdp.anomaly.decisions.{status}", count)
