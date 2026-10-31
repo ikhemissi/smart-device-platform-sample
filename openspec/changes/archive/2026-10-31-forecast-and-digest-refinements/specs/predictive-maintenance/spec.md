@@ -3,7 +3,7 @@
 ## MODIFIED Requirements
 
 ### Requirement: Battery forecast
-For each assessed device reporting a battery voltage or level, the platform SHALL estimate the current level, the trend per day and the days left before the cut-off (2.5 V, or 10 % for a level), from the device's readings of the last 14 days, giving more weight to the recent days, and starting after the last sudden change of the level (typically a battery replacement) or the last lasting departure from the earlier trend (a marked steepening of the decline, or a smaller step); a new segment always covers at least 12 hours.
+For each assessed device reporting a battery voltage or level, the platform SHALL estimate the current level, the trend per day and the days left before the cut-off (2.5 V, or 10 % for a level) from the last 14 days of readings, weighting recent days more, and starting after the last change: a sudden change of the level (typically a replacement) or a lasting departure from the earlier trend (a steepening or a smaller step), a segment covering at least 12 hours.
 
 #### Scenario: Declining battery
 - **WHEN** a device's battery voltage falls steadily by 0.05 V a day and is at 2.65 V

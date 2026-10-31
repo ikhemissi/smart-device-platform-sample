@@ -21,7 +21,7 @@ Every day, once 06:00 UTC has passed, the platform SHALL generate one digest per
 - **THEN** the site's digest of the day is shown, with its period and generation time
 
 ### Requirement: Figures
-Each digest SHALL hold figures computed from the platform's data, never by a model, covering the site's devices (reporting and silent), each reported metric (average over the period and over the comparison period, and the change), alerts, anomalies, rejected messages, site certificates expiring within 30 days and, when maintenance is enabled, the site's maintenance queue.
+Each digest SHALL hold figures computed from the platform's data, never by a model, covering the site's devices (reporting and silent), each reported metric among the configured ones (average over the period and over the comparison period, and the change; battery metrics are not compared by default, the maintenance queue covers batteries), alerts, anomalies, rejected messages, site certificates expiring within 30 days and, when maintenance is enabled, the site's maintenance queue.
 
 #### Scenario: Silent device
 - **WHEN** a device of the site has not reported for more than 15 minutes at generation time
@@ -34,6 +34,10 @@ Each digest SHALL hold figures computed from the platform's data, never by a mod
 #### Scenario: Maintenance queue
 - **WHEN** devices of the site are in the maintenance queue at generation time
 - **THEN** the figures give the number of items by status and the most urgent devices with their probability and days left
+
+#### Scenario: Batteries not compared
+- **WHEN** a digest is generated with the default settings
+- **THEN** its metric figures hold no battery voltage or level, and batteries appear only through the maintenance queue
 
 ### Requirement: Brief
 Each digest SHALL include a brief of at most six sentences, in English, generated from the digest's figures only: every number it contains SHALL appear in the figures, and every device it mentions SHALL be named by its id.
