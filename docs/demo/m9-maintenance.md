@@ -22,10 +22,10 @@ A field team visits sites on a schedule; a device whose battery runs out between
 
 | Part | Who |
 |---|---|
-| Battery forecast: level, trend per day, days left before the cut-off (2.5 V or 10 %) | computed by the platform, from the last battery replacement |
+| Battery forecast: level, trend per day, days left before the cut-off (2.5 V or 10 %) | computed by the platform, from the last change of the battery: a replacement, or a lasting change of its trend (an aging battery's decline steepening) |
 | Reporting signals: gaps, silence, rejected messages | computed by the platform |
 | Probability of a visit within 7 days | `Microsoft-Decision-1` |
-| Work order: at most four sentences | written by `gpt-6-luna` **from the figures only** |
+| Work order: a plain instruction to the technician, two to four sentences | written by `gpt-6-luna` **from the figures only** |
 
 ## 2. Read the queue
 

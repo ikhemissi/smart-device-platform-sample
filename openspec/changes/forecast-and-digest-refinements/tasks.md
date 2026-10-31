@@ -15,6 +15,6 @@
 
 ## 4. Delivery
 
-- [ ] 4.1 Update the README, the detector README and the M8/M9 demo guides where they describe the forecast or the digest metrics
+- [x] 4.1 Update the README, the detector README and the M8/M9 demo guides where they describe the forecast or the digest metrics
 - [ ] 4.2 Tests and linters (`uv run pytest`, `uv run ruff check src tests`, `terraform fmt`/`validate`, `openspec validate --all --strict`); rebuild the job image; `azd provision --preview` then `azd provision` for the Terraform default
 - [ ] 4.3 After the next hourly run in `sdp-dev`: the assessments of the healthy devices and paris-01-ruuvi5-003 match the dry run

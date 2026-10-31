@@ -31,7 +31,7 @@ A site manager wants to know, in one look, whether the site is fine — not to o
 
 1. Sign in to the portal and open **Sites → paris-01**.
 2. The **Digest** card shows the brief, the period and when it was generated. Device ids in the brief are links: open one.
-3. Below the brief, the **figures**: devices (with any silent one and since when), the metrics table (average, previous 7 days, change), alerts, anomalies by classification and status, rejected messages, certificates expiring within 30 days.
+3. Below the brief, the **figures**: devices (with any silent one and since when), the metrics table (average, previous 7 days, change; batteries are not compared here, the maintenance figures cover them), alerts, anomalies by classification and status, rejected messages, certificates expiring within 30 days.
 4. Point out that every number of the brief is in the figures: the platform checks it on every digest (`sdp.digest.unsupported_numbers` in the trace is 0).
 
 A site without digests (not in `DIGEST_SITES`) says so; with `DIGEST_ENABLED=false` the card is not shown at all.

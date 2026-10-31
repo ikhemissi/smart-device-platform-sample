@@ -235,7 +235,7 @@ flowchart LR
   API --> AG[AI assistant]
 ```
 
-- **Figures computed, text written:** devices reporting and silent, metric averages over the last 24 hours against the 7 days before, alerts, anomalies, rejected messages and expiring certificates are computed in code; the model only writes a few sentences from them, and every number it states is checked against the figures.
+- **Figures computed, text written:** devices reporting and silent, metric averages over the last 24 hours against the 7 days before (batteries excepted: the maintenance queue covers them), alerts, anomalies, rejected messages and expiring certificates are computed in code; the model only writes a few sentences from them, and every number it states is checked against the figures.
 - **Regenerate** records a request; the job serves it within 5 minutes, so the device API keeps data-plane access only.
 - If the model fails, the figures are shown without a brief and a later run adds it.
 
@@ -252,7 +252,7 @@ flowchart LR
   PG --> DG[site digest]
 ```
 
-- **Forecast in code:** a weighted trend of each device's hourly battery averages since its last sudden change (a replacement) gives the level, the trend per day and the days left before the cut-off (2.5 V or 10 %); reporting signals (gaps, silence, rejected messages) come from SQL.
+- **Forecast in code:** a weighted trend of each device's hourly battery averages since its last change (a replacement, a smaller step or a steepening of the decline, found by a change-point search) gives the level, the trend per day and the days left before the cut-off (2.5 V or 10 %); reporting signals (gaps, silence, rejected messages) come from SQL.
 - **The decision model gives the probability** that the device needs a visit within 7 days; from `MAINTENANCE_CONFIDENCE` the device enters the queue with the reasons that crossed a rule and a short work order. Items leave the queue when the probability falls (resolved) or when an Editor marks the visit done; *Planned* records an intervention being organised.
 - **Everywhere the data is used:** the queue is in the portal (page and device card), in the assistant (`list_maintenance`) and in the site digest's figures.
 - **Demo devices age:** the simulator drains the battery of `<site>-ruuvi5-003` in about two weeks, then replaces it (`SIMULATOR_AGING_DEVICES`).

@@ -99,11 +99,11 @@ then updates the queue (`sdp.device_maintenance`, `sdp.maintenance_items`):
 
 | Step | Who | What |
 |---|---|---|
-| Battery forecast | code (`battery.py`) | hourly battery averages of 14 days, from the last sudden change (> 0.1 V or 5 points: a replacement); weighted trend (half-life 3 days) → level, trend per day, days left before 2.5 V or 10 % |
+| Battery forecast | code (`battery.py`) | hourly battery averages of 14 days, from the last sudden change (> 0.1 V or 5 points: a replacement) or change point (the best two-line split, with 12 hours on each side, when it moves the level now by more than 0.01 V or 1.5 points: a smaller step or a steepening); weighted trend (half-life 3 days) → level, trend per day, days left before 2.5 V or 10 % |
 | Signals | SQL (`data.py`) | messages, median interval and longest gap over the last 24 hours and the 7 days before, minutes since the last message, rejected messages |
 | Probability | `Microsoft-Decision-1` | will the device need an on-site intervention within 7 days? (one question per device and run) |
 | Queue | code (`lifecycle.py`) | from `SDP_MAINTENANCE_CONFIDENCE`: open an item with its reasons, update it, or resolve it when the probability falls; no new item within 7 days of a visit marked done |
-| Work order | `gpt-6-luna` | at most four sentences for a new item (refreshed after 24 hours); every number is checked against the input |
+| Work order | `gpt-6-luna` | a plain instruction to a technician (action, facts in plain words, urgency; no rules nor thresholds), two to four sentences, for a new item (refreshed after 24 hours); every number is checked against the input |
 
 | Variable | azd setting | Default |
 |---|---|---|
