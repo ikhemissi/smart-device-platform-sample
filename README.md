@@ -384,7 +384,7 @@ flowchart LR
 | `PORTAL_ANOMALIES` | on when the detector is deployed | `false` hides the anomaly card and page |
 | `DIGEST_ENABLED` | `true` | `false` removes the site digest job; the portal card and the assistant tool follow |
 | `DIGEST_SITES` | every site | Sites that get a daily digest (comma-separated) |
-| `DIGEST_METRICS` | `temperature,humidity,pressure,co2,illuminance,battery_voltage,battery_level` | Metrics summarised in digests |
+| `DIGEST_METRICS` | `temperature,humidity,pressure,co2,illuminance` | Metrics compared in digests (batteries are covered by the maintenance figures) |
 | `PORTAL_DIGESTS` | on when the digest job is deployed | `false` hides the Digest card |
 | `MAINTENANCE_ENABLED` | `true` | `false` removes the maintenance job; the portal, the assistant tool and the digest figures follow (data kept) |
 | `MAINTENANCE_SITES` | every site | Sites assessed for maintenance (comma-separated) |

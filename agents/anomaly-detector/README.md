@@ -81,7 +81,7 @@ identity) ([PRD-008](../../docs/prd/PRD-008-m8-site-digest.md),
 | Variable | azd setting | Default |
 |---|---|---|
 | `SDP_DIGEST_SITES` | `DIGEST_SITES` | every site |
-| `SDP_DIGEST_METRICS` | `DIGEST_METRICS` | `temperature,humidity,pressure,co2,illuminance,battery_voltage,battery_level` |
+| `SDP_DIGEST_METRICS` | `DIGEST_METRICS` | `temperature,humidity,pressure,co2,illuminance` (batteries: see the maintenance figures) |
 | `SDP_MAINTENANCE_ENABLED`, `SDP_MAINTENANCE_SITES` | `MAINTENANCE_ENABLED`, `MAINTENANCE_SITES` | the figures of the sites the maintenance job assesses include their queue (open and planned counts, the 5 most likely devices) |
 | — | `DIGEST_ENABLED` | `true`; `false` removes the job |
 

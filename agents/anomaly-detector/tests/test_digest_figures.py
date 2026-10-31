@@ -163,3 +163,13 @@ def test_maintenance_figures_follow_the_maintenance_settings(monkeypatch, enable
     monkeypatch.setenv("SDP_MAINTENANCE_SITES", sites)
     settings = DigestSettings()
     assert [s for s in ["paris-01", "lyon-01"] if settings.assesses(s)] == assessed
+
+
+def test_battery_metrics_are_not_compared_by_default(monkeypatch):
+    monkeypatch.setenv("SDP_DB_HOST", "localhost")
+    monkeypatch.setenv("SDP_DB_USER", "sdp_insights")
+    monkeypatch.setenv("AZURE_OPENAI_ENDPOINT", "https://ais.openai.example/")
+    monkeypatch.delenv("SDP_DIGEST_METRICS", raising=False)
+    metrics = DigestSettings(_env_file=None).metrics
+    assert "temperature" in metrics
+    assert not {"battery_voltage", "battery_level"} & set(metrics)

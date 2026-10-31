@@ -7,7 +7,7 @@
 
 ## 2. Site digest
 
-- [ ] 2.1 Remove the battery metrics from the default digest metrics (code and Terraform) with a test; dry run `site-digest --dry-run --site lyon-01` without battery averages and with the maintenance figures
+- [x] 2.1 Remove the battery metrics from the default digest metrics (code and Terraform) with a test; dry run `site-digest --dry-run --site lyon-01` without battery averages and with the maintenance figures
 
 ## 3. Work orders
 

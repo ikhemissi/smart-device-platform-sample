@@ -238,7 +238,7 @@ module "apps" {
     enabled = local.digest_enabled
     # Empty: every site.
     sites   = trimspace(var.digest_sites)
-    metrics = coalesce(var.digest_metrics, "temperature,humidity,pressure,co2,illuminance,battery_voltage,battery_level")
+    metrics = coalesce(var.digest_metrics, "temperature,humidity,pressure,co2,illuminance")
   }
   maintenance = {
     enabled = local.maintenance_enabled

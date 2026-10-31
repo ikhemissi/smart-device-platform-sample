@@ -5,7 +5,8 @@ from functools import cached_property
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-DEFAULT_METRICS = "temperature,humidity,pressure,co2,illuminance,battery_voltage,battery_level"
+# Batteries are left out: the maintenance queue in the same digest covers them (refinements design D2).
+DEFAULT_METRICS = "temperature,humidity,pressure,co2,illuminance"
 
 
 def _csv(value: str) -> list[str]:
