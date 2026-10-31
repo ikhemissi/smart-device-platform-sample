@@ -6,7 +6,7 @@
 
 ![Smart Device Platform architecture](docs/architecture/architecture.svg)
 
-**Contents:** [Why it matters](#why-it-matters) · [What it shows](#what-it-shows) · [Architecture](#architecture) · [How it works](#how-it-works) · [Security](#security) · [Repository](#repository) · [Build and test](#build-and-test) · [Continuous integration](#continuous-integration) · [Deploy to Azure](#deploy-to-azure) · [Operate](#operate) · [Demonstrator costs](#demonstrator-costs) · [Before production](#before-production) · [Contributing](#contributing)
+**Contents:** [Why it matters](#why-it-matters) · [What it shows](#what-it-shows) · [Architecture](#architecture) · [How it works](#how-it-works) · [Security](#security) · [Repository](#repository) · [Build and test](#build-and-test) · [Continuous integration](#continuous-integration) · [Deploy to Azure](#deploy-to-azure) · [Operate](#operate) · [Demonstrator costs](#demonstrator-costs) · [Production considerations](#production-considerations) · [Contributing](#contributing)
 
 ## Why it matters
 
@@ -429,9 +429,9 @@ What the `sdp-dev` environment costs to run, as calculated on **31 October 2026*
 | **Platform total** | **$19.49** | **$592** |
 | **Evaluations** (about 3 assistant eval runs, agent answers plus judges; one-off, about $0.05 per run) | $0.16 in total | — |
 
-Other live tests and dry runs cost about $0.01 in total; unit tests, CI and the cloud agent mock the models. API Management, Container Apps and Log Analytics make up about 70 % of the cost; Defender for Cloud is a subscription plan rather than part of the platform. Production sizing (see below) costs more.
+Other live tests and dry runs cost about $0.01 in total; unit tests, CI and the cloud agent mock the models. API Management, Container Apps and Log Analytics make up about 70 % of the cost; Defender for Cloud is a subscription plan rather than part of the platform.
 
-## Before production
+## Production considerations
 
 This is a demonstrator: several choices favour a quick, low-cost deployment from scratch over production needs. Review at least the following before using it in production; the first rows are the hardest to change later.
 
