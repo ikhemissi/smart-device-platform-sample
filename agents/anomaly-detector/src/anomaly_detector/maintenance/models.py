@@ -22,12 +22,13 @@ QUESTION = "intervention"
 INSTRUCTIONS = (
     "Will this device need an on-site intervention (battery replacement, repair or reset) within the next 7 days?"
 )
-# A missing battery is not a risk: many devices do not report one (live check, M9 task 2.5: without this, devices
-# without battery got probabilities near 0.9).
+# Explicit criteria (live check, M9 task 2.5): with general wording, the model ignored a missing battery (p ~ 0.9 for
+# devices without one) and rated failing communication low (silent 6 h: 0.08; gaps 20x usual: 0.09).
 CRITERIA = {
-    "true": "the battery forecast reaches its cut-off within 7 days, or the reporting signals show the device failing "
-    "(silent, gaps much longer than usual, many rejected messages)",
-    "false": "otherwise; a device that does not report its battery is judged on its reporting signals only",
+    "true": "the battery forecast reaches its cut-off within 7 days; or the device's communication is failing: silent "
+    "for more than an hour, gaps between messages over the last 24 hours more than ten times its usual interval, or "
+    "20 or more rejected messages in 24 hours",
+    "false": "otherwise; a device that does not report its battery is judged on its communication only",
 }
 MODEL_VERSION = "1"
 

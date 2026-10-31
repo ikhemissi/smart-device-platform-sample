@@ -27,7 +27,8 @@ KINDS = {
     LEVEL: Kind(unit="%", cutoff=10.0, sudden_change=5.0, min_decline_per_day=0.05, decimals=1),
 }
 HALF_LIFE_DAYS = 3.0
-MIN_TREND_SPAN = timedelta(hours=24)
+# 12 hours of an aging battery (0.035 V a day) already give a clear slope over the hourly averages' noise.
+MIN_TREND_SPAN = timedelta(hours=12)
 HISTORY = timedelta(days=14)
 
 
@@ -86,7 +87,7 @@ def _weighted_fit(points: Sequence[HourlyBattery], now: datetime) -> tuple[float
 
 
 def forecast(points: Sequence[HourlyBattery], metric: str, now: datetime) -> Forecast | None:
-    """None without readings. With less than 24 hours of readings since the last sudden change: the latest hourly
+    """None without readings. With less than 12 hours of readings since the last sudden change: the latest hourly
     average only, no trend nor days left."""
     if metric not in KINDS:
         raise ValueError(f"not a battery metric: {metric}")

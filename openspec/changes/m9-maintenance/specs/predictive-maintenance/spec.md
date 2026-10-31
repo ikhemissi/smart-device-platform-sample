@@ -25,7 +25,7 @@ For each assessed device reporting a battery voltage or level, the platform SHAL
 - **THEN** its forecast only uses the readings since that rise
 
 #### Scenario: Not enough data
-- **WHEN** a device has less than 1 day of battery readings since its last replacement
+- **WHEN** a device has less than 12 hours of battery readings since its last replacement
 - **THEN** its forecast gives the current level without trend or days left
 
 ### Requirement: Reporting signals
@@ -43,7 +43,7 @@ For each assessed device, the platform SHALL obtain from the decision model the 
 - **THEN** the device keeps its previous assessment, the failure is visible in the monitoring tools, and the next run retries
 
 ### Requirement: Maintenance queue
-A device whose intervention probability is at or above the configured confidence (default 0.5) SHALL be in the maintenance queue with its probability, the main reasons (as computed figures) and a work order of at most four sentences written from those figures only; the queue SHALL be listed most likely first. A device SHALL have at most one item open or planned at a time; its probability and reasons SHALL be updated by later assessments.
+A device whose intervention probability is at or above the configured confidence (default 0.4) SHALL be in the maintenance queue with its probability, the main reasons (as computed figures) and a work order of at most four sentences written from those figures only; the queue SHALL be listed most likely first. A device SHALL have at most one item open or planned at a time; its probability and reasons SHALL be updated by later assessments.
 
 #### Scenario: Aging battery
 - **WHEN** a device's battery forecast gives 3 days left

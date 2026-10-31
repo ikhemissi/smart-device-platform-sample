@@ -108,13 +108,31 @@ then updates the queue (`sdp.device_maintenance`, `sdp.maintenance_items`):
 | Variable | azd setting | Default |
 |---|---|---|
 | `SDP_MAINTENANCE_SITES` | `MAINTENANCE_SITES` | every site |
-| `SDP_MAINTENANCE_CONFIDENCE` | `MAINTENANCE_CONFIDENCE` | `0.5` |
+| `SDP_MAINTENANCE_CONFIDENCE` | `MAINTENANCE_CONFIDENCE` | `0.4` (tuned below) |
 | — | `MAINTENANCE_ENABLED` | `true`; `false` removes the job (data kept) |
 
 ```bash
 uv run maintenance --dry-run --site paris-01 --no-models  # forecasts and signals only, nothing written
 uv run maintenance --dry-run --site paris-01              # with the probabilities and work orders, nothing written
 ```
+
+### Tuning the maintenance confidence
+
+`MAINTENANCE_CONFIDENCE=0.4` comes from live calls of the decision model on real `sdp-dev` signals and forecasts (31 Oct
+2026), with the question's explicit criteria (battery cut-off within 7 days; silent for more than an hour; gaps more
+than ten times the usual interval; 20 or more rejected messages in 24 hours):
+
+| Case (live, Microsoft-Decision-1) | Probability |
+|---|---|
+| Aging battery, 3.5 / 5 days left | 0.98 / 0.99 |
+| Aging battery, 9 / 12 days left | 0.27 / 0.15 |
+| Healthy battery (300 days), no trend yet | 0.01 / 0.03 |
+| No battery: healthy signals, silent 30 min | 0.01 / 0.01 |
+| No battery: silent 6 h | 0.82 |
+| No battery: gaps 20 times the usual interval | 0.50 |
+| No battery: 40 / 8 rejected messages in 24 h | 0.99 / 0.01 |
+
+0.4 queues the aging batteries and the failing devices with a margin, and none of the healthy cases.
 
 A run is one Application Insights request `sdp.maintenance.run` (role `sdp-maintenance`) with its counts, and child
 spans `sdp.maintenance.decide` (probability) and `sdp.maintenance.work_order` (token usage, unsupported numbers).

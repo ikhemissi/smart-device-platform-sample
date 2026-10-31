@@ -244,7 +244,7 @@ module "apps" {
     enabled = local.maintenance_enabled
     # Empty: every site.
     sites               = trimspace(var.maintenance_sites)
-    confidence          = coalesce(var.maintenance_confidence, "0.5")
+    confidence          = coalesce(var.maintenance_confidence, "0.4")
     decision_endpoint   = module.foundry.account_endpoint
     decision_deployment = module.foundry.decision_model_deployment_name
   }

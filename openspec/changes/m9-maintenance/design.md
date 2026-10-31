@@ -27,7 +27,7 @@ Input: the device's hourly battery averages of the last 14 days (rollups) plus t
 1. **Segment**: start after the last *sudden change*: a step between consecutive hourly averages larger than 0.1 V (or 5 percentage points for a level) in either direction — a replacement, or the simulator's model change.
 2. **Trend**: weighted least squares of value against time over the segment, weights `0.5 ** (age_days / 3)` (half-life 3 days: recent days count more — the "piecewise" choice).
 3. **Output**: `level` (fitted value now), `slope_per_day`, `days_left = (level - cutoff) / -slope` when `slope < -0.001 V/day` (or `-0.05 %/day`), else none; `since` (segment start); cut-offs 2.5 V and 10 %.
-4. Less than 24 hours of readings in the segment → level only (latest hourly average), no trend.
+4. Less than 12 hours of readings in the segment → level only (latest hourly average), no trend. (24 hours at first; the live check showed that every Ruuvi battery restarted a segment when the new simulator was deployed, and 12 hours of an aging battery already give a clear slope.)
 
 ### D3. Reporting signals (SQL, per device)
 Over the last 24 hours (P) and the 7 days before (C), from `sdp.measurements.measured_at` with `lag()` per device: message count, median interval and longest gap in P and C; `minutes_since_last` from `sdp.devices.last_seen_at`; rejected messages in P from `sdp.rejected_messages` by `device_id`.
@@ -35,8 +35,20 @@ Over the last 24 hours (P) and the 7 days before (C), from `sdp.measurements.mea
 ### D4. Intervention probability (Microsoft-Decision-1)
 One `noul` question per device and run: *"Will this device need an on-site intervention (battery replacement, repair or reset) within the next 7 days?"*, criteria `true`: "the battery reaches its cut-off within 7 days, or the device is failing to report", `false`: "the device will keep working without a visit for 7 days". State: device (id, site, payload format), battery forecast (D2) and signals (D3) only. Stored: `p(true)`, model, version `1`. A failure leaves the previous assessment (with its time) and counts as an error. The client follows `decision.py` (same endpoint, deployment, Entra token); the request and response format is the one already used there (`answers.<name>.noul` holds the probability).
 
+**Live check (task 2.5):** with the first wording, the model read a missing battery as a risk (p ≈ 0.9 for every Cayenne device) and rated failing communication low (silent 6 h: 0.08; gaps 20 times the usual interval: 0.09). The state now says `battery: {"reported": false}` and the `true` criterion is explicit: battery cut-off within 7 days, or communication failing — silent for more than an hour, gaps over the last 24 hours more than ten times the usual interval, or 20 or more rejected messages in 24 hours. Measured probabilities (live, real signals and forecasts):
+
+| Case (live, Microsoft-Decision-1) | Probability |
+|---|---|
+| Aging battery, 3.5 / 5 days left | 0.98 / 0.99 |
+| Aging battery, 9 / 12 days left | 0.27 / 0.15 |
+| Healthy battery (300 days), no trend yet | 0.01 / 0.03 |
+| No battery: healthy signals, silent 30 min | 0.01 / 0.01 |
+| No battery: silent 6 h | 0.82 |
+| No battery: gaps 20 times the usual interval | 0.50 |
+| No battery: 40 / 8 rejected messages in 24 h | 0.99 / 0.01 |
+
 ### D5. Queue lifecycle
-`MAINTENANCE_CONFIDENCE` default 0.5. Per device after its assessment:
+`MAINTENANCE_CONFIDENCE` default 0.4 (tuned, see D4). Per device after its assessment:
 - p ≥ confidence, no `open`/`planned` item, and no item marked `done` in the last 7 days → **open** an item with the reasons and a work order (D6).
 - p ≥ confidence and an `open`/`planned` item → update its probability, reasons and `updated_at`; refresh the work order when it is older than 24 hours.
 - p < confidence and an `open`/`planned` item → **resolved** (by the platform, `resolved_at`).

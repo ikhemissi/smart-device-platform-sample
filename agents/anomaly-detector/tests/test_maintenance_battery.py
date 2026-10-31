@@ -59,11 +59,18 @@ def test_recent_days_weigh_more():
     assert f.slope_per_day < -0.008
 
 
-def test_less_than_24_hours_gives_the_level_only():
-    points = series(2.80, 0.05, 20)
+def test_less_than_12_hours_gives_the_level_only():
+    points = series(2.80, 0.05, 10)
     f = forecast(points, VOLTAGE, NOW)
     assert f.level == pytest.approx(points[-1].average, abs=0.001)
     assert f.slope_per_day is None and f.days_left is None
+
+
+def test_twelve_hours_of_an_aging_battery_give_its_trend():
+    """The demo's aging devices (0.035 V a day) are forecast half a day after a new battery or a model change."""
+    f = forecast(series(2.66, 0.035, 12), VOLTAGE, NOW)
+    assert f.slope_per_day == pytest.approx(-0.035, abs=0.002)
+    assert f.days_left == pytest.approx((2.66 - 0.035 * 12 / 24 - 2.5) / 0.035, abs=0.3)
 
 
 def test_level_cutoff_and_threshold():

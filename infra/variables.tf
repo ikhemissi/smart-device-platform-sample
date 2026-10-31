@@ -221,7 +221,7 @@ variable "maintenance_sites" {
 }
 
 variable "maintenance_confidence" {
-  description = "Intervention probability from which a device is queued (MAINTENANCE_CONFIDENCE). Empty: 0.5."
+  description = "Intervention probability from which a device is queued (MAINTENANCE_CONFIDENCE). Empty: 0.4."
   type        = string
   default     = ""
 }

@@ -371,7 +371,7 @@ flowchart LR
 | `PORTAL_DIGESTS` | on when the digest job is deployed | `false` hides the Digest card |
 | `MAINTENANCE_ENABLED` | `true` | `false` removes the maintenance job; the portal, the assistant tool and the digest figures follow (data kept) |
 | `MAINTENANCE_SITES` | every site | Sites assessed for maintenance (comma-separated) |
-| `MAINTENANCE_CONFIDENCE` | `0.5` | Probability of a visit within 7 days from which a device enters the queue |
+| `MAINTENANCE_CONFIDENCE` | `0.4` | Probability of a visit within 7 days from which a device enters the queue |
 | `SIMULATOR_AGING_DEVICES` | `<site>-ruuvi5-003` per demo site | Simulated devices whose battery drains in about two weeks |
 | `PORTAL_MAINTENANCE` | on when the maintenance job is deployed | `false` hides the Maintenance page and the device page's *Battery and maintenance* card |
 

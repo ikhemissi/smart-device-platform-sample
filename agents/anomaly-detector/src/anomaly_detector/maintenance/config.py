@@ -22,7 +22,7 @@ class MaintenanceSettings(BaseSettings):
     model_deployment: str = Field(default="gpt-6-luna", validation_alias="FOUNDRY_MODEL_DEPLOYMENT_NAME")
     # Empty: every site.
     sites_csv: str = Field(default="", validation_alias="SDP_MAINTENANCE_SITES")
-    confidence: float = Field(default=0.5, gt=0, le=1, validation_alias="SDP_MAINTENANCE_CONFIDENCE")
+    confidence: float = Field(default=0.4, gt=0, le=1, validation_alias="SDP_MAINTENANCE_CONFIDENCE")
     applicationinsights_connection_string: str | None = Field(
         default=None, validation_alias="APPLICATIONINSIGHTS_CONNECTION_STRING"
     )

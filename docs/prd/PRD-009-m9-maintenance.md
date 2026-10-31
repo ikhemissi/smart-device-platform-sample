@@ -33,7 +33,7 @@ Tell the field team **which devices need a visit this week, and why**, before th
 
 1. Every hour, each device of the configured sites has a battery forecast (level, trend, estimated days left before its cut-off) when it reports a battery, and a probability of needing an intervention within 7 days.
 2. The forecast follows the recent trend and restarts after a battery replacement (a jump up of the battery level).
-3. The queue lists the devices whose probability is at or above the configured level (default 50 %), most likely first, each with the main reasons (figures computed by the platform) and a work order of a few sentences written from them.
+3. The queue lists the devices whose probability is at or above the configured level (default 40 %), most likely first, each with the main reasons (figures computed by the platform) and a work order of a few sentences written from them.
 4. Editors can mark an item planned or done with a comment; Readers cannot. A device marked done is not queued again for 7 days.
 5. Device pages show the battery forecast; the site digest gives the number of devices queued and the most urgent ones.
 6. The AI assistant can list the queue within the user's permissions.
