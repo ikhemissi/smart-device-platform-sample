@@ -14,7 +14,7 @@ azd provision && azd deploy        # or: azd up
 eval "$(azd env get-values)"
 ```
 
-The maintenance job (`caj-upkeep-<token>`) runs every hour and assesses every site of `MAINTENANCE_SITES` (default all). The simulator drains the battery of one device per site in about two weeks, then replaces it (`SIMULATOR_AGING_DEVICES`, default `<site>-ruuvi5-003`): forecasts are meaningful one day after the simulator is deployed, and an aging device enters the queue when its battery has a few days left.
+The maintenance job (`caj-upkeep-<token>`) runs every hour and assesses every site of `MAINTENANCE_SITES` (default all). The simulator drains the battery of one device per site in about two weeks, then replaces it (`SIMULATOR_AGING_DEVICES`, default `<site>-ruuvi5-003`): a forecast needs 12 hours of readings after a battery replacement (or after the simulator is first deployed), and an aging device enters the queue when its battery has about a week left.
 
 Requirements on the presenter's machine: `az`, `azd`, Python 3 with [uv](https://docs.astral.sh/uv/) (for the dry run).
 
