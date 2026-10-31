@@ -51,19 +51,7 @@ public final class IotHubTransport implements DeviceTransport {
     public DeviceConnection connect(SimulatedDevice device) throws Exception {
         DeviceCredentials credentials = certificates.issue(siteCas.siteCa(device.siteId()), device.deviceId(), clock.instant());
         X509DeviceSecurityProvider security = new X509DeviceSecurityProvider(credentials);
-
-        ProvisioningDeviceClient provisioning = ProvisioningDeviceClient.create(
-                dpsGlobalEndpoint, idScope, ProvisioningDeviceClientTransportProtocol.MQTT, security);
-        ProvisioningDeviceClientRegistrationResult result;
-        try {
-            result = provisioning.registerDeviceSync();
-        } finally {
-            provisioning.close();
-        }
-        if (result.getProvisioningDeviceClientStatus() != ProvisioningDeviceClientStatus.PROVISIONING_DEVICE_STATUS_ASSIGNED) {
-            throw new IllegalStateException("device " + device.deviceId() + " not assigned by DPS: "
-                    + result.getProvisioningDeviceClientStatus() + " " + result.getSubstatus());
-        }
+        ProvisioningDeviceClientRegistrationResult result = provision(device, security);
         log.info("Device {} provisioned to {}", result.getDeviceId(), result.getIothubUri());
 
         DeviceClient client = new DeviceClient(result.getIothubUri(), result.getDeviceId(), security,
@@ -92,6 +80,23 @@ public final class IotHubTransport implements DeviceTransport {
                 client.close();
             }
         };
+    }
+
+    private ProvisioningDeviceClientRegistrationResult provision(SimulatedDevice device, X509DeviceSecurityProvider security)
+            throws Exception {
+        ProvisioningDeviceClient provisioning = ProvisioningDeviceClient.create(
+                dpsGlobalEndpoint, idScope, ProvisioningDeviceClientTransportProtocol.MQTT, security);
+        ProvisioningDeviceClientRegistrationResult result;
+        try {
+            result = provisioning.registerDeviceSync();
+        } finally {
+            provisioning.close();
+        }
+        if (result.getProvisioningDeviceClientStatus() != ProvisioningDeviceClientStatus.PROVISIONING_DEVICE_STATUS_ASSIGNED) {
+            throw new IllegalStateException("device " + device.deviceId() + " not assigned by DPS: "
+                    + result.getProvisioningDeviceClientStatus() + " " + result.getSubstatus());
+        }
+        return result;
     }
 
     static Message toIotHubMessage(OutgoingMessage outgoing) {

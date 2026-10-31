@@ -44,14 +44,12 @@ public class PrincipalsTask {
         String url = adminDatabaseUrl(dataSource.determineUrl(), properties.adminDatabase());
         try (Connection admin = DriverManager.getConnection(url, dataSource.determineUsername(), dataSource.determinePassword())) {
             boolean entra = exists(admin, "SELECT 1 FROM pg_proc WHERE proname = 'pgaadauth_create_principal_with_oid'");
-            for (MigratorProperties.Principal p : properties.principals()) {
+            for (MigratorProperties.Principal principal : properties.principals()) {
                 if (entra) {
-                    ensureEntraPrincipal(admin, p);
-                } else if (!roleExists(admin, p.name())) {
-                    try (Statement s = admin.createStatement()) {
-                        s.execute("CREATE ROLE " + quote(p.name()) + " LOGIN");
-                    }
-                    log.info("Created database role {}", p.name());
+                    ensureEntraPrincipal(admin, principal);
+                } else if (!roleExists(admin, principal.name())) {
+                    execute(admin, "CREATE ROLE " + quote(principal.name()) + " LOGIN");
+                    log.info("Created database role {}", principal.name());
                 }
             }
         } catch (SQLException e) {
@@ -59,40 +57,42 @@ public class PrincipalsTask {
         }
     }
 
-    private void ensureEntraPrincipal(Connection admin, MigratorProperties.Principal p) throws SQLException {
-        if (p.objectId() == null || p.objectId().isBlank()) {
-            throw new IllegalStateException("object id required to create Entra principal " + p.name());
+    private void ensureEntraPrincipal(Connection admin, MigratorProperties.Principal principal) throws SQLException {
+        if (principal.objectId() == null || principal.objectId().isBlank()) {
+            throw new IllegalStateException("object id required to create Entra principal " + principal.name());
         }
-        try (PreparedStatement q = admin.prepareStatement(
-                "SELECT 1 FROM pgaadauth_list_principals(false) WHERE rolname = ? UNION SELECT 1 FROM pgaadauth_list_principals(true) WHERE rolname = ?")) {
-            q.setString(1, p.name());
-            q.setString(2, p.name());
-            try (ResultSet rs = q.executeQuery()) {
-                if (rs.next()) {
-                    return;
-                }
-            }
+        if (entraPrincipalExists(admin, principal.name())) {
+            return;
         }
-        if (roleExists(admin, p.name())) {
-            log.warn("Replacing plain database role {} by its Entra principal", p.name());
-            try (Statement s = admin.createStatement()) {
-                s.execute("DROP ROLE " + quote(p.name()));
-            }
+        if (roleExists(admin, principal.name())) {
+            log.warn("Replacing plain database role {} by its Entra principal", principal.name());
+            execute(admin, "DROP ROLE " + quote(principal.name()));
         }
         try (PreparedStatement create = admin.prepareStatement(
                 "SELECT pgaadauth_create_principal_with_oid(?, ?, 'service', false, false)")) {
-            create.setString(1, p.name());
-            create.setString(2, p.objectId());
+            create.setString(1, principal.name());
+            create.setString(2, principal.objectId());
             create.execute();
         }
-        log.info("Created Entra principal {} (object id {})", p.name(), p.objectId());
+        log.info("Created Entra principal {} (object id {})", principal.name(), principal.objectId());
+    }
+
+    private static boolean entraPrincipalExists(Connection admin, String name) throws SQLException {
+        try (PreparedStatement query = admin.prepareStatement(
+                "SELECT 1 FROM pgaadauth_list_principals(false) WHERE rolname = ? UNION SELECT 1 FROM pgaadauth_list_principals(true) WHERE rolname = ?")) {
+            query.setString(1, name);
+            query.setString(2, name);
+            try (ResultSet rs = query.executeQuery()) {
+                return rs.next();
+            }
+        }
     }
 
     /** After migrations (group roles exist): grants each principal its group role. Idempotent. */
     public void grantGroupRoles() {
-        try (Connection c = database.getConnection(); Statement s = c.createStatement()) {
-            for (MigratorProperties.Principal p : properties.principals()) {
-                s.execute("GRANT " + quote(p.groupRole()) + " TO " + quote(p.name()));
+        try (Connection connection = database.getConnection(); Statement statement = connection.createStatement()) {
+            for (MigratorProperties.Principal principal : properties.principals()) {
+                statement.execute("GRANT " + quote(principal.groupRole()) + " TO " + quote(principal.name()));
             }
         } catch (SQLException e) {
             throw new IllegalStateException("Cannot grant group roles to workload principals", e);
@@ -103,18 +103,24 @@ public class PrincipalsTask {
         return url.replaceFirst("^(jdbc:postgresql://[^/]+/)[^?]*", "$1" + database);
     }
 
-    private static boolean roleExists(Connection c, String role) throws SQLException {
-        try (PreparedStatement q = c.prepareStatement("SELECT 1 FROM pg_roles WHERE rolname = ?")) {
-            q.setString(1, role);
-            try (ResultSet rs = q.executeQuery()) {
+    private static boolean roleExists(Connection connection, String role) throws SQLException {
+        try (PreparedStatement query = connection.prepareStatement("SELECT 1 FROM pg_roles WHERE rolname = ?")) {
+            query.setString(1, role);
+            try (ResultSet rs = query.executeQuery()) {
                 return rs.next();
             }
         }
     }
 
-    private static boolean exists(Connection c, String sql) throws SQLException {
-        try (Statement s = c.createStatement(); ResultSet rs = s.executeQuery(sql)) {
+    private static boolean exists(Connection connection, String sql) throws SQLException {
+        try (Statement statement = connection.createStatement(); ResultSet rs = statement.executeQuery(sql)) {
             return rs.next();
+        }
+    }
+
+    private static void execute(Connection connection, String sql) throws SQLException {
+        try (Statement statement = connection.createStatement()) {
+            statement.execute(sql);
         }
     }
 

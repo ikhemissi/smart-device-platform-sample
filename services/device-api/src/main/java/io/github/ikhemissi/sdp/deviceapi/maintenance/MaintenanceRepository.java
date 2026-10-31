@@ -1,10 +1,11 @@
 package io.github.ikhemissi.sdp.deviceapi.maintenance;
 
+import static io.github.ikhemissi.sdp.deviceapi.jdbc.JdbcValues.instant;
+import static io.github.ikhemissi.sdp.deviceapi.jdbc.JdbcValues.utc;
+
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.Instant;
-import java.time.OffsetDateTime;
-import java.time.ZoneOffset;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -90,14 +91,5 @@ public class MaintenanceRepository {
                 rs.getString("battery"), rs.getString("work_order"), rs.getString("work_order_model"),
                 instant(rs, "work_order_at"), instant(rs, "opened_at"), instant(rs, "updated_at"), instant(rs, "resolved_at"),
                 rs.getString("status_by"), instant(rs, "status_at"), rs.getString("status_comment"));
-    }
-
-    private static Instant instant(ResultSet rs, String column) throws SQLException {
-        OffsetDateTime value = rs.getObject(column, OffsetDateTime.class);
-        return value == null ? null : value.toInstant();
-    }
-
-    private static OffsetDateTime utc(Instant instant) {
-        return OffsetDateTime.ofInstant(instant, ZoneOffset.UTC);
     }
 }

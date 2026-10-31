@@ -1,12 +1,12 @@
 package io.github.ikhemissi.sdp.alerts.notifications;
 
-import java.sql.Array;
+import static io.github.ikhemissi.sdp.alerts.JdbcValues.instant;
+import static io.github.ikhemissi.sdp.alerts.JdbcValues.strings;
+import static io.github.ikhemissi.sdp.alerts.JdbcValues.utc;
+
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.Instant;
-import java.time.OffsetDateTime;
-import java.time.ZoneOffset;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.jdbc.core.simple.JdbcClient;
@@ -101,18 +101,5 @@ public class NotificationStore {
 
     private static String truncate(String error) {
         return error == null ? null : error.length() > 1000 ? error.substring(0, 1000) : error;
-    }
-
-    private static List<String> strings(Array array) throws SQLException {
-        return array == null ? List.of() : Arrays.asList((String[]) array.getArray());
-    }
-
-    private static Instant instant(ResultSet rs, String column) throws SQLException {
-        OffsetDateTime value = rs.getObject(column, OffsetDateTime.class);
-        return value == null ? null : value.toInstant();
-    }
-
-    private static OffsetDateTime utc(Instant instant) {
-        return OffsetDateTime.ofInstant(instant, ZoneOffset.UTC);
     }
 }

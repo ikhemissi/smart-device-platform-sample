@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import io.github.ikhemissi.sdp.deviceapi.web.ApiException;
+import io.github.ikhemissi.sdp.deviceapi.web.EntityTags;
 import java.time.Instant;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.json.JsonMapper;
@@ -61,9 +62,9 @@ class DevicePatchTest {
 
     @Test
     void ifMatchAcceptsListsWeakTagsAndWildcard() {
-        assertThat(DeviceService.matches("\"a\", W/\"b\"", "\"b\"")).isTrue();
-        assertThat(DeviceService.matches("*", "\"b\"")).isTrue();
-        assertThat(DeviceService.matches("\"a\"", "\"b\"")).isFalse();
+        assertThat(EntityTags.matches("\"a\", W/\"b\"", "\"b\"")).isTrue();
+        assertThat(EntityTags.matches("*", "\"b\"")).isTrue();
+        assertThat(EntityTags.matches("\"a\"", "\"b\"")).isFalse();
     }
 
     @Test

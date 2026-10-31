@@ -13,7 +13,6 @@ import io.github.ikhemissi.sdp.simulator.transport.DeviceTransport;
 import io.github.ikhemissi.sdp.simulator.transport.IotHubTransport;
 import io.opentelemetry.api.OpenTelemetry;
 import java.time.Clock;
-import java.util.Arrays;
 import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -78,7 +77,7 @@ public class DeviceSimulatorApplication {
     }
 
     private static PayloadFormat format(String id) {
-        return Arrays.stream(PayloadFormat.values()).filter(f -> f.id().equals(id.trim())).findFirst()
+        return PayloadFormat.fromId(id.trim())
                 .orElseThrow(() -> new IllegalArgumentException("unknown format '" + id + "' in sdp.simulator.formats"));
     }
 }

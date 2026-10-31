@@ -45,15 +45,15 @@ final class RuuviDf3Codec implements PayloadCodec {
         if (p.length != LENGTH) {
             return Codecs.malformed("ruuvi-df3 payload must be " + LENGTH + " bytes, got " + p.length);
         }
-        Map<String, BigDecimal> m = new LinkedHashMap<>();
-        m.put(Metric.TEMPERATURE.key(), temperature(u8(p, 2), u8(p, 3)));
-        m.put(Metric.HUMIDITY.key(), scaled(u8(p, 1), HALF));
-        m.put(Metric.PRESSURE.key(), scaled(u16be(p, 4) + PRESSURE_OFFSET_PA, HUNDREDTH));
-        m.put(Metric.ACCELERATION_X.key(), scaled(s16be(p, 6), MILLI));
-        m.put(Metric.ACCELERATION_Y.key(), scaled(s16be(p, 8), MILLI));
-        m.put(Metric.ACCELERATION_Z.key(), scaled(s16be(p, 10), MILLI));
-        m.put(Metric.BATTERY_VOLTAGE.key(), scaled(u16be(p, 12), MILLI));
-        return new DecodeResult.Decoded(PayloadFormat.RUUVI_DF3, m, Map.of());
+        Map<String, BigDecimal> metrics = new LinkedHashMap<>();
+        metrics.put(Metric.TEMPERATURE.key(), temperature(u8(p, 2), u8(p, 3)));
+        metrics.put(Metric.HUMIDITY.key(), scaled(u8(p, 1), HALF));
+        metrics.put(Metric.PRESSURE.key(), scaled(u16be(p, 4) + PRESSURE_OFFSET_PA, HUNDREDTH));
+        metrics.put(Metric.ACCELERATION_X.key(), scaled(s16be(p, 6), MILLI));
+        metrics.put(Metric.ACCELERATION_Y.key(), scaled(s16be(p, 8), MILLI));
+        metrics.put(Metric.ACCELERATION_Z.key(), scaled(s16be(p, 10), MILLI));
+        metrics.put(Metric.BATTERY_VOLTAGE.key(), scaled(u16be(p, 12), MILLI));
+        return new DecodeResult.Decoded(PayloadFormat.RUUVI_DF3, metrics, Map.of());
     }
 
     private static BigDecimal temperature(int signAndInteger, int fraction) {

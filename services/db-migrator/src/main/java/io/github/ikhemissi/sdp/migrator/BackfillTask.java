@@ -8,11 +8,12 @@ import io.github.ikhemissi.sdp.fleet.PayloadFactory;
 import io.github.ikhemissi.sdp.fleet.ReadingModel;
 import io.github.ikhemissi.sdp.fleet.SimulatedDevice;
 import java.nio.charset.StandardCharsets;
+import java.sql.Connection;
+import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.Arrays;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
@@ -77,10 +78,11 @@ public class BackfillTask {
         long total = 0;
         long skipped = 0;
         for (Device device : devices) {
-            long[] counts = tx.execute(status -> backfill(device, from));
-            total += counts[0];
-            skipped += counts[1];
-            log.info("History backfill: {} measurements for {} ({} to {})", counts[0], device.deviceId(), from, device.firstSeenAt());
+            DeviceHistory history = tx.execute(status -> backfill(device, from));
+            total += history.measurements;
+            skipped += history.skippedReadings;
+            log.info("History backfill: {} measurements for {} ({} to {})", history.measurements, device.deviceId(), from,
+                    device.firstSeenAt());
         }
         jdbc.execute("ANALYZE sdp.measurements");
         // Past hours changed: fleet rollups are rebuilt by the next maintenance run.
@@ -98,13 +100,9 @@ public class BackfillTask {
         return jdbc.query("""
                         SELECT device_id, site_id, last_payload_format, first_seen_at FROM sdp.devices
                          WHERE first_seen_at > ?""" + sites + " ORDER BY device_id",
-                (rs, i) -> new Device(rs.getString(1), rs.getString(2), format(rs.getString(3)),
+                (rs, i) -> new Device(rs.getString(1), rs.getString(2), PayloadFormat.fromId(rs.getString(3)).orElse(null),
                         rs.getTimestamp(4).toInstant()), args)
                 .stream().filter(d -> d.format() != null).toList();
-    }
-
-    private static PayloadFormat format(String id) {
-        return Arrays.stream(PayloadFormat.values()).filter(f -> f.id().equals(id)).findFirst().orElse(null);
     }
 
     /** Daily partitions for the backfilled days (as schema owner), so no row lands in the default partition. */
@@ -115,58 +113,66 @@ public class BackfillTask {
                 Timestamp.from(from), Timestamp.from(until));
     }
 
-    private long[] backfill(Device device, Instant from) {
+    /** What was generated for one device. */
+    private static final class DeviceHistory {
+        long measurements;
+        long skippedReadings;
+        Instant firstMeasuredAt;
+        final Map<String, Instant> metricsLastSeen = new TreeMap<>();
+    }
+
+    private DeviceHistory backfill(Device device, Instant from) {
+        DeviceHistory history = jdbc.execute((ConnectionCallback<DeviceHistory>) connection -> copyHistory(connection, device, from));
+        if (history.firstMeasuredAt != null) {
+            jdbc.update("UPDATE sdp.devices SET first_seen_at = LEAST(first_seen_at, ?) WHERE device_id = ?",
+                    Timestamp.from(history.firstMeasuredAt), device.deviceId());
+            history.metricsLastSeen.forEach((metric, lastSeen) -> jdbc.update("""
+                    INSERT INTO sdp.device_metrics (device_id, metric, last_seen_at) VALUES (?, ?, ?)
+                    ON CONFLICT (device_id, metric) DO UPDATE
+                       SET last_seen_at = GREATEST(sdp.device_metrics.last_seen_at, EXCLUDED.last_seen_at)""",
+                    device.deviceId(), metric, Timestamp.from(lastSeen)));
+        }
+        return history;
+    }
+
+    /** Streams the device's generated measurements into {@code sdp.measurements} with {@code COPY}. */
+    private DeviceHistory copyHistory(Connection connection, Device device, Instant from) throws SQLException {
         SimulatedDevice simulated = new SimulatedDevice(device.deviceId(), device.siteId(), device.format());
         // Anchored at the first live measurement so slow drifts (battery) join the live readings continuously.
         ReadingModel model = new ReadingModel(simulated, List.of(), device.firstSeenAt());
         Random random = new Random(device.deviceId().hashCode() * 31L + from.getEpochSecond());
         PayloadFactory payloads = new PayloadFactory(0, random.nextLong());
         Grid grid = new Grid(device.deviceId(), settings.interval().toMillis(), settings.jitter().toMillis());
-        Map<String, Instant> metricsLastSeen = new TreeMap<>();
-        long[] counts = new long[2];
-        Instant[] first = new Instant[1];
+        DeviceHistory history = new DeviceHistory();
 
-        jdbc.execute((ConnectionCallback<Void>) connection -> {
-            CopyIn copy = connection.unwrap(PGConnection.class).getCopyAPI().copyIn(COPY);
-            try {
-                StringBuilder rows = new StringBuilder(FLUSH_BYTES + 4096);
-                for (long slot = grid.firstSlot(from); grid.time(slot).isBefore(device.firstSeenAt()); slot++) {
-                    Instant at = grid.time(slot);
-                    byte[] payload = payloads.build(simulated, model.next(at)).bytes();
-                    if (PayloadCodecs.decode(payload) instanceof DecodeResult.Decoded decoded) {
-                        appendRow(rows, device, at, at.plusMillis(300 + random.nextInt(1200)), decoded, payload);
-                        decoded.metrics().keySet().forEach(metric -> metricsLastSeen.put(metric, at));
-                        if (first[0] == null) {
-                            first[0] = at;
-                        }
-                        counts[0]++;
-                    } else {
-                        counts[1]++;
+        CopyIn copy = connection.unwrap(PGConnection.class).getCopyAPI().copyIn(COPY);
+        try {
+            StringBuilder rows = new StringBuilder(FLUSH_BYTES + 4096);
+            for (long slot = grid.firstSlot(from); grid.time(slot).isBefore(device.firstSeenAt()); slot++) {
+                Instant at = grid.time(slot);
+                byte[] payload = payloads.build(simulated, model.next(at)).bytes();
+                if (PayloadCodecs.decode(payload) instanceof DecodeResult.Decoded decoded) {
+                    appendRow(rows, device, at, at.plusMillis(300 + random.nextInt(1200)), decoded, payload);
+                    decoded.metrics().keySet().forEach(metric -> history.metricsLastSeen.put(metric, at));
+                    if (history.firstMeasuredAt == null) {
+                        history.firstMeasuredAt = at;
                     }
-                    if (rows.length() >= FLUSH_BYTES) {
-                        write(copy, rows);
-                    }
+                    history.measurements++;
+                } else {
+                    history.skippedReadings++;
                 }
-                write(copy, rows);
-                copy.endCopy();
-            } finally {
-                if (copy.isActive()) {
-                    copy.cancelCopy();
+                if (rows.length() >= FLUSH_BYTES) {
+                    write(copy, rows);
                 }
             }
-            return null;
-        });
-
-        if (first[0] != null) {
-            jdbc.update("UPDATE sdp.devices SET first_seen_at = LEAST(first_seen_at, ?) WHERE device_id = ?",
-                    Timestamp.from(first[0]), device.deviceId());
-            metricsLastSeen.forEach((metric, lastSeen) -> jdbc.update("""
-                    INSERT INTO sdp.device_metrics (device_id, metric, last_seen_at) VALUES (?, ?, ?)
-                    ON CONFLICT (device_id, metric) DO UPDATE
-                       SET last_seen_at = GREATEST(sdp.device_metrics.last_seen_at, EXCLUDED.last_seen_at)""",
-                    device.deviceId(), metric, Timestamp.from(lastSeen)));
+            write(copy, rows);
+            copy.endCopy();
+        } finally {
+            if (copy.isActive()) {
+                copy.cancelCopy();
+            }
         }
-        return counts;
+        return history;
     }
 
     /**
@@ -217,7 +223,7 @@ public class BackfillTask {
         return rows.append('"').append(value.replace("\"", "\"\"")).append('"');
     }
 
-    private static void write(CopyIn copy, StringBuilder rows) throws java.sql.SQLException {
+    private static void write(CopyIn copy, StringBuilder rows) throws SQLException {
         if (!rows.isEmpty()) {
             byte[] bytes = rows.toString().getBytes(StandardCharsets.UTF_8);
             copy.writeToCopy(bytes, 0, bytes.length);

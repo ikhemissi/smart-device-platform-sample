@@ -1,6 +1,7 @@
 package io.github.ikhemissi.sdp.deviceapi.cache;
 
 import com.azure.core.credential.TokenCredential;
+import com.azure.identity.DefaultAzureCredentialBuilder;
 import io.opentelemetry.api.OpenTelemetry;
 import java.time.Clock;
 import java.time.Duration;
@@ -22,7 +23,7 @@ class CacheConfiguration {
 
     @Bean
     EntraIdRedisCredentialsProvider redisCredentials(ObjectProvider<TokenCredential> credential, Clock clock) {
-        return new EntraIdRedisCredentialsProvider(credential.getIfAvailable(() -> new com.azure.identity.DefaultAzureCredentialBuilder().build()),
+        return new EntraIdRedisCredentialsProvider(credential.getIfAvailable(() -> new DefaultAzureCredentialBuilder().build()),
                 Duration.ofMinutes(10), clock);
     }
 

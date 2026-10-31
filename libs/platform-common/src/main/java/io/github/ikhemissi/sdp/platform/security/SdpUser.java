@@ -34,10 +34,13 @@ public record SdpUser(String objectId, String displayName, String userPrincipalN
     }
 
     static boolean has(Authentication authentication, SdpRole role) {
-        if (role.appRole() == null) {
-            return authentication != null && authentication.isAuthenticated();
+        if (authentication == null) {
+            return false;
         }
-        return authentication != null && authentication.getAuthorities().stream()
+        if (role.appRole() == null) {
+            return authentication.isAuthenticated();
+        }
+        return authentication.getAuthorities().stream()
                 .map(GrantedAuthority::getAuthority)
                 .anyMatch(role.appRole()::equals);
     }

@@ -1,6 +1,7 @@
 package io.github.ikhemissi.sdp.deviceapi.cache;
 
 import java.time.Duration;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 
@@ -22,7 +23,7 @@ public interface HistoryCache {
     HistoryCache NONE = new HistoryCache() {
         @Override
         public List<String> getAll(List<String> keys) {
-            return java.util.Arrays.asList(new String[keys.size()]);
+            return Arrays.asList(new String[keys.size()]);
         }
 
         @Override

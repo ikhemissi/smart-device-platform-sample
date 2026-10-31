@@ -51,23 +51,23 @@ public class SiteRepository {
 
     public List<SiteCertificate> certificates(String siteId) {
         return jdbc.sql("SELECT * FROM sdp.site_certificates WHERE site_id = :id ORDER BY slot")
-                .param("id", siteId).query(this::certificate).list();
+                .param("id", siteId).query(this::mapCertificate).list();
     }
 
     public List<SiteCertificate> allCertificates() {
-        return jdbc.sql("SELECT * FROM sdp.site_certificates ORDER BY site_id, slot").query(this::certificate).list();
+        return jdbc.sql("SELECT * FROM sdp.site_certificates ORDER BY site_id, slot").query(this::mapCertificate).list();
     }
 
-    public void insertCertificate(SiteCertificate c) {
+    public void insertCertificate(SiteCertificate certificate) {
         jdbc.sql("""
                         INSERT INTO sdp.site_certificates (site_id, fingerprint, slot, subject, issuer, not_before, not_after,
                                                            dps_certificate_name, added_by, added_by_name, added_at)
                         VALUES (:site, :fp, :slot, :subject, :issuer, :notBefore, :notAfter, :dps, :by, :byName, :at)""")
-                .param("site", c.siteId()).param("fp", c.fingerprint()).param("slot", c.slot())
-                .param("subject", c.subject()).param("issuer", c.issuer())
-                .param("notBefore", utc(c.notBefore())).param("notAfter", utc(c.notAfter()))
-                .param("dps", c.dpsCertificateName()).param("by", c.addedBy()).param("byName", c.addedByName())
-                .param("at", utc(c.addedAt()))
+                .param("site", certificate.siteId()).param("fp", certificate.fingerprint()).param("slot", certificate.slot())
+                .param("subject", certificate.subject()).param("issuer", certificate.issuer())
+                .param("notBefore", utc(certificate.notBefore())).param("notAfter", utc(certificate.notAfter()))
+                .param("dps", certificate.dpsCertificateName()).param("by", certificate.addedBy()).param("byName", certificate.addedByName())
+                .param("at", utc(certificate.addedAt()))
                 .update();
     }
 
@@ -152,7 +152,7 @@ public class SiteRepository {
 
     // --- Mapping --------------------------------------------------------------------------------------------
 
-    private SiteCertificate certificate(ResultSet rs, int row) throws SQLException {
+    private SiteCertificate mapCertificate(ResultSet rs, int row) throws SQLException {
         Instant notAfter = instant(rs, "not_after");
         return new SiteCertificate(rs.getString("site_id"), rs.getString("fingerprint"), rs.getString("slot"),
                 rs.getString("subject"), rs.getString("issuer"), instant(rs, "not_before"), notAfter,

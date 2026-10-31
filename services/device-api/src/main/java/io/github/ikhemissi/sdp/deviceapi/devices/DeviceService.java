@@ -1,11 +1,11 @@
 package io.github.ikhemissi.sdp.deviceapi.devices;
 
 import io.github.ikhemissi.sdp.deviceapi.web.ApiException;
+import io.github.ikhemissi.sdp.deviceapi.web.EntityTags;
 import io.github.ikhemissi.sdp.platform.security.SdpUser;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
-import java.util.Arrays;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -43,7 +43,7 @@ public class DeviceService {
                     "Send the device's current entity tag in If-Match to avoid overwriting a concurrent change.");
         }
         DeviceRecord current = repository.lockById(deviceId).orElseThrow(() -> notFound(deviceId));
-        if (!matches(ifMatch, current.entityTag())) {
+        if (!EntityTags.matches(ifMatch, current.entityTag())) {
             throw new ApiException(HttpStatus.PRECONDITION_FAILED,
                     "The device was changed by someone else; reload it and apply your change again.");
         }
@@ -58,13 +58,6 @@ public class DeviceService {
 
     private Instant reportingSince() {
         return clock.instant().minus(properties.reportingWindow());
-    }
-
-    static boolean matches(String ifMatch, String entityTag) {
-        return Arrays.stream(ifMatch.split(","))
-                .map(String::strip)
-                .map(tag -> tag.startsWith("W/") ? tag.substring(2) : tag)
-                .anyMatch(tag -> tag.equals("*") || tag.equals(entityTag));
     }
 
     private static ApiException notFound(String deviceId) {

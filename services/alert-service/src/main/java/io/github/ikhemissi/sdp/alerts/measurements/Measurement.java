@@ -2,6 +2,7 @@ package io.github.ikhemissi.sdp.alerts.measurements;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.time.format.DateTimeParseException;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import tools.jackson.databind.JsonNode;
@@ -48,7 +49,7 @@ public record Measurement(String deviceId, String siteId, String payloadFormat, 
                     Instant.parse(text(node, "measuredAt")),
                     node.hasNonNull("receivedAt") ? Instant.parse(node.get("receivedAt").asString()) : null,
                     messageKey, metrics);
-        } catch (java.time.format.DateTimeParseException e) {
+        } catch (DateTimeParseException e) {
             throw new InvalidMeasurementException("invalid time: " + e.getMessage());
         }
     }

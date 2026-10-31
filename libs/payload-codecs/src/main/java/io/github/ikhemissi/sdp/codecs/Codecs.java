@@ -2,6 +2,7 @@ package io.github.ikhemissi.sdp.codecs;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.util.HexFormat;
 import java.util.Map;
 import java.util.Set;
 
@@ -75,13 +76,21 @@ final class Codecs {
         return Math.max(min, Math.min(max, raw.longValueExact()));
     }
 
+    /** Rejects unknown or unsupported metric keys; only Cayenne LPP accepts the {@code _ch<n>} channel suffix. */
     static void requireSupported(Map<String, ? extends Number> metrics, Set<Metric> supported, PayloadFormat format) {
         for (String key : metrics.keySet()) {
             Metric metric = Metric.fromKey(key).orElse(null);
-            if (metric == null || !supported.contains(metric) || (!key.equals(metric.key()) && format != PayloadFormat.CAYENNE_LPP)) {
+            boolean supportedMetric = metric != null && supported.contains(metric);
+            boolean hasChannelSuffix = supportedMetric && !key.equals(metric.key());
+            if (!supportedMetric || (hasChannelSuffix && format != PayloadFormat.CAYENNE_LPP)) {
                 throw new IllegalArgumentException("Metric '" + key + "' is not supported by " + format.id());
             }
         }
+    }
+
+    /** Formats an unsigned byte as {@code 0xAB}. */
+    static String hexByte(int value) {
+        return "0x" + HexFormat.of().withUpperCase().toHexDigits((byte) value);
     }
 
     static DecodeResult.Rejected malformed(String detail) {

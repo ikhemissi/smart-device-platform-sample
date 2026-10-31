@@ -34,33 +34,33 @@ public final class BatchDecoder {
         Set<String> seen = new HashSet<>();
         int duplicates = 0;
 
-        for (TelemetryMessage m : messages) {
-            String deviceKey = (m.deviceId() == null ? "" : m.deviceId()) + '\n' + m.messageKey();
-            if (!seen.add(deviceKey)) {
+        for (TelemetryMessage message : messages) {
+            if (!seen.add(TelemetryStore.key(message.deviceId(), message.messageKey()))) {
                 duplicates++;
                 continue;
             }
-            if (m.deviceId() == null || m.deviceId().isBlank()) {
-                rejections.add(rejection(m, receivedAt, MISSING_DEVICE, "message has no IoT Hub device id"));
-                outcomes.add(new Outcome(m, null, MISSING_DEVICE));
+            if (message.deviceId() == null || message.deviceId().isBlank()) {
+                rejections.add(rejection(message, receivedAt, MISSING_DEVICE, "message has no IoT Hub device id"));
+                outcomes.add(new Outcome(message, null, MISSING_DEVICE));
                 continue;
             }
-            DecodeResult result = PayloadCodecs.decode(m.payload());
-            if (result instanceof DecodeResult.Rejected r) {
-                rejections.add(rejection(m, receivedAt, r.reason().name(), r.detail()));
-                outcomes.add(new Outcome(m, null, r.reason().name()));
+            DecodeResult result = PayloadCodecs.decode(message.payload());
+            if (result instanceof DecodeResult.Rejected rejected) {
+                rejections.add(rejection(message, receivedAt, rejected.reason().name(), rejected.detail()));
+                outcomes.add(new Outcome(message, null, rejected.reason().name()));
                 continue;
             }
-            DecodeResult.Decoded d = (DecodeResult.Decoded) result;
-            String siteProblem = siteProblem(m.siteId());
+            DecodeResult.Decoded decoded = (DecodeResult.Decoded) result;
+            String format = decoded.format().id();
+            String siteProblem = siteProblem(message.siteId());
             if (siteProblem != null) {
-                rejections.add(rejection(m, receivedAt, MISSING_SITE, siteProblem));
-                outcomes.add(new Outcome(m, d.format().id(), MISSING_SITE));
+                rejections.add(rejection(message, receivedAt, MISSING_SITE, siteProblem));
+                outcomes.add(new Outcome(message, format, MISSING_SITE));
                 continue;
             }
-            measurements.add(new Measurement(m.deviceId(), m.siteId(), m.enqueuedAt(), receivedAt, m.messageKey(),
-                    d.format().id(), m.payload(), d.metrics(), d.attributes()));
-            outcomes.add(new Outcome(m, d.format().id(), null));
+            measurements.add(new Measurement(message.deviceId(), message.siteId(), message.enqueuedAt(), receivedAt,
+                    message.messageKey(), format, message.payload(), decoded.metrics(), decoded.attributes()));
+            outcomes.add(new Outcome(message, format, null));
         }
         return new DecodedBatch(measurements, rejections, outcomes, duplicates);
     }
@@ -75,8 +75,9 @@ public final class BatchDecoder {
         return null;
     }
 
-    private static Rejection rejection(TelemetryMessage m, Instant receivedAt, String reason, String detail) {
-        String siteId = m.siteId() != null && SITE_ID.matcher(m.siteId()).matches() ? m.siteId() : null;
-        return new Rejection(m.deviceId(), siteId, m.enqueuedAt(), receivedAt, m.messageKey(), reason, detail, m.payload());
+    private static Rejection rejection(TelemetryMessage message, Instant receivedAt, String reason, String detail) {
+        String siteId = message.siteId() != null && SITE_ID.matcher(message.siteId()).matches() ? message.siteId() : null;
+        return new Rejection(message.deviceId(), siteId, message.enqueuedAt(), receivedAt, message.messageKey(), reason,
+                detail, message.payload());
     }
 }

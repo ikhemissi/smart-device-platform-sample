@@ -1,13 +1,11 @@
 package io.github.ikhemissi.sdp.alerts.evaluation;
 
+import static io.github.ikhemissi.sdp.alerts.JdbcValues.instant;
+import static io.github.ikhemissi.sdp.alerts.JdbcValues.strings;
+import static io.github.ikhemissi.sdp.alerts.JdbcValues.utc;
+
 import java.math.BigDecimal;
-import java.sql.Array;
-import java.sql.ResultSet;
-import java.sql.SQLException;
 import java.time.Instant;
-import java.time.OffsetDateTime;
-import java.time.ZoneOffset;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -105,18 +103,5 @@ public class AlertStore {
                 .param("alert", alertId).param("kind", kind).param("now", utc(now))
                 .param("recipients", recipients.toArray(String[]::new)).param("value", value)
                 .update();
-    }
-
-    private static List<String> strings(Array array) throws SQLException {
-        return array == null ? List.of() : Arrays.asList((String[]) array.getArray());
-    }
-
-    private static Instant instant(ResultSet rs, String column) throws SQLException {
-        OffsetDateTime value = rs.getObject(column, OffsetDateTime.class);
-        return value == null ? null : value.toInstant();
-    }
-
-    private static OffsetDateTime utc(Instant instant) {
-        return OffsetDateTime.ofInstant(instant, ZoneOffset.UTC);
     }
 }

@@ -1,9 +1,11 @@
 package io.github.ikhemissi.sdp.deviceapi.devices;
 
+import static io.github.ikhemissi.sdp.deviceapi.jdbc.JdbcValues.instant;
+import static io.github.ikhemissi.sdp.deviceapi.jdbc.JdbcValues.utc;
+
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.Instant;
-import java.time.OffsetDateTime;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -68,7 +70,7 @@ public class DeviceRepository {
                 .param("displayName", displayName)
                 .param("description", description)
                 .param("location", location == null ? null : json.writeValueAsString(location))
-                .param("at", OffsetDateTime.ofInstant(at, java.time.ZoneOffset.UTC))
+                .param("at", utc(at))
                 .param("editorId", editorId)
                 .param("editorName", editorName)
                 .param("id", deviceId)
@@ -83,7 +85,7 @@ public class DeviceRepository {
         }
         if (query.status() != null) {
             where.append(query.status() == DeviceStatus.REPORTING ? " AND d.last_seen_at >= :since" : " AND d.last_seen_at < :since");
-            params.put("since", OffsetDateTime.ofInstant(reportingSince, java.time.ZoneOffset.UTC));
+            params.put("since", utc(reportingSince));
         }
         if (query.search() != null) {
             where.append(" AND (d.device_id ILIKE :pattern ESCAPE '\\' OR d.display_name ILIKE :pattern ESCAPE '\\')");
@@ -106,10 +108,5 @@ public class DeviceRepository {
                 instant(rs, "updated_at"),
                 rs.getString("updated_by"),
                 rs.getString("updated_by_name"));
-    }
-
-    private static Instant instant(ResultSet rs, String column) throws SQLException {
-        OffsetDateTime value = rs.getObject(column, OffsetDateTime.class);
-        return value == null ? null : value.toInstant();
     }
 }

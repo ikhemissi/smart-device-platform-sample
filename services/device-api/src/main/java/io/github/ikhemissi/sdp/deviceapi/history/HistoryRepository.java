@@ -1,10 +1,11 @@
 package io.github.ikhemissi.sdp.deviceapi.history;
 
+import static io.github.ikhemissi.sdp.deviceapi.jdbc.JdbcValues.utc;
+
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.Instant;
 import java.time.OffsetDateTime;
-import java.time.ZoneOffset;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -148,9 +149,5 @@ public class HistoryRepository {
         OffsetDateTime value = rs.getObject(column, OffsetDateTime.class);
         // -infinity watermarks are returned as OffsetDateTime.MIN.
         return value == null ? null : value.equals(OffsetDateTime.MIN) ? Instant.MIN : value.toInstant();
-    }
-
-    private static OffsetDateTime utc(Instant instant) {
-        return OffsetDateTime.ofInstant(instant, ZoneOffset.UTC);
     }
 }

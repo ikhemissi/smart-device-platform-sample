@@ -61,19 +61,16 @@ public class CertificateValidator {
             throw new CertificateRejectedException("The certificate is not valid yet (valid from "
                     + certificate.getNotBefore().toInstant() + ").");
         }
-        byte[] der = encoded(certificate);
-        return new CaCertificate(
-                certificate.getSubjectX500Principal().getName(X500Principal.RFC2253),
-                certificate.getIssuerX500Principal().getName(X500Principal.RFC2253),
-                fingerprint(der),
-                certificate.getNotBefore().toInstant(),
-                certificate.getNotAfter().toInstant(),
-                pem(der));
+        return describe(certificate);
     }
 
     /** Parses a certificate stored by DPS (trusted source), without validity checks. */
     public static CaCertificate describe(String pem) {
         X509Certificate certificate = parse(pem.getBytes(StandardCharsets.US_ASCII), pem);
+        return describe(certificate);
+    }
+
+    private static CaCertificate describe(X509Certificate certificate) {
         byte[] der = encoded(certificate);
         return new CaCertificate(
                 certificate.getSubjectX500Principal().getName(X500Principal.RFC2253),

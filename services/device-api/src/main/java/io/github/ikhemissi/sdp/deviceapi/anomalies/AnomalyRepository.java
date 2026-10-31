@@ -1,10 +1,11 @@
 package io.github.ikhemissi.sdp.deviceapi.anomalies;
 
+import static io.github.ikhemissi.sdp.deviceapi.jdbc.JdbcValues.instant;
+import static io.github.ikhemissi.sdp.deviceapi.jdbc.JdbcValues.utc;
+
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.Instant;
-import java.time.OffsetDateTime;
-import java.time.ZoneOffset;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -97,14 +98,5 @@ public class AnomalyRepository {
                 rs.getObject("confidence_threshold", Double.class), rs.getString("decision_model"),
                 rs.getString("decision_model_version"), rs.getString("explanation"), rs.getString("explanation_model"),
                 instant(rs, "detected_at"), instant(rs, "updated_at"), review);
-    }
-
-    private static Instant instant(ResultSet rs, String column) throws SQLException {
-        OffsetDateTime value = rs.getObject(column, OffsetDateTime.class);
-        return value == null ? null : value.toInstant();
-    }
-
-    private static OffsetDateTime utc(Instant instant) {
-        return OffsetDateTime.ofInstant(instant, ZoneOffset.UTC);
     }
 }

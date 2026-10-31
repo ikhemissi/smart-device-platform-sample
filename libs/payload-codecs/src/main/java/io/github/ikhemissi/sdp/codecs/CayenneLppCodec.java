@@ -15,7 +15,6 @@ import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -62,6 +61,8 @@ final class CayenneLppCodec implements PayloadCodec {
             Metric.ANALOG_INPUT, Metric.ANALOG_OUTPUT, Metric.ILLUMINANCE, Metric.PRESENCE, Metric.TEMPERATURE,
             Metric.HUMIDITY, Metric.ACCELERATION_X, Metric.ACCELERATION_Y, Metric.ACCELERATION_Z, Metric.PRESSURE,
             Metric.LATITUDE, Metric.LONGITUDE, Metric.ALTITUDE);
+    private static final Set<Metric> ACCELERATION = EnumSet.of(Metric.ACCELERATION_X, Metric.ACCELERATION_Y, Metric.ACCELERATION_Z);
+    private static final Set<Metric> POSITION = EnumSet.of(Metric.LATITUDE, Metric.LONGITUDE, Metric.ALTITUDE);
 
     private record Reading(Metric metric, int channel, BigDecimal value) {
     }
@@ -91,19 +92,19 @@ final class CayenneLppCodec implements PayloadCodec {
             int type = u8(p, offset + 1);
             Integer length = VALUE_LENGTH.get(type);
             if (length == null) {
-                return Codecs.malformed("unsupported Cayenne LPP type 0x" + HexFormat.of().withUpperCase().toHexDigits((byte) type)
-                        + " on channel " + channel);
+                return Codecs.malformed("unsupported Cayenne LPP type " + Codecs.hexByte(type) + " on channel " + channel);
             }
-            int value = offset + 2;
-            if (value + length > p.length) {
+            int valueOffset = offset + 2;
+            if (valueOffset + length > p.length) {
                 return Codecs.malformed("truncated Cayenne LPP value on channel " + channel);
             }
-            readings.addAll(read(p, value, channel, type));
-            offset = value + length;
+            readings.addAll(read(p, valueOffset, channel, type));
+            offset = valueOffset + length;
         }
         return new DecodeResult.Decoded(PayloadFormat.CAYENNE_LPP, keyed(readings), Map.of());
     }
 
+    /** Reads the value of one data object of {@code type} starting at offset {@code o}. */
     private static List<Reading> read(byte[] p, int o, int channel, int type) {
         return switch (type) {
             case DIGITAL_INPUT -> List.of(new Reading(Metric.DIGITAL_INPUT, channel, BigDecimal.valueOf(u8(p, o))));
@@ -127,6 +128,7 @@ final class CayenneLppCodec implements PayloadCodec {
         };
     }
 
+    /** Keys each reading by its metric, suffixed with {@code _ch<n>} only when the metric appears on several channels. */
     private static Map<String, BigDecimal> keyed(List<Reading> readings) {
         Map<Metric, Set<Integer>> channels = new HashMap<>();
         readings.forEach(r -> channels.computeIfAbsent(r.metric(), k -> new HashSet<>()).add(r.channel()));
@@ -158,33 +160,23 @@ final class CayenneLppCodec implements PayloadCodec {
         return out.toByteArray();
     }
 
-    private static final Set<Metric> ACCELERATION = EnumSet.of(Metric.ACCELERATION_X, Metric.ACCELERATION_Y, Metric.ACCELERATION_Z);
-    private static final Set<Metric> POSITION = EnumSet.of(Metric.LATITUDE, Metric.LONGITUDE, Metric.ALTITUDE);
-
+    /** Writes the channel's frames; the three acceleration axes and the GPS position each share a single frame. */
     private static void writeChannel(ByteArrayOutputStream out, int channel, Map<Metric, Number> values) {
         boolean accelerationWritten = false;
         boolean positionWritten = false;
-        for (Map.Entry<Metric, Number> e : values.entrySet()) {
-            Number v = e.getValue();
-            Metric metric = e.getKey();
+        for (Map.Entry<Metric, Number> entry : values.entrySet()) {
+            Metric metric = entry.getKey();
+            Number v = entry.getValue();
             if (ACCELERATION.contains(metric)) {
                 if (!accelerationWritten) {
-                    byte[] value = new byte[6];
-                    putU16be(value, 0, (int) unscaled(values.getOrDefault(Metric.ACCELERATION_X, 0), MILLI, -32_768, 32_767));
-                    putU16be(value, 2, (int) unscaled(values.getOrDefault(Metric.ACCELERATION_Y, 0), MILLI, -32_768, 32_767));
-                    putU16be(value, 4, (int) unscaled(values.getOrDefault(Metric.ACCELERATION_Z, 0), MILLI, -32_768, 32_767));
-                    frame(out, channel, ACCELEROMETER, value);
+                    frame(out, channel, ACCELEROMETER, accelerometerValue(values));
                     accelerationWritten = true;
                 }
                 continue;
             }
             if (POSITION.contains(metric)) {
                 if (!positionWritten) {
-                    byte[] value = new byte[9];
-                    putS24be(value, 0, (int) unscaled(values.getOrDefault(Metric.LATITUDE, 0), TEN_THOUSANDTH, -900_000, 900_000));
-                    putS24be(value, 3, (int) unscaled(values.getOrDefault(Metric.LONGITUDE, 0), TEN_THOUSANDTH, -1_800_000, 1_800_000));
-                    putS24be(value, 6, (int) unscaled(values.getOrDefault(Metric.ALTITUDE, 0), HUNDREDTH, -8_388_608, 8_388_607));
-                    frame(out, channel, GPS, value);
+                    frame(out, channel, GPS, gpsValue(values));
                     positionWritten = true;
                 }
                 continue;
@@ -202,6 +194,22 @@ final class CayenneLppCodec implements PayloadCodec {
                 default -> throw new IllegalArgumentException("Metric not supported by cayenne-lpp: " + metric.key());
             }
         }
+    }
+
+    private static byte[] accelerometerValue(Map<Metric, Number> values) {
+        byte[] value = new byte[6];
+        putU16be(value, 0, (int) unscaled(values.getOrDefault(Metric.ACCELERATION_X, 0), MILLI, -32_768, 32_767));
+        putU16be(value, 2, (int) unscaled(values.getOrDefault(Metric.ACCELERATION_Y, 0), MILLI, -32_768, 32_767));
+        putU16be(value, 4, (int) unscaled(values.getOrDefault(Metric.ACCELERATION_Z, 0), MILLI, -32_768, 32_767));
+        return value;
+    }
+
+    private static byte[] gpsValue(Map<Metric, Number> values) {
+        byte[] value = new byte[9];
+        putS24be(value, 0, (int) unscaled(values.getOrDefault(Metric.LATITUDE, 0), TEN_THOUSANDTH, -900_000, 900_000));
+        putS24be(value, 3, (int) unscaled(values.getOrDefault(Metric.LONGITUDE, 0), TEN_THOUSANDTH, -1_800_000, 1_800_000));
+        putS24be(value, 6, (int) unscaled(values.getOrDefault(Metric.ALTITUDE, 0), HUNDREDTH, -8_388_608, 8_388_607));
+        return value;
     }
 
     private static byte[] oneByte(long value) {

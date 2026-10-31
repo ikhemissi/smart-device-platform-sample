@@ -10,12 +10,14 @@ import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.TreeSet;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
@@ -86,65 +88,79 @@ public class JdbcTelemetryStore implements TelemetryStore {
     }
 
     private StoreResult persistInTransaction(DecodedBatch batch) {
-        Set<String> sites = new TreeSet<>();
-        batch.measurements().forEach(m -> sites.add(m.siteId()));
-        if (!sites.isEmpty()) {
-            jdbc.update(con -> {
-                PreparedStatement ps = con.prepareStatement(INSERT_SITES);
-                ps.setArray(1, textArray(con, sites));
-                return ps;
-            });
-        }
-
+        insertSites(batch.measurements());
         Set<String> newKeys = recordInLedger(batch);
         Set<String> duplicateKeys = new HashSet<>();
 
         List<Measurement> measurements = new ArrayList<>();
         for (Measurement m : batch.measurements()) {
-            if (newKeys.contains(TelemetryStore.key(m.deviceId(), m.messageKey()))) {
+            String key = TelemetryStore.key(m.deviceId(), m.messageKey());
+            if (newKeys.contains(key)) {
                 measurements.add(m);
             } else {
-                duplicateKeys.add(TelemetryStore.key(m.deviceId(), m.messageKey()));
+                duplicateKeys.add(key);
             }
         }
         List<Rejection> rejections = new ArrayList<>();
         for (Rejection r : batch.rejections()) {
-            if (newKeys.contains(TelemetryStore.key(r.ledgerDeviceId(), r.messageKey()))) {
+            String key = TelemetryStore.key(r.ledgerDeviceId(), r.messageKey());
+            if (newKeys.contains(key)) {
                 rejections.add(r);
             } else {
-                duplicateKeys.add(TelemetryStore.key(r.ledgerDeviceId(), r.messageKey()));
+                duplicateKeys.add(key);
             }
         }
 
         if (!measurements.isEmpty()) {
-            jdbc.batchUpdate(INSERT_MEASUREMENT, measurements, measurements.size(), (ps, m) -> {
-                ps.setString(1, m.deviceId());
-                ps.setString(2, m.siteId());
-                ps.setTimestamp(3, Timestamp.from(m.measuredAt()));
-                ps.setTimestamp(4, Timestamp.from(m.receivedAt()));
-                ps.setString(5, m.messageKey());
-                ps.setString(6, m.payloadFormat());
-                ps.setBytes(7, m.rawPayload());
-                ps.setString(8, MetricsJson.numbers(m.metrics()));
-                ps.setString(9, MetricsJson.strings(m.attributes()));
-            });
+            insertMeasurements(measurements);
             upsertDevices(measurements);
             upsertDeviceMetrics(measurements);
         }
         if (!rejections.isEmpty()) {
-            jdbc.batchUpdate(INSERT_REJECTION, rejections, rejections.size(), (ps, r) -> {
-                ps.setTimestamp(1, Timestamp.from(r.receivedAt()));
-                ps.setTimestamp(2, r.enqueuedAt() == null ? null : Timestamp.from(r.enqueuedAt()));
-                ps.setString(3, r.deviceId());
-                ps.setString(4, r.siteId());
-                ps.setString(5, r.messageKey());
-                ps.setString(6, r.reason());
-                ps.setString(7, r.detail());
-                ps.setBytes(8, r.rawPayload());
-            });
+            insertRejections(rejections);
         }
         return new StoreResult(new PersistResult(measurements.size(), rejections.size(),
                 duplicateKeys.size() + batch.inBatchDuplicates()), duplicateKeys);
+    }
+
+    private void insertSites(List<Measurement> measurements) {
+        Set<String> sites = new TreeSet<>();
+        measurements.forEach(m -> sites.add(m.siteId()));
+        if (sites.isEmpty()) {
+            return;
+        }
+        jdbc.update(con -> {
+            PreparedStatement ps = con.prepareStatement(INSERT_SITES);
+            ps.setArray(1, textArray(con, sites));
+            return ps;
+        });
+    }
+
+    private void insertMeasurements(List<Measurement> measurements) {
+        jdbc.batchUpdate(INSERT_MEASUREMENT, measurements, measurements.size(), (ps, m) -> {
+            ps.setString(1, m.deviceId());
+            ps.setString(2, m.siteId());
+            ps.setTimestamp(3, Timestamp.from(m.measuredAt()));
+            ps.setTimestamp(4, Timestamp.from(m.receivedAt()));
+            ps.setString(5, m.messageKey());
+            ps.setString(6, m.payloadFormat());
+            ps.setBytes(7, m.rawPayload());
+            ps.setString(8, MetricsJson.numbers(m.metrics()));
+            ps.setString(9, MetricsJson.strings(m.attributes()));
+        });
+    }
+
+    private void insertRejections(List<Rejection> rejections) {
+        jdbc.batchUpdate(INSERT_REJECTION, rejections, rejections.size(), (ps, r) -> {
+            ps.setTimestamp(1, Timestamp.from(r.receivedAt()));
+            ps.setTimestamp(2, r.enqueuedAt() == null ? null : Timestamp.from(r.enqueuedAt()));
+            ps.setString(3, r.deviceId());
+            ps.setString(4, r.siteId());
+            ps.setString(5, r.messageKey());
+            ps.setString(6, r.reason());
+            ps.setString(7, r.detail());
+            ps.setBytes(8, r.rawPayload());
+        });
     }
 
     private Set<String> recordInLedger(DecodedBatch batch) {
@@ -196,7 +212,7 @@ public class JdbcTelemetryStore implements TelemetryStore {
     }
 
     private void upsertDeviceMetrics(List<Measurement> measurements) {
-        Map<String, Instant> lastSeen = new java.util.TreeMap<>();
+        Map<String, Instant> lastSeen = new TreeMap<>();
         for (Measurement m : measurements) {
             for (String metric : m.metrics().keySet()) {
                 lastSeen.merge(m.deviceId() + '\n' + metric, m.measuredAt(), (a, b) -> a.isAfter(b) ? a : b);
@@ -223,7 +239,7 @@ public class JdbcTelemetryStore implements TelemetryStore {
         });
     }
 
-    private static Array textArray(Connection con, java.util.Collection<String> values) throws SQLException {
+    private static Array textArray(Connection con, Collection<String> values) throws SQLException {
         return con.createArrayOf("text", values.toArray(String[]::new));
     }
 }

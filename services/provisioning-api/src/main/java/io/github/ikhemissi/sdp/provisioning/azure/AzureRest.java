@@ -12,6 +12,7 @@ import com.azure.core.http.policy.ExponentialBackoffOptions;
 import com.azure.core.http.policy.RetryOptions;
 import com.azure.core.http.policy.RetryPolicy;
 import com.azure.core.util.BinaryData;
+import com.azure.core.util.Context;
 import java.time.Duration;
 import java.util.Map;
 
@@ -49,7 +50,7 @@ public final class AzureRest {
             request.setBody(BinaryData.fromString(jsonBody));
         }
         headers.forEach(request::setHeader);
-        try (HttpResponse response = pipeline.sendSync(request, com.azure.core.util.Context.NONE)) {
+        try (HttpResponse response = pipeline.sendSync(request, Context.NONE)) {
             String body = response.getBodyAsBinaryData() == null ? "" : response.getBodyAsBinaryData().toString();
             return new Response(response.getStatusCode(), body, response.getHeaderValue(HttpHeaderName.ETAG),
                     response.getHeaderValue(HttpHeaderName.fromString("x-ms-continuation")));

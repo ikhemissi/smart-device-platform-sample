@@ -1,9 +1,9 @@
 package io.github.ikhemissi.sdp.deviceapi.digest;
 
+import static io.github.ikhemissi.sdp.deviceapi.jdbc.JdbcValues.instant;
+
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.time.Instant;
-import java.time.OffsetDateTime;
 import java.util.Optional;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Repository;
@@ -52,10 +52,5 @@ public class DigestRepository {
         return new SiteDigest.Digest(rs.getLong("id"), rs.getString("trigger"), instant(rs, "period_from"),
                 instant(rs, "period_to"), instant(rs, "comparison_from"), instant(rs, "generated_at"), rs.getString("brief"),
                 rs.getString("brief_model"), rs.getString("requested_by"), rs.getString("figures"));
-    }
-
-    private static Instant instant(ResultSet rs, String column) throws SQLException {
-        OffsetDateTime value = rs.getObject(column, OffsetDateTime.class);
-        return value == null ? null : value.toInstant();
     }
 }

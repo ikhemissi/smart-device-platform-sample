@@ -31,15 +31,16 @@ public class EmailRenderer {
         this.times = DateTimeFormatter.ofPattern("d MMM yyyy, HH:mm:ss z", Locale.ENGLISH).withZone(properties.email().timeZone());
     }
 
-    public EmailGateway.Email render(PendingNotification n) {
-        Map<String, Object> model = model(n);
+    public EmailGateway.Email render(PendingNotification notification) {
+        Map<String, Object> model = model(notification);
         Context context = new Context(Locale.ENGLISH, model);
-        return new EmailGateway.Email(n.recipients(), (String) model.get("subject"),
+        return new EmailGateway.Email(notification.recipients(), (String) model.get("subject"),
                 text.process("notification", context), html.process("notification", context));
     }
 
     Map<String, Object> model(PendingNotification n) {
-        String device = n.deviceName() == null || n.deviceName().isBlank() ? n.deviceId() : n.deviceName();
+        boolean unnamedDevice = n.deviceName() == null || n.deviceName().isBlank();
+        String device = unnamedDevice ? n.deviceId() : n.deviceName();
         String metric = n.metricDescription() == null ? n.metric() : n.metricDescription();
         String limit = "ABOVE".equals(n.direction()) ? "above " + quantity(n.thresholdMax(), n.unit())
                 : "below " + quantity(n.thresholdMin(), n.unit());
@@ -56,17 +57,26 @@ public class EmailRenderer {
             case PendingNotification.RESOLVED -> metric + " of " + device + " is back " + range + ".";
             default -> metric + " of " + device + " is " + limit + ".";
         });
-        model.put("device", n.deviceName() == null || n.deviceName().isBlank() ? n.deviceId() : n.deviceName() + " (" + n.deviceId() + ")");
+        model.put("device", unnamedDevice ? n.deviceId() : n.deviceName() + " (" + n.deviceId() + ")");
         model.put("site", n.siteName() == null || n.siteName().equals(n.siteId()) ? n.siteId() : n.siteName() + " (" + n.siteId() + ")");
         model.put("metric", metric + (n.unit() == null ? "" : " (" + n.unit() + ")"));
         model.put("currentValue", quantity(n.value(), n.unit()));
         model.put("worstValue", quantity(n.worstValue(), n.unit()));
         model.put("threshold", thresholdText(n.thresholdMin(), n.thresholdMax(), n.unit()));
         model.put("openedAt", time(n.openedAt()));
-        model.put("measuredAt", time(PendingNotification.RESOLVED.equals(n.kind()) ? n.closedAt() : PendingNotification.ALERT.equals(n.kind()) ? n.openedAt() : n.lastBreachAt()));
+        model.put("measuredAt", time(measuredAt(n)));
         model.put("closedAt", n.closedAt() == null ? null : time(n.closedAt()));
         model.put("link", portalBaseUrl + "/devices/" + n.deviceId());
         return model;
+    }
+
+    /** Time of the measurement the email reports: the opening, the latest breach (reminder) or the closing. */
+    private static Instant measuredAt(PendingNotification n) {
+        return switch (n.kind()) {
+            case PendingNotification.RESOLVED -> n.closedAt();
+            case PendingNotification.ALERT -> n.openedAt();
+            default -> n.lastBreachAt();
+        };
     }
 
     static String quantity(BigDecimal value, String unit) {

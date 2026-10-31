@@ -9,7 +9,6 @@ import static io.github.ikhemissi.sdp.codecs.Codecs.unscaled;
 import java.io.ByteArrayOutputStream;
 import java.math.BigDecimal;
 import java.util.EnumSet;
-import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -68,7 +67,7 @@ final class BtHomeV2Codec implements PayloadCodec {
             int id = p[offset] & 0xFF;
             ObjectType type = TYPES.stream().filter(t -> t.id() == id).findFirst().orElse(null);
             if (type == null) {
-                String objectId = "0x" + HexFormat.of().withUpperCase().toHexDigits((byte) id);
+                String objectId = Codecs.hexByte(id);
                 if (metrics.isEmpty()) {
                     return new DecodeResult.Rejected(RejectionReason.NO_SUPPORTED_DATA, "unsupported BTHome object id " + objectId);
                 }
@@ -76,7 +75,7 @@ final class BtHomeV2Codec implements PayloadCodec {
                 break;
             }
             if (offset + 1 + type.length() > p.length) {
-                return Codecs.malformed("truncated BTHome object 0x" + HexFormat.of().withUpperCase().toHexDigits((byte) id));
+                return Codecs.malformed("truncated BTHome object " + Codecs.hexByte(id));
             }
             long raw = type.signed() ? sLe(p, offset + 1, type.length()) : uLe(p, offset + 1, type.length());
             metrics.put(uniqueKey(metrics, type.metric().key()), scaled(raw, type.factor()));

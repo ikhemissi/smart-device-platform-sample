@@ -29,32 +29,31 @@ public class MaintenanceTask {
     }
 
     public void run() {
-        applyRetention();
+        String retention = interval(properties.retention());
+        applyRetention(retention);
         jdbc.execute("CALL partman.run_maintenance_proc()");
         long purged = purgeLedger();
-        int metrics = jdbc.update("DELETE FROM sdp.device_metrics WHERE last_seen_at < now() - ?::interval",
-                interval(properties.retention()));
+        int metrics = jdbc.update("DELETE FROM sdp.device_metrics WHERE last_seen_at < now() - ?::interval", retention);
         rollups.run(properties.retention());
-        int anomalies = jdbc.update("DELETE FROM sdp.anomalies WHERE ended_at < now() - ?::interval", interval(properties.retention()));
-        int digests = jdbc.update("DELETE FROM sdp.site_digest_requests WHERE processed_at < now() - ?::interval",
-                interval(properties.retention()))
-                + jdbc.update("DELETE FROM sdp.site_digests WHERE generated_at < now() - ?::interval", interval(properties.retention()));
+        int anomalies = jdbc.update("DELETE FROM sdp.anomalies WHERE ended_at < now() - ?::interval", retention);
+        int digests = jdbc.update("DELETE FROM sdp.site_digest_requests WHERE processed_at < now() - ?::interval", retention)
+                + jdbc.update("DELETE FROM sdp.site_digests WHERE generated_at < now() - ?::interval", retention);
         int items = jdbc.update("""
                 DELETE FROM sdp.maintenance_items
                  WHERE status IN ('done', 'resolved') AND coalesce(resolved_at, status_at, updated_at) < now() - ?::interval
-                """, interval(properties.retention()));
+                """, retention);
         log.info("Database maintenance completed: retention={}, ledgerRetention={}, ledgerKeysPurged={}, deviceMetricsPurged={}, "
                         + "anomaliesPurged={}, digestRowsPurged={}, maintenanceItemsPurged={}",
                 properties.retention(), properties.ledgerRetention(), purged, metrics, anomalies, digests, items);
     }
 
-    private void applyRetention() {
+    private void applyRetention(String retention) {
         for (String table : properties.partitionedTables()) {
             int updated = jdbc.update("""
                     UPDATE partman.part_config
                        SET retention = ?, retention_keep_table = false, infinite_time_partitions = true
                      WHERE parent_table = ?
-                    """, interval(properties.retention()), table);
+                    """, retention, table);
             if (updated != 1) {
                 throw new IllegalStateException("Table " + table + " is not managed by pg_partman");
             }

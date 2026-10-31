@@ -82,27 +82,36 @@ public class NotificationSender {
         if (claimed.isEmpty()) {
             return false;
         }
-        PendingNotification n = claimed.get();
+        PendingNotification notification = claimed.get();
         try {
-            gateway.send(renderer.render(n));
-            store.markSent(n, clock.instant());
-            metrics.notification(n.kind(), "sent");
-            log.info("{} email of alert {} sent to {} recipient(s)", n.kind(), n.alertId(), n.recipients().size());
+            gateway.send(renderer.render(notification));
+            store.markSent(notification, clock.instant());
+            metrics.notification(notification.kind(), "sent");
+            log.info("{} email of alert {} sent to {} recipient(s)", notification.kind(), notification.alertId(),
+                    notification.recipients().size());
         } catch (RuntimeException e) {
-            String error = e.getClass().getSimpleName() + ": " + e.getMessage();
-            Duration backoff = backoff(n.attempts());
-            Instant next = now.plus(backoff);
-            if (next.isAfter(n.createdAt().plus(properties.notifications().retryFor()))) {
-                store.markFailed(n.id(), error);
-                metrics.notification(n.kind(), "failed");
-                log.warn("{} email of alert {} failed after {} attempt(s): {}", n.kind(), n.alertId(), n.attempts() + 1, error);
-            } else {
-                store.markAttemptFailed(n.id(), error, next);
-                metrics.notification(n.kind(), "retry");
-                log.warn("{} email of alert {} failed (attempt {}), retrying in {}: {}", n.kind(), n.alertId(), n.attempts() + 1, backoff, error);
-            }
+            recordFailedAttempt(notification, e, now);
         }
         return true;
+    }
+
+    /** Schedules a retry with back-off, or gives up once the next attempt would be past {@code retry-for}. */
+    private void recordFailedAttempt(PendingNotification notification, RuntimeException failure, Instant now) {
+        String error = failure.getClass().getSimpleName() + ": " + failure.getMessage();
+        int attempt = notification.attempts() + 1;
+        Duration backoff = backoff(notification.attempts());
+        Instant next = now.plus(backoff);
+        if (next.isAfter(notification.createdAt().plus(properties.notifications().retryFor()))) {
+            store.markFailed(notification.id(), error);
+            metrics.notification(notification.kind(), "failed");
+            log.warn("{} email of alert {} failed after {} attempt(s): {}", notification.kind(), notification.alertId(),
+                    attempt, error);
+        } else {
+            store.markAttemptFailed(notification.id(), error, next);
+            metrics.notification(notification.kind(), "retry");
+            log.warn("{} email of alert {} failed (attempt {}), retrying in {}: {}", notification.kind(),
+                    notification.alertId(), attempt, backoff, error);
+        }
     }
 
     /** Queues a reminder for open alerts still breaching and not emailed for {@code reminder-interval}. */

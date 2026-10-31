@@ -59,24 +59,27 @@ public class MeasurementProcessor implements SmartLifecycle {
                                 OpenTelemetry openTelemetry) {
         this.evaluator = evaluator;
         this.tracer = openTelemetry.getTracer("sdp-alert-service");
-        AlertingProperties.ServiceBus sb = properties.servicebus();
-        ServiceBusClientBuilder builder = new ServiceBusClientBuilder();
-        if (StringUtils.hasText(sb.connectionString())) {
-            builder.connectionString(sb.connectionString());
-        } else if (StringUtils.hasText(sb.fullyQualifiedNamespace())) {
-            builder.fullyQualifiedNamespace(sb.fullyQualifiedNamespace()).credential(credential);
-        } else {
-            throw new IllegalStateException("sdp.alerting.servicebus.fully-qualified-namespace is required");
-        }
-        this.processor = builder.processor()
-                .topicName(sb.topic())
-                .subscriptionName(sb.subscription())
-                .maxConcurrentCalls(sb.maxConcurrentCalls())
-                .prefetchCount(sb.prefetch())
+        AlertingProperties.ServiceBus serviceBus = properties.servicebus();
+        this.processor = clientBuilder(serviceBus, credential).processor()
+                .topicName(serviceBus.topic())
+                .subscriptionName(serviceBus.subscription())
+                .maxConcurrentCalls(serviceBus.maxConcurrentCalls())
+                .prefetchCount(serviceBus.prefetch())
                 .disableAutoComplete()
                 .processMessage(this::process)
                 .processError(this::error)
                 .buildProcessorClient();
+    }
+
+    private static ServiceBusClientBuilder clientBuilder(AlertingProperties.ServiceBus serviceBus, TokenCredential credential) {
+        ServiceBusClientBuilder builder = new ServiceBusClientBuilder();
+        if (StringUtils.hasText(serviceBus.connectionString())) {
+            return builder.connectionString(serviceBus.connectionString());
+        }
+        if (StringUtils.hasText(serviceBus.fullyQualifiedNamespace())) {
+            return builder.fullyQualifiedNamespace(serviceBus.fullyQualifiedNamespace()).credential(credential);
+        }
+        throw new IllegalStateException("sdp.alerting.servicebus.fully-qualified-namespace is required");
     }
 
     void process(ServiceBusReceivedMessageContext context) {
@@ -94,7 +97,9 @@ public class MeasurementProcessor implements SmartLifecycle {
         } catch (Measurement.InvalidMeasurementException e) {
             log.warn("Dead-lettering message {}: {}", message.getMessageId(), e.getMessage());
             span.setStatus(StatusCode.ERROR, "invalid measurement");
-            context.deadLetter(new DeadLetterOptions().setDeadLetterReason("InvalidMeasurement").setDeadLetterErrorDescription(e.getMessage()));
+            context.deadLetter(new DeadLetterOptions()
+                    .setDeadLetterReason("InvalidMeasurement")
+                    .setDeadLetterErrorDescription(e.getMessage()));
         } catch (RuntimeException e) {
             log.warn("Evaluating message {} failed (redelivered): {}", message.getMessageId(), e.toString());
             span.recordException(e);

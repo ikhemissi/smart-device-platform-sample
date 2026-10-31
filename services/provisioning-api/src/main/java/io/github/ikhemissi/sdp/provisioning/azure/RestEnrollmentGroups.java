@@ -41,8 +41,7 @@ public class RestEnrollmentGroups implements EnrollmentGroups {
 
     @Override
     public EnrollmentGroup put(EnrollmentGroup group) {
-        Map<HttpHeaderName, String> headers = group.etag() == null ? Map.of() : Map.of(AzureRest.IF_MATCH, group.etag());
-        AzureRest.Response response = rest.send(HttpMethod.PUT, path(group.id()), group.toJson(), headers);
+        AzureRest.Response response = rest.send(HttpMethod.PUT, path(group.id()), group.toJson(), ifMatch(group));
         if (response.status() != 200 && response.status() != 201) {
             throw AzureRest.failure("Updating enrollment group " + group.id(), response);
         }
@@ -51,8 +50,7 @@ public class RestEnrollmentGroups implements EnrollmentGroups {
 
     @Override
     public void delete(EnrollmentGroup group) {
-        Map<HttpHeaderName, String> headers = group.etag() == null ? Map.of() : Map.of(AzureRest.IF_MATCH, group.etag());
-        AzureRest.Response response = rest.send(HttpMethod.DELETE, path(group.id()), null, headers);
+        AzureRest.Response response = rest.send(HttpMethod.DELETE, path(group.id()), null, ifMatch(group));
         if (response.status() != 204 && response.status() != 200 && response.status() != 404) {
             throw AzureRest.failure("Deleting enrollment group " + group.id(), response);
         }
@@ -81,6 +79,11 @@ public class RestEnrollmentGroups implements EnrollmentGroups {
             continuation = response.continuation();
         } while (continuation != null && !continuation.isBlank());
         return groups;
+    }
+
+    /** Makes the change conditional on the group's entity tag, when it was read from DPS. */
+    private static Map<HttpHeaderName, String> ifMatch(EnrollmentGroup group) {
+        return group.etag() == null ? Map.of() : Map.of(AzureRest.IF_MATCH, group.etag());
     }
 
     private static String path(String groupId) {

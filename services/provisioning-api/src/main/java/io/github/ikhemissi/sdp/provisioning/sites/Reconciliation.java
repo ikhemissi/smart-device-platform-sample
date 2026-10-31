@@ -7,7 +7,7 @@ import io.github.ikhemissi.sdp.provisioning.azure.EnrollmentGroups;
 import io.github.ikhemissi.sdp.provisioning.certificates.CaCertificate;
 import io.github.ikhemissi.sdp.provisioning.certificates.CertificateValidator;
 import java.time.Clock;
-import java.util.HashMap;
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -95,15 +95,15 @@ public class Reconciliation {
             Set<String> sitesWithGroups = new HashSet<>();
             for (EnrollmentGroup group : siteGroups) {
                 sitesWithGroups.add(group.siteId());
-                int[] counts = locks.withSite(group.siteId(), () -> reconcile(group.siteId(), Optional.of(group)));
-                added += counts[0];
-                removed += counts[1];
+                Counts counts = locks.withSite(group.siteId(), () -> reconcile(group.siteId(), Optional.of(group)));
+                added += counts.added();
+                removed += counts.removed();
             }
             // Records of sites whose group no longer exists in DPS.
             for (String siteId : repository.allCertificates().stream().map(SiteCertificate::siteId).distinct().toList()) {
                 if (!sitesWithGroups.contains(siteId)) {
-                    int[] counts = locks.withSite(siteId, () -> reconcile(siteId, Optional.empty()));
-                    removed += counts[1];
+                    Counts counts = locks.withSite(siteId, () -> reconcile(siteId, Optional.empty()));
+                    removed += counts.removed();
                 }
             }
             int retried = 0;
@@ -115,72 +115,86 @@ public class Reconciliation {
         });
     }
 
-    /** Returns {added, removed}. */
-    private int[] reconcile(String siteId, Optional<EnrollmentGroup> groupFromList) {
+    private record Counts(int added, int removed) {
+    }
+
+    /** A certificate the site's enrollment group references, by fingerprint. */
+    private record ExpectedCertificate(String slot, CaCertificate ca, String dpsName) {
+    }
+
+    private Counts reconcile(String siteId, Optional<EnrollmentGroup> groupFromList) {
         // Re-read under the site lock: a trust change may have happened since the list was taken.
         Optional<EnrollmentGroup> group = groupFromList.isPresent() ? groups.get(EnrollmentGroup.idOf(siteId)) : Optional.empty();
-        Map<String, String> expectedSlots = new LinkedHashMap<>();
-        Map<String, CaCertificate> expected = new HashMap<>();
-        Map<String, String> dpsNames = new HashMap<>();
+        Map<String, ExpectedCertificate> expected = new LinkedHashMap<>();
         group.filter(EnrollmentGroup::enabled).ifPresent(g -> {
-            put(g.primary(), "primary", expectedSlots, expected, dpsNames);
-            put(g.secondary(), "secondary", expectedSlots, expected, dpsNames);
+            expect(g.primary(), "primary", expected);
+            expect(g.secondary(), "secondary", expected);
         });
         return tx.execute(status -> {
-            int added = 0;
-            int removed = 0;
             repository.insertSite(siteId, siteId);
-            List<SiteCertificate> moved = new java.util.ArrayList<>();
-            for (SiteCertificate record : repository.certificates(siteId)) {
-                String slot = expectedSlots.get(record.fingerprint());
-                if (slot == null) {
-                    repository.deleteCertificate(siteId, record.fingerprint());
-                    repository.audit(siteId, ACTOR, "Reconciliation", AuditEvent.RECONCILED_REMOVED, record.fingerprint(),
-                            Map.of("reason", "not trusted by the device provisioning service"));
-                    removed++;
-                } else if (!slot.equals(record.slot())) {
-                    // Deleted first and re-inserted below: slots are unique per site, so a swap needs both rows out.
-                    repository.deleteCertificate(siteId, record.fingerprint());
-                    moved.add(record);
-                }
-            }
-            for (SiteCertificate record : moved) {
-                repository.insertCertificate(new SiteCertificate(siteId, record.fingerprint(), expectedSlots.get(record.fingerprint()),
-                        record.subject(), record.issuer(), record.notBefore(), record.notAfter(), null, record.addedBy(),
-                        record.addedByName(), record.addedAt(), record.dpsCertificateName()));
-            }
-            Set<String> recorded = new HashSet<>();
-            repository.certificates(siteId).forEach(c -> recorded.add(c.fingerprint()));
-            for (Map.Entry<String, String> entry : expectedSlots.entrySet()) {
-                String fingerprint = entry.getKey();
-                if (recorded.contains(fingerprint)) {
-                    continue;
-                }
-                CaCertificate ca = expected.get(fingerprint);
-                String name = dpsNames.get(fingerprint);
-                // Bootstrap CAs are registered under the site's group name (scripts/bootstrap-demo-sites.sh).
-                boolean bootstrap = name.equals(EnrollmentGroup.idOf(siteId));
-                repository.insertCertificate(new SiteCertificate(siteId, fingerprint, entry.getValue(), ca.subject(), ca.issuer(),
-                        ca.notBefore(), ca.notAfter(), null, bootstrap ? "deployment" : ACTOR,
-                        bootstrap ? "Deployment" : "Reconciliation", clock.instant(), name));
-                repository.audit(siteId, ACTOR, "Reconciliation", AuditEvent.RECONCILED_ADDED, fingerprint,
-                        Map.of("slot", entry.getValue(), "subject", ca.subject(), "dpsCertificate", name));
-                added++;
-            }
-            return new int[] {added, removed};
+            int removed = removeUnexpectedAndFixSlots(siteId, expected);
+            int added = addMissing(siteId, expected);
+            return new Counts(added, removed);
         });
     }
 
-    private void put(String dpsName, String slot, Map<String, String> slots, Map<String, CaCertificate> cas,
-                     Map<String, String> names) {
+    /** Deletes records of certificates DPS no longer trusts and moves the others to their DPS slot; returns how many were deleted. */
+    private int removeUnexpectedAndFixSlots(String siteId, Map<String, ExpectedCertificate> expected) {
+        int removed = 0;
+        List<SiteCertificate> moved = new ArrayList<>();
+        for (SiteCertificate record : repository.certificates(siteId)) {
+            ExpectedCertificate expectation = expected.get(record.fingerprint());
+            if (expectation == null) {
+                repository.deleteCertificate(siteId, record.fingerprint());
+                repository.audit(siteId, ACTOR, "Reconciliation", AuditEvent.RECONCILED_REMOVED, record.fingerprint(),
+                        Map.of("reason", "not trusted by the device provisioning service"));
+                removed++;
+            } else if (!expectation.slot().equals(record.slot())) {
+                // Deleted first and re-inserted below: slots are unique per site, so a swap needs both rows out.
+                repository.deleteCertificate(siteId, record.fingerprint());
+                moved.add(record);
+            }
+        }
+        for (SiteCertificate record : moved) {
+            repository.insertCertificate(new SiteCertificate(siteId, record.fingerprint(), expected.get(record.fingerprint()).slot(),
+                    record.subject(), record.issuer(), record.notBefore(), record.notAfter(), null, record.addedBy(),
+                    record.addedByName(), record.addedAt(), record.dpsCertificateName()));
+        }
+        return removed;
+    }
+
+    /** Records the certificates DPS trusts that the platform does not know; returns how many were added. */
+    private int addMissing(String siteId, Map<String, ExpectedCertificate> expected) {
+        int added = 0;
+        Set<String> recorded = new HashSet<>();
+        repository.certificates(siteId).forEach(c -> recorded.add(c.fingerprint()));
+        for (Map.Entry<String, ExpectedCertificate> entry : expected.entrySet()) {
+            String fingerprint = entry.getKey();
+            if (recorded.contains(fingerprint)) {
+                continue;
+            }
+            ExpectedCertificate certificate = entry.getValue();
+            CaCertificate ca = certificate.ca();
+            String name = certificate.dpsName();
+            // Bootstrap CAs are registered under the site's group name (scripts/bootstrap-demo-sites.sh).
+            boolean bootstrap = name.equals(EnrollmentGroup.idOf(siteId));
+            repository.insertCertificate(new SiteCertificate(siteId, fingerprint, certificate.slot(), ca.subject(), ca.issuer(),
+                    ca.notBefore(), ca.notAfter(), null, bootstrap ? "deployment" : ACTOR,
+                    bootstrap ? "Deployment" : "Reconciliation", clock.instant(), name));
+            repository.audit(siteId, ACTOR, "Reconciliation", AuditEvent.RECONCILED_ADDED, fingerprint,
+                    Map.of("slot", certificate.slot(), "subject", ca.subject(), "dpsCertificate", name));
+            added++;
+        }
+        return added;
+    }
+
+    private void expect(String dpsName, String slot, Map<String, ExpectedCertificate> expected) {
         if (dpsName == null) {
             return;
         }
         certificates.find(dpsName).ifPresentOrElse(registered -> {
             CaCertificate ca = CertificateValidator.describe(registered.pem());
-            slots.put(ca.fingerprint(), slot);
-            cas.put(ca.fingerprint(), ca);
-            names.put(ca.fingerprint(), dpsName);
+            expected.put(ca.fingerprint(), new ExpectedCertificate(slot, ca, dpsName));
         }, () -> log.warn("Enrollment group references DPS certificate {} which does not exist", dpsName));
     }
 }

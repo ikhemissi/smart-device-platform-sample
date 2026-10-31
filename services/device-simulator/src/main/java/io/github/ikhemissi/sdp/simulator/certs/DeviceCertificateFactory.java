@@ -1,5 +1,6 @@
 package io.github.ikhemissi.sdp.simulator.certs;
 
+import java.io.IOException;
 import java.math.BigInteger;
 import java.security.GeneralSecurityException;
 import java.security.KeyPair;
@@ -65,7 +66,7 @@ public final class DeviceCertificateFactory {
             X509Certificate certificate = new JcaX509CertificateConverter()
                     .getCertificate(builder.build(new JcaContentSignerBuilder(algorithm).build(ca.privateKey())));
             return new DeviceCredentials(deviceId, certificate, keys.getPrivate(), List.of(ca.certificate()));
-        } catch (GeneralSecurityException | OperatorCreationException | java.io.IOException e) {
+        } catch (GeneralSecurityException | OperatorCreationException | IOException e) {
             throw new IllegalStateException("cannot issue certificate for device " + deviceId, e);
         }
     }

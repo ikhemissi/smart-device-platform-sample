@@ -1,14 +1,13 @@
 package io.github.ikhemissi.sdp.deviceapi.alerts;
 
-import java.math.BigDecimal;
-import java.sql.Array;
+import static io.github.ikhemissi.sdp.deviceapi.jdbc.JdbcValues.instant;
+import static io.github.ikhemissi.sdp.deviceapi.jdbc.JdbcValues.strings;
+import static io.github.ikhemissi.sdp.deviceapi.jdbc.JdbcValues.utc;
+
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.Instant;
-import java.time.OffsetDateTime;
-import java.time.ZoneOffset;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -156,9 +155,7 @@ public class AlertRepository {
                             rs.getString("kind"), rs.getString("status"), rs.getInt("recipients"), rs.getInt("attempts"),
                             instant(rs, "created_at"), instant(rs, "sent_at"), rs.getString("last_error")));
                 });
-        return alerts.stream().map(a -> new Alert(a.id(), a.thresholdId(), a.deviceId(), a.deviceName(), a.siteId(), a.metric(),
-                a.unit(), a.thresholdMin(), a.thresholdMax(), a.direction(), a.status(), a.openedAt(), a.closedAt(), a.firstValue(),
-                a.worstValue(), a.lastValue(), a.lastBreachAt(), byAlert.getOrDefault(a.id(), List.of()))).toList();
+        return alerts.stream().map(alert -> alert.withNotifications(byAlert.getOrDefault(alert.id(), List.of()))).toList();
     }
 
     // --- Mapping --------------------------------------------------------------------------------------------------
@@ -175,24 +172,7 @@ public class AlertRepository {
         return new Alert(rs.getLong("id"), rs.getObject("threshold_id", UUID.class), rs.getString("device_id"),
                 rs.getString("device_name"), rs.getString("site_id"), rs.getString("metric"), rs.getString("unit"),
                 rs.getBigDecimal("threshold_min"), rs.getBigDecimal("threshold_max"), rs.getString("direction"),
-                rs.getString("status"), instant(rs, "opened_at"), instant(rs, "closed_at"), number(rs, "first_value"),
-                number(rs, "worst_value"), number(rs, "last_value"), instant(rs, "last_breach_at"), List.of());
-    }
-
-    private static BigDecimal number(ResultSet rs, String column) throws SQLException {
-        return rs.getBigDecimal(column);
-    }
-
-    private static List<String> strings(Array array) throws SQLException {
-        return array == null ? List.of() : Arrays.asList((String[]) array.getArray());
-    }
-
-    private static Instant instant(ResultSet rs, String column) throws SQLException {
-        OffsetDateTime value = rs.getObject(column, OffsetDateTime.class);
-        return value == null ? null : value.toInstant();
-    }
-
-    private static OffsetDateTime utc(Instant instant) {
-        return OffsetDateTime.ofInstant(instant, ZoneOffset.UTC);
+                rs.getString("status"), instant(rs, "opened_at"), instant(rs, "closed_at"), rs.getBigDecimal("first_value"),
+                rs.getBigDecimal("worst_value"), rs.getBigDecimal("last_value"), instant(rs, "last_breach_at"), List.of());
     }
 }

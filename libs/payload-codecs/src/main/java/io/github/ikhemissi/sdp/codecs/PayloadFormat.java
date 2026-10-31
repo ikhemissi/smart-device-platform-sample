@@ -1,5 +1,8 @@
 package io.github.ikhemissi.sdp.codecs;
 
+import java.util.Arrays;
+import java.util.Optional;
+
 /** Supported device payload formats and their stable identifiers (ADR-0003). */
 public enum PayloadFormat {
     RUUVI_DF5("ruuvi-df5"),
@@ -16,5 +19,9 @@ public enum PayloadFormat {
     /** Identifier stored with measurements and exposed by APIs. */
     public String id() {
         return id;
+    }
+
+    public static Optional<PayloadFormat> fromId(String id) {
+        return Arrays.stream(values()).filter(format -> format.id.equals(id)).findFirst();
     }
 }

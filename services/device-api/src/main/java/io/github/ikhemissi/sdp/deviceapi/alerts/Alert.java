@@ -32,6 +32,11 @@ public record Alert(
         Instant lastBreachAt,
         List<Notification> notifications) {
 
+    Alert withNotifications(List<Notification> notifications) {
+        return new Alert(id, thresholdId, deviceId, deviceName, siteId, metric, unit, thresholdMin, thresholdMax, direction,
+                status, openedAt, closedAt, firstValue, worstValue, lastValue, lastBreachAt, notifications);
+    }
+
     /** An email of the alert: the alert itself, an hourly reminder, or the back-to-normal message. */
     @Schema(name = "AlertNotification")
     public record Notification(

@@ -89,15 +89,17 @@ public class FleetSimulator implements SmartLifecycle {
             devices.submit(() -> runDevice(device, start));
         }
         if (properties.duration() != null) {
-            durationWatcher = Thread.ofVirtual().name("simulation-duration").start(() -> {
-                try {
-                    Thread.sleep(properties.duration());
-                    log.info("Simulation duration {} elapsed", properties.duration());
-                    stop();
-                } catch (InterruptedException ignored) {
-                    Thread.currentThread().interrupt();
-                }
-            });
+            durationWatcher = Thread.ofVirtual().name("simulation-duration").start(this::stopAfterDuration);
+        }
+    }
+
+    private void stopAfterDuration() {
+        try {
+            Thread.sleep(properties.duration());
+            log.info("Simulation duration {} elapsed", properties.duration());
+            stop();
+        } catch (InterruptedException ignored) {
+            Thread.currentThread().interrupt();
         }
     }
 
@@ -117,9 +119,7 @@ public class FleetSimulator implements SmartLifecycle {
                 }
                 while (running.get() && !connection.lost()) {
                     send(device, model, connection);
-                    long jitter = properties.jitter().toMillis();
-                    long delay = properties.interval().toMillis() + (jitter == 0 ? 0 : ThreadLocalRandom.current().nextLong(-jitter, jitter + 1));
-                    sleep(Duration.ofMillis(delay));
+                    sleep(nextSendDelay());
                 }
                 if (connection.lost()) {
                     // As a real device: join again through DPS (fails while the site's trust or the device is disabled).
@@ -130,6 +130,13 @@ public class FleetSimulator implements SmartLifecycle {
                 return;
             }
         }
+    }
+
+    /** The reporting interval ± a random jitter. */
+    private Duration nextSendDelay() {
+        long jitter = properties.jitter().toMillis();
+        long variation = jitter == 0 ? 0 : ThreadLocalRandom.current().nextLong(-jitter, jitter + 1);
+        return Duration.ofMillis(properties.interval().toMillis() + variation);
     }
 
     private void send(SimulatedDevice device, ReadingModel model, DeviceConnection connection) throws InterruptedException {
@@ -176,7 +183,8 @@ public class FleetSimulator implements SmartLifecycle {
                     Thread.currentThread().interrupt();
                     return null;
                 }
-                backoff = backoff.multipliedBy(2).compareTo(MAX_CONNECT_BACKOFF) > 0 ? MAX_CONNECT_BACKOFF : backoff.multipliedBy(2);
+                Duration doubled = backoff.multipliedBy(2);
+                backoff = doubled.compareTo(MAX_CONNECT_BACKOFF) > 0 ? MAX_CONNECT_BACKOFF : doubled;
             }
         }
         return null;
@@ -194,7 +202,7 @@ public class FleetSimulator implements SmartLifecycle {
         return sb.toString();
     }
 
-    private void sleep(Duration duration) throws InterruptedException {
+    private static void sleep(Duration duration) throws InterruptedException {
         if (!duration.isNegative() && !duration.isZero()) {
             Thread.sleep(duration);
         }

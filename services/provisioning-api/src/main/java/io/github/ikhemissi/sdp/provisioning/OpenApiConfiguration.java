@@ -18,7 +18,7 @@ class OpenApiConfiguration {
     static final String REQUIRED_ROLE_EXTENSION = "x-sdp-required-role";
 
     @Bean
-    OpenAPI deviceApiOpenApi() {
+    OpenAPI provisioningApiOpenApi() {
         return new OpenAPI()
                 .info(new Info().title("Smart Device Platform API").version("v1")
                         .description("Site trust of the Smart Device Platform (provisioning API). Requires a Microsoft Entra ID access token "

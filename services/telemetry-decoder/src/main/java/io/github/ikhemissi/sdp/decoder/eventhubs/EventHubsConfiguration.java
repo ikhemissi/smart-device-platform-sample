@@ -56,9 +56,9 @@ public class EventHubsConfiguration {
     @Bean
     EventProcessorClient eventProcessorClient(DecoderProperties properties, TokenCredential credential,
                                               BlobContainerAsyncClient checkpointContainer, EventBatchHandler handler) {
-        DecoderProperties.EventHubs eh = properties.eventhubs();
+        DecoderProperties.EventHubs eventHubs = properties.eventhubs();
         EventProcessorClientBuilder builder = new EventProcessorClientBuilder()
-                .consumerGroup(eh.consumerGroup())
+                .consumerGroup(eventHubs.consumerGroup())
                 .checkpointStore(new BlobCheckpointStore(checkpointContainer))
                 .processEventBatch(handler::onBatch, properties.batch().maxSize(), properties.batch().maxWait())
                 .processPartitionInitialization(handler::onInitialization)
@@ -68,10 +68,12 @@ public class EventHubsConfiguration {
                 .initialPartitionEventPosition(partitionId -> EventPosition.earliest())
                 // Tells whether a batch ends at the partition's last enqueued event (ingestion watermark).
                 .trackLastEnqueuedEventProperties(true);
-        if (StringUtils.hasText(eh.connectionString())) {
-            builder.connectionString(eh.connectionString(), eh.eventHubName());
-        } else if (StringUtils.hasText(eh.fullyQualifiedNamespace())) {
-            builder.fullyQualifiedNamespace(eh.fullyQualifiedNamespace()).eventHubName(eh.eventHubName()).credential(credential);
+        if (StringUtils.hasText(eventHubs.connectionString())) {
+            builder.connectionString(eventHubs.connectionString(), eventHubs.eventHubName());
+        } else if (StringUtils.hasText(eventHubs.fullyQualifiedNamespace())) {
+            builder.fullyQualifiedNamespace(eventHubs.fullyQualifiedNamespace())
+                    .eventHubName(eventHubs.eventHubName())
+                    .credential(credential);
         } else {
             throw new IllegalStateException("sdp.decoder.eventhubs.fully-qualified-namespace is required");
         }

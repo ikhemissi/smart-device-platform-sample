@@ -102,8 +102,7 @@ public class SiteTrustService {
             if (current.stream().anyMatch(c -> c.fingerprint().equals(ca.fingerprint()))) {
                 throw new ApiException(HttpStatus.CONFLICT, "This certificate is already trusted by site " + siteId + ".");
             }
-            Optional<EnrollmentGroup> existing = dps(() -> groups.get(EnrollmentGroup.idOf(siteId)));
-            EnrollmentGroup group = existing.orElse(null);
+            EnrollmentGroup group = dps(() -> groups.get(EnrollmentGroup.idOf(siteId))).orElse(null);
             boolean trusted = group != null && group.enabled();
             String primary = trusted ? group.primary() : null;
             String secondary = trusted ? group.secondary() : null;
@@ -112,32 +111,11 @@ public class SiteTrustService {
                         "Site " + siteId + " already trusts two certificates; remove one before adding another.");
             }
             String name = ca.dpsName(siteId);
-            // Already registered when re-added after being the last certificate (the disabled group keeps it); DPS
-            // refuses to register a name again, so the registered certificate is reused when it is the same one.
-            boolean registered = dps(() -> certificates.find(name)).map(held -> {
-                if (!CertificateValidator.describe(held.pem()).fingerprint().equals(ca.fingerprint())) {
-                    throw new ApiException(HttpStatus.CONFLICT,
-                            "The device provisioning service already holds another certificate named " + name + ".");
-                }
-                return true;
-            }).orElse(false);
-            if (!registered) {
-                dps(() -> {
-                    certificates.register(name, ca.pem());
-                    return null;
-                });
-            }
+            boolean alreadyRegistered = ensureRegistered(name, ca);
             String slot = primary == null ? "primary" : "secondary";
             EnrollmentGroup updated = (group == null ? EnrollmentGroup.create(siteId) : group)
                     .withReferences(primary == null ? name : primary, primary == null ? secondary : name);
-            try {
-                dps(() -> groups.put(updated));
-            } catch (RuntimeException e) {
-                if (!registered) {
-                    deleteQuietly(name);
-                }
-                throw e;
-            }
+            putGroup(updated, alreadyRegistered ? null : name);
             // References a disabled group still held (from its last certificate) are no longer used.
             if (group != null && !group.enabled()) {
                 for (String stale : new String[] {group.primary(), group.secondary()}) {
@@ -151,12 +129,7 @@ public class SiteTrustService {
             repository.insertCertificate(certificate);
             repository.audit(siteId, user.objectId(), user.displayName(), AuditEvent.CERTIFICATE_ADDED, ca.fingerprint(),
                     Map.of("slot", slot, "subject", ca.subject(), "notAfter", ca.notAfter().toString()));
-            DeviceOperation operation = null;
-            int disabled = repository.devicesDisabledByPlatform(siteId).size();
-            if (disabled > 0) {
-                operation = repository.createOperation(siteId, DeviceOperation.ENABLE, disabled);
-                repository.supersedePending(siteId, operation.id());
-            }
+            DeviceOperation operation = startEnablingDisabledDevices(siteId);
             SiteCertificate stored = repository.certificates(siteId).stream()
                     .filter(c -> c.fingerprint().equals(ca.fingerprint())).findFirst().orElseThrow();
             return new Change(stored, operation);
@@ -164,30 +137,75 @@ public class SiteTrustService {
         return new Change(change.certificate(), runOperation(change.deviceOperation()));
     }
 
+    /**
+     * Registers the certificate in DPS under {@code name}, unless it is already registered: it is when re-added after
+     * being the last certificate (the disabled group keeps it); DPS refuses to register a name again, so the
+     * registered certificate is reused when it is the same one.
+     *
+     * @return whether the certificate was already registered
+     */
+    private boolean ensureRegistered(String name, CaCertificate ca) {
+        boolean registered = dps(() -> certificates.find(name)).map(held -> {
+            if (!CertificateValidator.describe(held.pem()).fingerprint().equals(ca.fingerprint())) {
+                throw new ApiException(HttpStatus.CONFLICT,
+                        "The device provisioning service already holds another certificate named " + name + ".");
+            }
+            return true;
+        }).orElse(false);
+        if (!registered) {
+            dps(() -> {
+                certificates.register(name, ca.pem());
+                return null;
+            });
+        }
+        return registered;
+    }
+
+    /** Updates the enrollment group; if DPS refuses, the certificate just registered for it (if any) is deleted. */
+    private void putGroup(EnrollmentGroup group, String newlyRegisteredCertificate) {
+        try {
+            dps(() -> groups.put(group));
+        } catch (RuntimeException e) {
+            if (newlyRegisteredCertificate != null) {
+                deleteQuietly(newlyRegisteredCertificate);
+            }
+            throw e;
+        }
+    }
+
+    /** Devices disabled by the platform (when the site lost its last certificate) are enabled again. */
+    private DeviceOperation startEnablingDisabledDevices(String siteId) {
+        int disabled = repository.devicesDisabledByPlatform(siteId).size();
+        if (disabled == 0) {
+            return null;
+        }
+        DeviceOperation operation = repository.createOperation(siteId, DeviceOperation.ENABLE, disabled);
+        repository.supersedePending(siteId, operation.id());
+        return operation;
+    }
+
+    /** A removal, and the DPS certificate to delete once it is committed (none while a disabled group references it). */
+    private record Removal(Change change, String unusedDpsCertificate) {
+    }
+
     public Change removeCertificate(String siteId, String fingerprint, SdpUser user) {
         String normalized = fingerprint.toLowerCase();
-        String[] removedName = new String[1];
-        Change change = tx.execute(status -> {
+        Removal removal = tx.execute(status -> {
             repository.lockSite(siteId);
             requireSite(siteId);
             List<SiteCertificate> current = repository.certificates(siteId);
             SiteCertificate removed = current.stream().filter(c -> c.fingerprint().equals(normalized)).findFirst()
                     .orElseThrow(() -> ApiException.notFound("Site " + siteId + " does not trust a certificate with fingerprint " + fingerprint + "."));
-            removedName[0] = removed.dpsCertificateName();
-            Optional<EnrollmentGroup> group = dps(() -> groups.get(EnrollmentGroup.idOf(siteId)));
-            List<String> remaining = new ArrayList<>();
-            group.filter(EnrollmentGroup::enabled).ifPresent(g -> {
-                for (String ref : new String[] {g.primary(), g.secondary()}) {
-                    if (ref != null && !ref.equals(removed.dpsCertificateName())) {
-                        remaining.add(ref);
-                    }
-                }
-            });
+            Optional<EnrollmentGroup> enabledGroup = dps(() -> groups.get(EnrollmentGroup.idOf(siteId)))
+                    .filter(EnrollmentGroup::enabled);
+            List<String> remaining = enabledGroup
+                    .map(group -> otherReferences(group, removed.dpsCertificateName()))
+                    .orElse(List.of());
             boolean last = remaining.isEmpty();
-            if (group.isPresent() && group.get().enabled()) {
+            if (enabledGroup.isPresent()) {
                 EnrollmentGroup updated = last
-                        ? group.get().disabled()
-                        : group.get().withReferences(remaining.get(0), remaining.size() > 1 ? remaining.get(1) : null);
+                        ? enabledGroup.get().disabled()
+                        : enabledGroup.get().withReferences(remaining.get(0), remaining.size() > 1 ? remaining.get(1) : null);
                 dps(() -> groups.put(updated));
             }
             repository.deleteCertificate(siteId, normalized);
@@ -195,19 +213,29 @@ public class SiteTrustService {
                     .forEach(c -> repository.setSlot(siteId, c.fingerprint(), "primary"));
             repository.audit(siteId, user.objectId(), user.displayName(), AuditEvent.CERTIFICATE_REMOVED, normalized,
                     Map.of("slot", removed.slot(), "subject", removed.subject(), "lastCertificate", last));
-            DeviceOperation operation = null;
-            if (last) {
-                operation = repository.createOperation(siteId, DeviceOperation.DISABLE, repository.deviceIds(siteId).size());
-                repository.supersedePending(siteId, operation.id());
-                // The disabled group keeps referencing the certificate (DPS requires one), so it stays registered.
-                removedName[0] = null;
+            if (!last) {
+                return new Removal(new Change(removed, null), removed.dpsCertificateName());
             }
-            return new Change(removed, operation);
+            DeviceOperation operation = repository.createOperation(siteId, DeviceOperation.DISABLE, repository.deviceIds(siteId).size());
+            repository.supersedePending(siteId, operation.id());
+            // The disabled group keeps referencing the certificate (DPS requires one), so it stays registered.
+            return new Removal(new Change(removed, operation), null);
         });
-        if (removedName[0] != null) {
-            deleteQuietly(removedName[0]);
+        if (removal.unusedDpsCertificate() != null) {
+            deleteQuietly(removal.unusedDpsCertificate());
         }
+        Change change = removal.change();
         return new Change(change.certificate(), runOperation(change.deviceOperation()));
+    }
+
+    private static List<String> otherReferences(EnrollmentGroup group, String dpsCertificateName) {
+        List<String> others = new ArrayList<>();
+        for (String reference : new String[] {group.primary(), group.secondary()}) {
+            if (reference != null && !reference.equals(dpsCertificateName)) {
+                others.add(reference);
+            }
+        }
+        return others;
     }
 
     /** Small sites complete within the request; larger ones continue in the background (202 with the operation). */

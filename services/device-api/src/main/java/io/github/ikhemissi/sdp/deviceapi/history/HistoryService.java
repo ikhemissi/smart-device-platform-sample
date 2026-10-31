@@ -9,6 +9,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Supplier;
 import org.springframework.stereotype.Service;
 import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.json.JsonMapper;
@@ -98,13 +99,7 @@ public class HistoryService {
         List<String> keys = starts.stream()
                 .map(s -> cache.key("series:{" + deviceId + "|" + metric + "}:" + resolution.id() + ":" + s.getEpochSecond()))
                 .toList();
-        List<String> cached = cache.getAll(keys);
-        Chunk[] chunks = new Chunk[starts.size()];
-        for (int i = 0; i < starts.size(); i++) {
-            if (cached.get(i) != null) {
-                chunks[i] = json.readValue(cached.get(i), Chunk.class);
-            }
-        }
+        Chunk[] chunks = cachedChunks(keys);
         Map<String, HistoryCache.Entry> toCache = new LinkedHashMap<>();
         int i = 0;
         while (i < starts.size()) {
@@ -118,13 +113,29 @@ public class HistoryService {
             }
             load(deviceId, metric, resolution, starts, first, i, chunks);
             for (int c = first; c < i; c++) {
-                Instant end = starts.get(c).plus(size);
-                Duration ttl = !end.isAfter(completeBefore) ? properties.completeChunkTtl() : properties.openChunkTtl();
+                Duration ttl = chunkTtl(starts.get(c).plus(size), completeBefore);
                 toCache.put(keys.get(c), new HistoryCache.Entry(json.writeValueAsString(chunks[c]), ttl));
             }
         }
         cache.putAll(toCache);
         return List.of(chunks);
+    }
+
+    /** The cached chunks, {@code null} where missing. */
+    private Chunk[] cachedChunks(List<String> keys) {
+        List<String> cached = cache.getAll(keys);
+        Chunk[] chunks = new Chunk[keys.size()];
+        for (int i = 0; i < keys.size(); i++) {
+            if (cached.get(i) != null) {
+                chunks[i] = json.readValue(cached.get(i), Chunk.class);
+            }
+        }
+        return chunks;
+    }
+
+    /** A chunk that ends before the ingestion watermark can no longer change. */
+    private Duration chunkTtl(Instant chunkEnd, Instant completeBefore) {
+        return !chunkEnd.isAfter(completeBefore) ? properties.completeChunkTtl() : properties.openChunkTtl();
     }
 
     /** Reads chunks {@code [first, end)} in one query and splits the rows into their chunks. */
@@ -158,7 +169,7 @@ public class HistoryService {
         }
     }
 
-    private <T> T cached(String suffix, Duration ttl, TypeReference<T> type, java.util.function.Supplier<T> loader) {
+    private <T> T cached(String suffix, Duration ttl, TypeReference<T> type, Supplier<T> loader) {
         String key = cache.key(suffix);
         String hit = cache.getAll(List.of(key)).getFirst();
         if (hit != null) {

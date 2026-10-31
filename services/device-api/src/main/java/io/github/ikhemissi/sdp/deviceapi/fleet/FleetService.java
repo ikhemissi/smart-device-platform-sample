@@ -46,13 +46,21 @@ public class FleetService {
             throw ApiException.invalid(Map.of("to", List.of("the range must not exceed " + history.maxRange().toDays() + " days")));
         }
         requireSite(siteId);
+        List<MetricSummary.Group> groups = groups(partials(metric, siteId, from, to), groupBy);
+        return new MetricSummary(metric, unit, from, to, groupBy, siteId, groups);
+    }
 
+    /** Rollups of the complete hours already rolled up, raw measurements for the edges and the other hours. */
+    private List<Partial> partials(String metric, String siteId, Instant from, Instant to) {
         Instant firstHour = ceilHour(from);
         Instant rolledTo = repository.rolledUntil().map(r -> min(r, to.truncatedTo(ChronoUnit.HOURS))).orElse(firstHour);
-        List<Partial> partials = rolledTo.isAfter(firstHour)
+        return rolledTo.isAfter(firstHour)
                 ? repository.partials(metric, siteId, from, firstHour, firstHour, rolledTo, rolledTo, to)
                 : repository.partials(metric, siteId, from, to, from, from, to, to);
+    }
 
+    /** One group per device or per site, ordered by site (then device). */
+    private static List<MetricSummary.Group> groups(List<Partial> partials, GroupBy groupBy) {
         Map<String, Aggregate> byDevice = new LinkedHashMap<>();
         partials.forEach(p -> byDevice.computeIfAbsent(p.deviceId(), id -> new Aggregate(p.siteId(), id)).add(p));
         Map<String, Aggregate> groups = new TreeMap<>();
@@ -63,8 +71,7 @@ public class FleetService {
                 groups.computeIfAbsent(device.siteId, id -> new Aggregate(id, null)).merge(device);
             }
         }
-        return new MetricSummary(metric, unit, from, to, groupBy, siteId,
-                groups.values().stream().map(Aggregate::toGroup).toList());
+        return groups.values().stream().map(Aggregate::toGroup).toList();
     }
 
     public List<SiteStatus> status(String siteId) {
@@ -129,5 +136,4 @@ public class FleetService {
             return new MetricSummary.Group(siteId, deviceId, min, sum / count, max, count, deviceIds.size(), first, last);
         }
     }
-
 }

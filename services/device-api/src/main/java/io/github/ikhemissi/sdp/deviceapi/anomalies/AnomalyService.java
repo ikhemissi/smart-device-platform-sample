@@ -1,6 +1,7 @@
 package io.github.ikhemissi.sdp.deviceapi.anomalies;
 
 import io.github.ikhemissi.sdp.deviceapi.web.ApiException;
+import io.github.ikhemissi.sdp.deviceapi.web.Period;
 import io.github.ikhemissi.sdp.platform.security.SdpUser;
 import java.time.Clock;
 import java.time.Duration;
@@ -80,17 +81,6 @@ public class AnomalyService {
     }
 
     private Period period(Instant from, Instant to) {
-        Instant end = to != null ? to : clock.instant().plusSeconds(1);
-        Instant start = from != null ? from : end.minus(DEFAULT_PERIOD);
-        if (!start.isBefore(end)) {
-            throw ApiException.invalid(Map.of("from", List.of("must be before to")));
-        }
-        if (Duration.between(start, end).compareTo(MAX_PERIOD) > 0) {
-            throw ApiException.invalid(Map.of("from", List.of("the period is at most 92 days")));
-        }
-        return new Period(start, end);
-    }
-
-    private record Period(Instant from, Instant to) {
+        return Period.of(from, to, clock.instant(), DEFAULT_PERIOD, MAX_PERIOD);
     }
 }

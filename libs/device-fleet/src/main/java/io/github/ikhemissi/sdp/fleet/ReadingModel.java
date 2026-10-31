@@ -112,49 +112,49 @@ public final class ReadingModel {
         double co2 = override("co2", now, Math.max(400, co2Base + 350 * daylight + random.nextGaussian() * 15));
         double illuminance = override("illuminance", now, Math.max(0, illuminancePeak * daylight + random.nextGaussian() * 5));
 
-        Map<String, Number> m = new LinkedHashMap<>();
+        Map<String, Number> metrics = new LinkedHashMap<>();
         Map<String, String> attributes = new LinkedHashMap<>();
         switch (device.format()) {
             case RUUVI_DF5 -> {
-                m.put("temperature", temperature);
-                m.put("humidity", humidity);
-                m.put("pressure", pressure);
-                putAcceleration(m);
-                m.put("battery_voltage", clamp(voltage, 1.6, 3.646));
-                m.put("tx_power", 4);
-                m.put("movement_counter", movements);
-                m.put("measurement_sequence", sequence);
+                metrics.put("temperature", temperature);
+                metrics.put("humidity", humidity);
+                metrics.put("pressure", pressure);
+                putAcceleration(metrics);
+                metrics.put("battery_voltage", clamp(voltage, 1.6, 3.646));
+                metrics.put("tx_power", 4);
+                metrics.put("movement_counter", movements);
+                metrics.put("measurement_sequence", sequence);
                 attributes.put("mac", mac);
             }
             case RUUVI_DF3 -> {
-                m.put("temperature", temperature);
-                m.put("humidity", humidity);
-                m.put("pressure", pressure);
-                putAcceleration(m);
-                m.put("battery_voltage", voltage);
+                metrics.put("temperature", temperature);
+                metrics.put("humidity", humidity);
+                metrics.put("pressure", pressure);
+                putAcceleration(metrics);
+                metrics.put("battery_voltage", voltage);
             }
             case BTHOME_V2 -> {
-                m.put("packet_id", packetId);
-                m.put("battery_level", (int) Math.round(clamp((voltage - 2.2) / (3.1 - 2.2) * 100, 0, 100)));
-                m.put("temperature", temperature);
-                m.put("humidity", humidity);
-                m.put("pressure", pressure);
-                m.put("co2", (int) Math.round(co2));
+                metrics.put("packet_id", packetId);
+                metrics.put("battery_level", (int) Math.round(clamp((voltage - 2.2) / (3.1 - 2.2) * 100, 0, 100)));
+                metrics.put("temperature", temperature);
+                metrics.put("humidity", humidity);
+                metrics.put("pressure", pressure);
+                metrics.put("co2", (int) Math.round(co2));
             }
             case CAYENNE_LPP -> {
-                m.put("temperature", temperature);
-                m.put("humidity", humidity);
-                m.put("pressure", pressure);
-                m.put("illuminance", (int) Math.round(illuminance));
+                metrics.put("temperature", temperature);
+                metrics.put("humidity", humidity);
+                metrics.put("pressure", pressure);
+                metrics.put("illuminance", (int) Math.round(illuminance));
             }
         }
-        return new Reading(m, attributes);
+        return new Reading(metrics, attributes);
     }
 
-    private void putAcceleration(Map<String, Number> m) {
-        m.put("acceleration_x", random.nextGaussian() * 0.01);
-        m.put("acceleration_y", random.nextGaussian() * 0.01);
-        m.put("acceleration_z", 1.0 + random.nextGaussian() * 0.005);
+    private void putAcceleration(Map<String, Number> metrics) {
+        metrics.put("acceleration_x", random.nextGaussian() * 0.01);
+        metrics.put("acceleration_y", random.nextGaussian() * 0.01);
+        metrics.put("acceleration_z", 1.0 + random.nextGaussian() * 0.005);
     }
 
     private double override(String metric, Instant now, double value) {

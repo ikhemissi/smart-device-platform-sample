@@ -1,12 +1,13 @@
 package io.github.ikhemissi.sdp.deviceapi.alerts;
 
 import io.github.ikhemissi.sdp.deviceapi.web.ApiException;
+import io.github.ikhemissi.sdp.deviceapi.web.EntityTags;
+import io.github.ikhemissi.sdp.deviceapi.web.Period;
 import io.github.ikhemissi.sdp.platform.security.SdpUser;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -60,7 +61,7 @@ public class AlertService {
         }
         int version = repository.lockThreshold(deviceId, id).orElseThrow(() -> notFound(deviceId, id));
         Threshold current = repository.threshold(deviceId, id).orElseThrow();
-        if (!matches(ifMatch, Threshold.entityTag(id, version))) {
+        if (!EntityTags.matches(ifMatch, Threshold.entityTag(id, version))) {
             throw new ApiException(HttpStatus.PRECONDITION_FAILED,
                     "The threshold was changed by someone else; reload it and apply your change again.");
         }
@@ -76,7 +77,7 @@ public class AlertService {
     @Transactional
     public void delete(String deviceId, UUID id, String ifMatch) {
         int version = repository.lockThreshold(deviceId, id).orElseThrow(() -> notFound(deviceId, id));
-        if (ifMatch != null && !ifMatch.isBlank() && !matches(ifMatch, Threshold.entityTag(id, version))) {
+        if (ifMatch != null && !ifMatch.isBlank() && !EntityTags.matches(ifMatch, Threshold.entityTag(id, version))) {
             throw new ApiException(HttpStatus.PRECONDITION_FAILED,
                     "The threshold was changed by someone else; reload it before deleting it.");
         }
@@ -108,15 +109,7 @@ public class AlertService {
     }
 
     private Period period(Instant from, Instant to) {
-        Instant end = to != null ? to : now().plusSeconds(1);
-        Instant start = from != null ? from : end.minus(DEFAULT_PERIOD);
-        if (!start.isBefore(end)) {
-            throw ApiException.invalid(Map.of("from", List.of("must be before to")));
-        }
-        if (Duration.between(start, end).compareTo(MAX_PERIOD) > 0) {
-            throw ApiException.invalid(Map.of("from", List.of("the period is at most 92 days")));
-        }
-        return new Period(start, end);
+        return Period.of(from, to, now(), DEFAULT_PERIOD, MAX_PERIOD);
     }
 
     private void requireDevice(String deviceId) {
@@ -129,17 +122,7 @@ public class AlertService {
         return clock.instant().truncatedTo(ChronoUnit.MICROS);
     }
 
-    static boolean matches(String ifMatch, String entityTag) {
-        return Arrays.stream(ifMatch.split(","))
-                .map(String::strip)
-                .map(tag -> tag.startsWith("W/") ? tag.substring(2) : tag)
-                .anyMatch(tag -> tag.equals("*") || tag.equals(entityTag));
-    }
-
     private static ApiException notFound(String deviceId, UUID id) {
         return ApiException.notFound("Device '" + deviceId + "' has no threshold " + id + ".");
-    }
-
-    private record Period(Instant from, Instant to) {
     }
 }

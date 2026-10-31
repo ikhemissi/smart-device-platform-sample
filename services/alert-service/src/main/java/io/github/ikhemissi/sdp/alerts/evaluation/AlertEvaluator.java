@@ -62,42 +62,57 @@ public class AlertEvaluator {
         return evaluations;
     }
 
-    private Outcome evaluate(UUID thresholdId, Measurement m) {
+    private Outcome evaluate(UUID thresholdId, Measurement measurement) {
         Optional<LockedThreshold> locked = store.lock(thresholdId);
         if (locked.isEmpty() || !locked.get().enabled()) {
             return Outcome.SKIPPED;
         }
         LockedThreshold threshold = locked.get();
-        BigDecimal value = m.metrics().get(threshold.metric());
+        BigDecimal value = measurement.metrics().get(threshold.metric());
         if (value == null) {
             return Outcome.SKIPPED;
         }
-        if (threshold.lastEvaluatedAt() != null) {
-            if (m.measuredAt().isBefore(threshold.lastEvaluatedAt())) {
-                return Outcome.IGNORED_OLDER;
-            }
-            if (m.measuredAt().equals(threshold.lastEvaluatedAt()) && m.messageKey().equals(threshold.lastMessageKey())) {
-                return Outcome.DUPLICATE;
-            }
+        Optional<Outcome> alreadyEvaluated = olderOrDuplicate(threshold, measurement);
+        if (alreadyEvaluated.isPresent()) {
+            return alreadyEvaluated.get();
         }
-        store.markEvaluated(thresholdId, m.measuredAt(), m.messageKey());
+        store.markEvaluated(thresholdId, measurement.measuredAt(), measurement.messageKey());
+        return applyValue(threshold, measurement, value);
+    }
 
+    private static Optional<Outcome> olderOrDuplicate(LockedThreshold threshold, Measurement measurement) {
+        if (threshold.lastEvaluatedAt() == null) {
+            return Optional.empty();
+        }
+        if (measurement.measuredAt().isBefore(threshold.lastEvaluatedAt())) {
+            return Optional.of(Outcome.IGNORED_OLDER);
+        }
+        if (measurement.measuredAt().equals(threshold.lastEvaluatedAt())
+                && measurement.messageKey().equals(threshold.lastMessageKey())) {
+            return Optional.of(Outcome.DUPLICATE);
+        }
+        return Optional.empty();
+    }
+
+    /** Opens, updates or closes the threshold's alert for a value measured after every value evaluated so far. */
+    private Outcome applyValue(LockedThreshold threshold, Measurement measurement, BigDecimal value) {
         String breach = breach(threshold, value);
-        Optional<OpenAlert> open = store.openAlert(thresholdId);
+        Optional<OpenAlert> open = store.openAlert(threshold.id());
         if (breach != null && open.isEmpty()) {
-            long alertId = store.openAlert(threshold, m.siteId(), breach, value, m.measuredAt());
+            long alertId = store.openAlert(threshold, measurement.siteId(), breach, value, measurement.measuredAt());
             store.queueNotification(alertId, "ALERT", threshold.recipients(), value, clock.instant());
             metrics.opened(threshold.metric());
             return Outcome.OPENED;
         }
         if (breach != null) {
             OpenAlert alert = open.get();
-            store.recordBreach(alert.id(), value, worst(alert, value), m.measuredAt());
+            store.recordBreach(alert.id(), value, worst(alert, value), measurement.measuredAt());
             return Outcome.ONGOING;
         }
         if (open.isPresent()) {
-            store.close(open.get().id(), value, m.measuredAt());
-            store.queueNotification(open.get().id(), "RESOLVED", threshold.recipients(), value, clock.instant());
+            long alertId = open.get().id();
+            store.close(alertId, value, measurement.measuredAt());
+            store.queueNotification(alertId, "RESOLVED", threshold.recipients(), value, clock.instant());
             metrics.closed(threshold.metric());
             return Outcome.RESOLVED;
         }

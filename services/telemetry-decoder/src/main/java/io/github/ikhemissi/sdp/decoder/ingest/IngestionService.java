@@ -10,6 +10,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Supplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -71,18 +72,9 @@ public class IngestionService {
         try (Scope ignored = batchSpan.makeCurrent()) {
             DecodedBatch batch = BatchDecoder.decode(messages, clock.instant());
             List<Span> messageSpans = telemetry.startMessages(batch.outcomes());
-            batch.rejections().forEach(r -> log.warn("Rejected device message: device={} site={} key={} reason={} detail={}",
-                    r.deviceId(), r.siteId(), r.messageKey(), r.reason(), r.detail()));
+            logRejections(batch);
             try {
-                StoreResult result = withRetry("Persisting", () -> store.persist(batch));
-                // Every stored measurement, including those an earlier attempt already stored: that attempt may have
-                // failed to publish them. Re-published messages are dropped by the topic's duplicate detection.
-                if (!batch.measurements().isEmpty()) {
-                    withRetry("Publishing", () -> {
-                        publisher.publish(batch.measurements());
-                        return null;
-                    });
-                }
+                StoreResult result = persistAndPublish(batch);
                 telemetry.completeMessages(batch.outcomes(), messageSpans, result.duplicateKeys(), clock.instant());
                 log.debug("Batch persisted: partition={} size={} result={}", partitionId, messages.size(), result.counts());
                 return result.counts();
@@ -99,7 +91,25 @@ public class IngestionService {
         }
     }
 
-    private <T> T withRetry(String step, java.util.function.Supplier<T> action) {
+    private static void logRejections(DecodedBatch batch) {
+        batch.rejections().forEach(r -> log.warn("Rejected device message: device={} site={} key={} reason={} detail={}",
+                r.deviceId(), r.siteId(), r.messageKey(), r.reason(), r.detail()));
+    }
+
+    private StoreResult persistAndPublish(DecodedBatch batch) {
+        StoreResult result = withRetry("Persisting", () -> store.persist(batch));
+        // Every stored measurement, including those an earlier attempt already stored: that attempt may have
+        // failed to publish them. Re-published messages are dropped by the topic's duplicate detection.
+        if (!batch.measurements().isEmpty()) {
+            withRetry("Publishing", () -> {
+                publisher.publish(batch.measurements());
+                return null;
+            });
+        }
+        return result;
+    }
+
+    private <T> T withRetry(String step, Supplier<T> action) {
         Duration backoff = initialBackoff;
         int attempt = 0;
         while (true) {
@@ -112,9 +122,7 @@ public class IngestionService {
                 health.set(new Health(true, null, null));
                 return result;
             } catch (RuntimeException e) {
-                Health previous = health.get();
-                Instant since = previous.healthy() ? clock.instant() : previous.failingSince();
-                health.set(new Health(false, since, e.getClass().getSimpleName() + ": " + e.getMessage()));
+                markFailing(e);
                 if (!running.get()) {
                     throw new IngestionAbortedException("Stopping with an unacknowledgeable batch (" + step.toLowerCase()
                             + " failed); it will be redelivered", e);
@@ -126,9 +134,20 @@ public class IngestionService {
                     Thread.currentThread().interrupt();
                     throw new IngestionAbortedException("Interrupted while retrying; batch will be redelivered", e);
                 }
-                backoff = backoff.multipliedBy(2).compareTo(maxBackoff) > 0 ? maxBackoff : backoff.multipliedBy(2);
+                backoff = nextBackoff(backoff);
             }
         }
+    }
+
+    private void markFailing(RuntimeException error) {
+        Health previous = health.get();
+        Instant since = previous.healthy() ? clock.instant() : previous.failingSince();
+        health.set(new Health(false, since, error.getClass().getSimpleName() + ": " + error.getMessage()));
+    }
+
+    private Duration nextBackoff(Duration backoff) {
+        Duration doubled = backoff.multipliedBy(2);
+        return doubled.compareTo(maxBackoff) > 0 ? maxBackoff : doubled;
     }
 
     public Health health() {

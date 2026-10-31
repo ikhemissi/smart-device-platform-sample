@@ -81,16 +81,16 @@ public final class IngestionTelemetry {
     /** Starts one span per message (child of the current batch span, linked to the device's trace context). */
     public List<Span> startMessages(List<Outcome> outcomes) {
         List<Span> spans = new ArrayList<>(outcomes.size());
-        for (Outcome o : outcomes) {
-            TelemetryMessage m = o.message();
+        for (Outcome outcome : outcomes) {
+            TelemetryMessage message = outcome.message();
             SpanBuilder builder = tracer.spanBuilder("sdp.ingest.message");
-            SpanContext device = deviceContext(m.traceparent());
+            SpanContext device = deviceContext(message.traceparent());
             if (device.isValid()) {
                 builder.addLink(device);
             }
-            setIfPresent(builder, DEVICE_ID, m.deviceId());
-            setIfPresent(builder, SITE_ID, m.siteId());
-            setIfPresent(builder, PAYLOAD_FORMAT, o.payloadFormat());
+            setIfPresent(builder, DEVICE_ID, message.deviceId());
+            setIfPresent(builder, SITE_ID, message.siteId());
+            setIfPresent(builder, PAYLOAD_FORMAT, outcome.payloadFormat());
             spans.add(builder.startSpan());
         }
         return spans;
@@ -99,27 +99,27 @@ public final class IngestionTelemetry {
     /** Records metrics and ends message spans once the batch outcome is known. */
     public void completeMessages(List<Outcome> outcomes, List<Span> spans, Set<String> duplicateKeys, Instant persistedAt) {
         for (int i = 0; i < outcomes.size(); i++) {
-            Outcome o = outcomes.get(i);
-            TelemetryMessage m = o.message();
-            boolean duplicate = duplicateKeys.contains(TelemetryStore.key(m.deviceId(), m.messageKey()));
-            String outcome = duplicate ? DUPLICATE : o.rejected() ? REJECTED : STORED;
+            Outcome outcome = outcomes.get(i);
+            TelemetryMessage message = outcome.message();
+            boolean duplicate = duplicateKeys.contains(TelemetryStore.key(message.deviceId(), message.messageKey()));
+            String outcomeValue = duplicate ? DUPLICATE : outcome.rejected() ? REJECTED : STORED;
 
             var attributes = Attributes.builder()
-                    .put(PAYLOAD_FORMAT, o.payloadFormat() == null ? "unknown" : o.payloadFormat())
-                    .put(OUTCOME, outcome);
-            if (o.rejected()) {
-                attributes.put(REASON, o.rejectionReason());
+                    .put(PAYLOAD_FORMAT, outcome.payloadFormat() == null ? "unknown" : outcome.payloadFormat())
+                    .put(OUTCOME, outcomeValue);
+            if (outcome.rejected()) {
+                attributes.put(REASON, outcome.rejectionReason());
             }
             messages.add(1, attributes.build());
-            if (STORED.equals(outcome) && m.enqueuedAt() != null) {
-                latency.record(Duration.between(m.enqueuedAt(), persistedAt).toMillis() / 1000.0,
-                        Attributes.of(PAYLOAD_FORMAT, o.payloadFormat()));
+            if (STORED.equals(outcomeValue) && message.enqueuedAt() != null) {
+                latency.record(Duration.between(message.enqueuedAt(), persistedAt).toMillis() / 1000.0,
+                        Attributes.of(PAYLOAD_FORMAT, outcome.payloadFormat()));
             }
 
             Span span = spans.get(i);
-            span.setAttribute(OUTCOME, outcome);
-            if (o.rejected()) {
-                span.setAttribute(REASON, o.rejectionReason());
+            span.setAttribute(OUTCOME, outcomeValue);
+            if (outcome.rejected()) {
+                span.setAttribute(REASON, outcome.rejectionReason());
             }
             span.end();
         }

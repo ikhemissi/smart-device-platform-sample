@@ -1,5 +1,6 @@
 package io.github.ikhemissi.sdp.provisioning.azure;
 
+import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ObjectNode;
 
@@ -26,20 +27,20 @@ public final class EnrollmentGroup {
 
     /** New group for a site, enabled, with devices assigned to the linked IoT hub and moved with their data. */
     public static EnrollmentGroup create(String siteId) {
-        ObjectNode doc = JSON.createObjectNode();
-        doc.put("enrollmentGroupId", idOf(siteId));
-        doc.putObject("attestation").put("type", "x509").putObject("x509").putObject("caReferences");
-        doc.putObject("initialTwin").putObject("tags").put("siteId", siteId);
-        doc.withObject("initialTwin").putObject("properties").putObject("desired");
-        doc.put("provisioningStatus", "enabled");
-        doc.putObject("reprovisionPolicy").put("updateHubAssignment", true).put("migrateDeviceData", true);
-        return new EnrollmentGroup(doc, null);
+        ObjectNode document = JSON.createObjectNode();
+        document.put("enrollmentGroupId", idOf(siteId));
+        document.putObject("attestation").put("type", "x509").putObject("x509").putObject("caReferences");
+        document.putObject("initialTwin").putObject("tags").put("siteId", siteId);
+        document.withObject("initialTwin").putObject("properties").putObject("desired");
+        document.put("provisioningStatus", "enabled");
+        document.putObject("reprovisionPolicy").put("updateHubAssignment", true).put("migrateDeviceData", true);
+        return new EnrollmentGroup(document, null);
     }
 
     public static EnrollmentGroup parse(String json, String etag) {
-        ObjectNode doc = (ObjectNode) JSON.readTree(json);
-        String bodyEtag = doc.path("etag").asString(null);
-        return new EnrollmentGroup(doc, etag != null ? etag : bodyEtag);
+        ObjectNode document = (ObjectNode) JSON.readTree(json);
+        String bodyEtag = document.path("etag").asString(null);
+        return new EnrollmentGroup(document, etag != null ? etag : bodyEtag);
     }
 
     public String id() {
@@ -71,8 +72,7 @@ public final class EnrollmentGroup {
 
     /** Copy with the given CA references ({@code null} clears a slot) and provisioning enabled. */
     public EnrollmentGroup withReferences(String primary, String secondary) {
-        ObjectNode copy = document.deepCopy();
-        copy.remove("etag");
+        ObjectNode copy = documentWithoutEtag();
         ObjectNode refs = copy.withObject("attestation").put("type", "x509").withObject("x509").putObject("caReferences");
         if (primary != null) {
             refs.put("primary", primary);
@@ -86,19 +86,23 @@ public final class EnrollmentGroup {
 
     /** Copy that no device can provision through; references are kept (DPS requires one). */
     public EnrollmentGroup disabled() {
-        ObjectNode copy = document.deepCopy();
-        copy.remove("etag");
+        ObjectNode copy = documentWithoutEtag();
         copy.put("provisioningStatus", "disabled");
         return new EnrollmentGroup(copy, etag);
     }
 
     public String toJson() {
-        ObjectNode copy = document.deepCopy();
-        copy.remove("etag");
-        return JSON.writeValueAsString(copy);
+        return JSON.writeValueAsString(documentWithoutEtag());
     }
 
-    private tools.jackson.databind.JsonNode caReferences() {
+    /** The entity tag travels in the {@code If-Match} header, never in the document sent to DPS. */
+    private ObjectNode documentWithoutEtag() {
+        ObjectNode copy = document.deepCopy();
+        copy.remove("etag");
+        return copy;
+    }
+
+    private JsonNode caReferences() {
         return document.path("attestation").path("x509").path("caReferences");
     }
 }

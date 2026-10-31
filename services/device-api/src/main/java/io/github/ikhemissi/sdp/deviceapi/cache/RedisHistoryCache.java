@@ -9,6 +9,7 @@ import io.lettuce.core.SocketOptions;
 import io.lettuce.core.TimeoutOptions;
 import io.lettuce.core.api.StatefulRedisConnection;
 import io.lettuce.core.api.async.RedisAsyncCommands;
+import io.lettuce.core.codec.StringCodec;
 import io.opentelemetry.api.OpenTelemetry;
 import io.opentelemetry.api.common.AttributeKey;
 import io.opentelemetry.api.common.Attributes;
@@ -20,7 +21,9 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -35,6 +38,7 @@ public class RedisHistoryCache implements HistoryCache, AutoCloseable {
 
     private static final Logger log = LoggerFactory.getLogger(RedisHistoryCache.class);
     private static final AttributeKey<String> OPERATION = AttributeKey.stringKey("sdp.cache.operation");
+    private static final AttributeKey<String> OUTCOME = AttributeKey.stringKey("sdp.cache.outcome");
     private static final Duration CONNECT_TIMEOUT = Duration.ofSeconds(5);
 
     private final CacheProperties properties;
@@ -46,7 +50,7 @@ public class RedisHistoryCache implements HistoryCache, AutoCloseable {
     private final AtomicInteger consecutiveFailures = new AtomicInteger();
     private volatile Instant openUntil = Instant.MIN;
     private volatile StatefulRedisConnection<String, String> connection;
-    private final java.util.concurrent.atomic.AtomicBoolean connecting = new java.util.concurrent.atomic.AtomicBoolean();
+    private final AtomicBoolean connecting = new AtomicBoolean();
     private volatile Instant nextConnectAttempt = Instant.MIN;
 
     public RedisHistoryCache(CacheProperties properties, EntraIdRedisCredentialsProvider credentials,
@@ -89,7 +93,7 @@ public class RedisHistoryCache implements HistoryCache, AutoCloseable {
         }
         RedisAsyncCommands<String, String> redis = commands("get");
         if (redis == null) {
-            count(0, keys.size());
+            countLookups(0, keys.size());
             return misses;
         }
         try {
@@ -97,17 +101,17 @@ public class RedisHistoryCache implements HistoryCache, AutoCloseable {
                     .get(properties.commandTimeout().toMillis(), TimeUnit.MILLISECONDS);
             List<String> result = new ArrayList<>(keys.size());
             int hits = 0;
-            for (KeyValue<String, String> value : values) {
-                String v = value.getValueOrElse(null);
-                result.add(v);
-                hits += v == null ? 0 : 1;
+            for (KeyValue<String, String> keyValue : values) {
+                String value = keyValue.getValueOrElse(null);
+                result.add(value);
+                hits += value == null ? 0 : 1;
             }
             succeeded();
-            count(hits, keys.size() - hits);
+            countLookups(hits, keys.size() - hits);
             return result;
         } catch (Exception e) {
             failed("get", e);
-            count(0, keys.size());
+            countLookups(0, keys.size());
             return misses;
         }
     }
@@ -124,8 +128,8 @@ public class RedisHistoryCache implements HistoryCache, AutoCloseable {
         try {
             var futures = entries.entrySet().stream()
                     .map(e -> redis.set(e.getKey(), e.getValue().value(), SetArgs.Builder.px(e.getValue().ttl())).toCompletableFuture())
-                    .toArray(java.util.concurrent.CompletableFuture[]::new);
-            java.util.concurrent.CompletableFuture.allOf(futures).get(properties.commandTimeout().toMillis() * 2, TimeUnit.MILLISECONDS);
+                    .toArray(CompletableFuture[]::new);
+            CompletableFuture.allOf(futures).get(properties.commandTimeout().toMillis() * 2, TimeUnit.MILLISECONDS);
             succeeded();
         } catch (Exception e) {
             failed("put", e);
@@ -150,7 +154,7 @@ public class RedisHistoryCache implements HistoryCache, AutoCloseable {
         if (connection != null || clock.instant().isBefore(nextConnectAttempt) || !connecting.compareAndSet(false, true)) {
             return;
         }
-        client.connectAsync(io.lettuce.core.codec.StringCodec.UTF8, uri).whenComplete((connected, error) -> {
+        client.connectAsync(StringCodec.UTF8, uri).whenComplete((connected, error) -> {
             if (error == null) {
                 connection = connected;
                 log.info("History cache connection established ({}:{})", properties.host(), properties.port());
@@ -199,12 +203,12 @@ public class RedisHistoryCache implements HistoryCache, AutoCloseable {
         }
     }
 
-    private void count(int hits, int misses) {
+    private void countLookups(int hits, int misses) {
         if (hits > 0) {
-            lookups.add(hits, Attributes.of(AttributeKey.stringKey("sdp.cache.outcome"), "hit"));
+            lookups.add(hits, Attributes.of(OUTCOME, "hit"));
         }
         if (misses > 0) {
-            lookups.add(misses, Attributes.of(AttributeKey.stringKey("sdp.cache.outcome"), "miss"));
+            lookups.add(misses, Attributes.of(OUTCOME, "miss"));
         }
     }
 

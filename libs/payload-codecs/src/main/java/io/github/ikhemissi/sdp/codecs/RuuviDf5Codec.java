@@ -52,42 +52,42 @@ final class RuuviDf5Codec implements PayloadCodec {
         if (p.length != LENGTH) {
             return Codecs.malformed("ruuvi-df5 payload must be " + LENGTH + " bytes, got " + p.length);
         }
-        Map<String, BigDecimal> m = new LinkedHashMap<>();
+        Map<String, BigDecimal> metrics = new LinkedHashMap<>();
         int temperature = s16be(p, 1);
         if (temperature != S16_NOT_AVAILABLE) {
-            m.put(Metric.TEMPERATURE.key(), scaled(temperature, TEMPERATURE_FACTOR));
+            metrics.put(Metric.TEMPERATURE.key(), scaled(temperature, TEMPERATURE_FACTOR));
         }
         int humidity = u16be(p, 3);
         if (humidity != U16_NOT_AVAILABLE) {
-            m.put(Metric.HUMIDITY.key(), scaled(humidity, HUMIDITY_FACTOR));
+            metrics.put(Metric.HUMIDITY.key(), scaled(humidity, HUMIDITY_FACTOR));
         }
         int pressure = u16be(p, 5);
         if (pressure != U16_NOT_AVAILABLE) {
-            m.put(Metric.PRESSURE.key(), scaled(pressure + PRESSURE_OFFSET_PA, HPA));
+            metrics.put(Metric.PRESSURE.key(), scaled(pressure + PRESSURE_OFFSET_PA, HPA));
         }
         Metric[] axes = {Metric.ACCELERATION_X, Metric.ACCELERATION_Y, Metric.ACCELERATION_Z};
         for (int i = 0; i < axes.length; i++) {
             int acceleration = s16be(p, 7 + 2 * i);
             if (acceleration != S16_NOT_AVAILABLE) {
-                m.put(axes[i].key(), scaled(acceleration, MILLI));
+                metrics.put(axes[i].key(), scaled(acceleration, MILLI));
             }
         }
         int power = u16be(p, 13);
         int voltage = power >>> 5;
         if (voltage != VOLTAGE_NOT_AVAILABLE) {
-            m.put(Metric.BATTERY_VOLTAGE.key(), scaled(voltage + BATTERY_OFFSET_MV, MILLI));
+            metrics.put(Metric.BATTERY_VOLTAGE.key(), scaled(voltage + BATTERY_OFFSET_MV, MILLI));
         }
         int tx = power & 0x1F;
         if (tx != TX_NOT_AVAILABLE) {
-            m.put(Metric.TX_POWER.key(), BigDecimal.valueOf(tx * 2L - 40));
+            metrics.put(Metric.TX_POWER.key(), BigDecimal.valueOf(tx * 2L - 40));
         }
         int movement = u8(p, 15);
         if (movement != MOVEMENT_NOT_AVAILABLE) {
-            m.put(Metric.MOVEMENT_COUNTER.key(), BigDecimal.valueOf(movement));
+            metrics.put(Metric.MOVEMENT_COUNTER.key(), BigDecimal.valueOf(movement));
         }
         int sequence = u16be(p, 16);
         if (sequence != U16_NOT_AVAILABLE) {
-            m.put(Metric.MEASUREMENT_SEQUENCE.key(), BigDecimal.valueOf(sequence));
+            metrics.put(Metric.MEASUREMENT_SEQUENCE.key(), BigDecimal.valueOf(sequence));
         }
         Map<String, String> attributes = new LinkedHashMap<>();
         boolean macAvailable = false;
@@ -97,7 +97,7 @@ final class RuuviDf5Codec implements PayloadCodec {
         if (macAvailable) {
             attributes.put("mac", MAC.formatHex(p, 18, LENGTH));
         }
-        return new DecodeResult.Decoded(PayloadFormat.RUUVI_DF5, m, attributes);
+        return new DecodeResult.Decoded(PayloadFormat.RUUVI_DF5, metrics, attributes);
     }
 
     @Override

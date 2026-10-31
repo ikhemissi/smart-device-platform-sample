@@ -24,10 +24,6 @@ public class ApiException extends RuntimeException {
         return new ApiException(HttpStatus.NOT_FOUND, detail);
     }
 
-    public static ApiException invalid(Map<String, List<String>> errors) {
-        return new ApiException(HttpStatus.BAD_REQUEST, ApiExceptionHandler.summary(errors), errors);
-    }
-
     public HttpStatus status() {
         return status;
     }

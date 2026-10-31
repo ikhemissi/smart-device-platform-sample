@@ -1,7 +1,6 @@
 package io.github.ikhemissi.sdp.codecs;
 
 import java.util.EnumMap;
-import java.util.HexFormat;
 import java.util.Map;
 
 /**
@@ -47,7 +46,7 @@ public final class PayloadCodecs {
                 return new DecodeResult.Rejected(RejectionReason.UNSUPPORTED_FORMAT, "encrypted BTHome v2 payloads are not supported");
             }
             return new DecodeResult.Rejected(RejectionReason.UNKNOWN_FORMAT,
-                    "unknown leading byte 0x" + HexFormat.of().withUpperCase().toHexDigits((byte) leading));
+                    "unknown leading byte " + Codecs.hexByte(leading));
         }
         try {
             return CODECS.get(format).decode(payload);

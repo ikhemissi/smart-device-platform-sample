@@ -19,14 +19,14 @@ public record Anomaly(String deviceId, String metric, double value, Duration dur
                     + ":(?<duration>\\d+[smh])(?::(?<delay>\\d+[smh]))?$");
 
     public static Anomaly parse(String spec) {
-        Matcher m = SPEC.matcher(spec.trim());
-        if (!m.matches()) {
+        Matcher matcher = SPEC.matcher(spec.trim());
+        if (!matcher.matches()) {
             throw new IllegalArgumentException("invalid anomaly '" + spec
                     + "', expected <deviceId>:<metric>=<value>[~<ramp>]:<duration>[:<delay>] e.g. paris-01-ruuvi5-001:temperature=12:5m");
         }
-        return new Anomaly(m.group("device"), m.group("metric"), Double.parseDouble(m.group("value")),
-                duration(m.group("duration")), m.group("delay") == null ? Duration.ZERO : duration(m.group("delay")),
-                m.group("ramp") == null ? Duration.ZERO : duration(m.group("ramp")));
+        return new Anomaly(matcher.group("device"), matcher.group("metric"), Double.parseDouble(matcher.group("value")),
+                duration(matcher.group("duration")), optionalDuration(matcher.group("delay")),
+                optionalDuration(matcher.group("ramp")));
     }
 
     public boolean isActive(String deviceId, Instant simulatorStart, Instant now) {
@@ -52,6 +52,10 @@ public record Anomaly(String deviceId, String metric, double value, Duration dur
             return 1;
         }
         return 1 - Duration.between(until, now).toMillis() / 1000.0 / rampSeconds;
+    }
+
+    private static Duration optionalDuration(String text) {
+        return text == null ? Duration.ZERO : duration(text);
     }
 
     private static Duration duration(String text) {

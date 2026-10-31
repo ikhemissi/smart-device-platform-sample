@@ -27,10 +27,10 @@ public final class ContainerEngine {
     public static synchronized boolean isRootlessPodman() {
         if (rootlessPodman == null) {
             var client = DockerClientFactory.instance().client();
-            boolean podman = client.versionCmd().exec().getComponents() != null
-                    && client.versionCmd().exec().getComponents().stream().anyMatch(c -> c.getName().startsWith("Podman"));
-            List<String> security = client.infoCmd().exec().getSecurityOptions();
-            rootlessPodman = podman && security != null && security.stream().anyMatch(o -> o.contains("rootless"));
+            var components = client.versionCmd().exec().getComponents();
+            boolean podman = components != null && components.stream().anyMatch(c -> c.getName().startsWith("Podman"));
+            List<String> securityOptions = client.infoCmd().exec().getSecurityOptions();
+            rootlessPodman = podman && securityOptions != null && securityOptions.stream().anyMatch(o -> o.contains("rootless"));
         }
         return rootlessPodman;
     }

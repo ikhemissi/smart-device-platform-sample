@@ -32,11 +32,11 @@ final class ProblemResponses implements AuthenticationEntryPoint, AccessDeniedHa
     public void handle(HttpServletRequest request, HttpServletResponse response, AccessDeniedException exception)
             throws IOException {
         accessDenied.handle(request, response, exception);
-        SdpRole role = exception instanceof MissingRoleException missing ? missing.requiredRole() : null;
-        String detail = role != null && role.appRole() != null
-                ? "This operation requires the " + role.appRole() + " permission."
+        String requiredRole = exception instanceof MissingRoleException missing ? missing.requiredRole().appRole() : null;
+        String detail = requiredRole != null
+                ? "This operation requires the " + requiredRole + " permission."
                 : "This operation is not permitted.";
-        write(request, response, 403, "Forbidden", detail, role != null ? role.appRole() : null);
+        write(request, response, 403, "Forbidden", detail, requiredRole);
     }
 
     private static void write(HttpServletRequest request, HttpServletResponse response, int status, String title,
