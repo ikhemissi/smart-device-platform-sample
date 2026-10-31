@@ -1,7 +1,5 @@
 # Demo guide — M9: Battery forecast and maintenance queue
 
-> **Draft:** written with the implementation; the figures and timings below are checked against `sdp-dev` by task 6.3 of the [change](../../openspec/changes/m9-maintenance/tasks.md).
-
 Shows which devices need a visit before they stop: the platform forecasts each battery and measures how each device reports, `Microsoft-Decision-1` gives the probability of a visit within 7 days, and `gpt-6-luna` writes a short work order for the devices that enter the queue ([PRD-009](../prd/PRD-009-m9-maintenance.md), [ADR-0011](../adr/ADR-0011-model-based-analysis.md)). Duration: about 15 minutes.
 
 ## Before the demo
