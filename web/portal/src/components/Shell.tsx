@@ -5,8 +5,8 @@ import { NavLink, Outlet, useMatch } from 'react-router'
 import { useCurrentUser } from '../api/queries'
 import { useSession } from '../auth/session'
 import { useFeatures } from '../features'
-import { AssistantPanel } from './assistant/AssistantPanel'
 import { AccessDenied } from '../pages/AccessDenied'
+import { AssistantPanel } from './assistant/AssistantPanel'
 import { ErrorState } from './ErrorState'
 
 const useStyles = makeStyles({
@@ -28,7 +28,7 @@ const useStyles = makeStyles({
   },
   active: { borderBottomColor: tokens.colorNeutralForegroundOnBrand, fontWeight: tokens.fontWeightSemibold },
   user: { display: 'flex', alignItems: 'center', gap: tokens.spacingHorizontalM },
-  signOut: { color: tokens.colorNeutralForegroundOnBrand },
+  headerButton: { color: tokens.colorNeutralForegroundOnBrand },
   main: { padding: tokens.spacingHorizontalXXL },
   skip: {
     position: 'absolute',
@@ -45,7 +45,7 @@ export function Shell() {
   const features = useFeatures()
   const [assistantOpen, setAssistantOpen] = useState(false)
   const devicePage = useMatch('/devices/:deviceId')
-  const assistant = features.assistant && me.data?.canRead === true
+  const assistantAvailable = features.assistant && me.data?.canRead === true
 
   let content
   if (me.isPending) {
@@ -66,30 +66,18 @@ export function Shell() {
         <nav aria-label="Sections" className={styles.nav}>
           {me.data?.canRead && (
             <>
-              <NavLink to="/devices" className={({ isActive }) => mergeClasses(styles.navLink, isActive && styles.active)}>
-                Devices
-              </NavLink>
-              <NavLink to="/sites" className={({ isActive }) => mergeClasses(styles.navLink, isActive && styles.active)}>
-                Sites
-              </NavLink>
-              {features.anomalies && (
-                <NavLink to="/anomalies" className={({ isActive }) => mergeClasses(styles.navLink, isActive && styles.active)}>
-                  Anomalies
-                </NavLink>
-              )}
-              {features.maintenance && (
-                <NavLink to="/maintenance" className={({ isActive }) => mergeClasses(styles.navLink, isActive && styles.active)}>
-                  Maintenance
-                </NavLink>
-              )}
+              <SectionLink to="/devices">Devices</SectionLink>
+              <SectionLink to="/sites">Sites</SectionLink>
+              {features.anomalies && <SectionLink to="/anomalies">Anomalies</SectionLink>}
+              {features.maintenance && <SectionLink to="/maintenance">Maintenance</SectionLink>}
             </>
           )}
         </nav>
         <div className={styles.user}>
-          {assistant && (
+          {assistantAvailable && (
             <Button
               appearance="transparent"
-              className={styles.signOut}
+              className={styles.headerButton}
               icon={<SparkleRegular />}
               aria-expanded={assistantOpen}
               onClick={() => setAssistantOpen((open) => !open)}
@@ -98,7 +86,7 @@ export function Shell() {
             </Button>
           )}
           {me.data && <Body1Strong>{me.data.displayName}</Body1Strong>}
-          <Button appearance="transparent" className={styles.signOut} icon={<SignOutRegular />} onClick={() => void session.signOut()}>
+          <Button appearance="transparent" className={styles.headerButton} icon={<SignOutRegular />} onClick={() => void session.signOut()}>
             Sign out
           </Button>
         </div>
@@ -106,9 +94,18 @@ export function Shell() {
       <main id="main" className={styles.main} tabIndex={-1}>
         {content}
       </main>
-      {assistant && (
+      {assistantAvailable && (
         <AssistantPanel open={assistantOpen} onClose={() => setAssistantOpen(false)} deviceId={devicePage?.params.deviceId} />
       )}
     </>
+  )
+}
+
+function SectionLink({ to, children }: { to: string; children: string }) {
+  const styles = useStyles()
+  return (
+    <NavLink to={to} className={({ isActive }) => mergeClasses(styles.navLink, isActive && styles.active)}>
+      {children}
+    </NavLink>
   )
 }

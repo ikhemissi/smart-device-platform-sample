@@ -1,11 +1,5 @@
 import type { Series } from '../api/types'
 
-/** Human label of a metric key: description when known, e.g. "Air temperature (°C)". */
-export function metricLabel(metric: string, unit: string | null | undefined, description?: string | null): string {
-  const base = description || metric.replace(/_/g, ' ').replace(/^./, (c) => c.toUpperCase())
-  return unit ? `${base} (${unit})` : base
-}
-
 /** Identifies the data drawn by a chart. */
 export function seriesKey(series: Series): string {
   return `${series.resolution}|${series.from}|${series.to}|${series.series.map((s) => `${s.metric}:${s.points.length}`).join(',')}`
@@ -145,4 +139,4 @@ function escapeHtml(value: string): string {
 }
 
 /** Fluent-inspired palette with good contrast on white. */
-export const PALETTE = ['#0f6cbd', '#c50f1f', '#107c10', '#8764b8']
+const PALETTE = ['#0f6cbd', '#c50f1f', '#107c10', '#8764b8']

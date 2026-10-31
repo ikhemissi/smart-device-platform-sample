@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { notificationSummary, parseRecipients, rangeText, validate } from './thresholdForm'
+import { notificationSummary, rangeText } from './alertText'
+import { parseRecipients, validate } from './thresholdForm'
 
 const valid = { metric: 'temperature', min: '2', max: '8', recipients: 'ops@example.com', enabled: true }
 

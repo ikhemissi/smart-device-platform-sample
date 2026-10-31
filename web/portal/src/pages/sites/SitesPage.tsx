@@ -2,7 +2,7 @@ import { Body1, Button, MessageBar, MessageBarBody, Spinner, Table, TableBody, T
 import { AddRegular } from '@fluentui/react-icons'
 import { useState } from 'react'
 import { Link } from 'react-router'
-import { useAllSiteCertificates, useCurrentUser, useSites } from '../../api/queries'
+import { useAllSiteCertificates, useCanWrite, useSites } from '../../api/queries'
 import { ErrorState } from '../../components/ErrorState'
 import { formatAbsolute, formatRelative, numberFormat } from '../../format'
 import { CreateSiteDialog } from './CreateSiteDialog'
@@ -15,9 +15,10 @@ const useStyles = makeStyles({
   link: { color: tokens.colorBrandForegroundLink, ':hover': { textDecoration: 'underline' } },
 })
 
+/** Every site with its devices and trust status; Editors create sites. */
 export function SitesPage() {
   const styles = useStyles()
-  const canWrite = useCurrentUser().data?.canWrite === true
+  const canWrite = useCanWrite()
   const sites = useSites()
   const certificates = useAllSiteCertificates()
   const [creating, setCreating] = useState(false)
@@ -85,13 +86,13 @@ export function SitesPage() {
         </Table>
       )}
       <CreateSiteDialog
-          open={creating}
-          onClose={() => setCreating(false)}
-          onCreated={(siteId) => {
-            setCreating(false)
-            setCreated(siteId)
-          }}
-        />
+        open={creating}
+        onClose={() => setCreating(false)}
+        onCreated={(siteId) => {
+          setCreating(false)
+          setCreated(siteId)
+        }}
+      />
     </section>
   )
 }

@@ -1,4 +1,5 @@
 import type { BatteryForecast, MaintenanceReason, MaintenanceStatus } from '../../api/types'
+import { readListParam } from '../../searchParams'
 
 export const STATUS_LABELS: Record<MaintenanceStatus, string> = {
   open: 'Open',
@@ -18,8 +19,7 @@ const trend = new Intl.NumberFormat(undefined, { maximumSignificantDigits: 2, si
 
 /** Statuses of the `status` URL parameter (comma-separated); the default ones when absent or invalid. */
 export function readStatuses(value: string | null): MaintenanceStatus[] {
-  const statuses = STATUSES.filter((s) => (value ?? '').split(',').includes(s))
-  return statuses.length > 0 ? statuses : DEFAULT_STATUSES
+  return readListParam(value, STATUSES, DEFAULT_STATUSES)
 }
 
 /** "72 %". */

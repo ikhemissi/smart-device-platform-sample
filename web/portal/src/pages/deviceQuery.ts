@@ -1,6 +1,7 @@
 import type { DeviceQuery, DeviceStatus, SortField, SortOrder } from '../api/types'
+import { withParams } from '../searchParams'
 
-export const PAGE_SIZE = 25
+const PAGE_SIZE = 25
 const SORT_FIELDS: SortField[] = ['displayName', 'siteId', 'firstSeen', 'lastSeen']
 const STATUSES: DeviceStatus[] = ['reporting', 'silent']
 
@@ -20,19 +21,11 @@ export function readDeviceQuery(params: URLSearchParams): DeviceQuery {
   }
 }
 
+export type DeviceListChanges = Partial<Record<'siteId' | 'status' | 'search' | 'sort' | 'order' | 'page', string | undefined>>
+
 /** Applies changes to the URL parameters; any filter or sort change goes back to the first page. */
-export function updateParams(
-  params: URLSearchParams,
-  changes: Partial<Record<'siteId' | 'status' | 'search' | 'sort' | 'order' | 'page', string | undefined>>,
-): URLSearchParams {
-  const next = new URLSearchParams(params)
-  for (const [key, value] of Object.entries(changes)) {
-    if (value === undefined || value === '') {
-      next.delete(key)
-    } else {
-      next.set(key, value)
-    }
-  }
+export function updateParams(params: URLSearchParams, changes: DeviceListChanges): URLSearchParams {
+  const next = withParams(params, changes)
   if (!('page' in changes)) {
     next.delete('page')
   }

@@ -1,29 +1,14 @@
-import {
-  Body1,
-  Button,
-  Dialog,
-  DialogActions,
-  DialogBody,
-  DialogContent,
-  DialogSurface,
-  DialogTitle,
-  Field,
-  MessageBar,
-  MessageBarBody,
-  Textarea,
-  makeStyles,
-  tokens,
-} from '@fluentui/react-components'
+import { Body1, Button, DialogActions, DialogBody, DialogContent, DialogTitle, makeStyles, tokens } from '@fluentui/react-components'
 import { type FormEvent, useState } from 'react'
 import { ApiError } from '../../api/client'
 import { explain } from '../../api/errors'
 import { useSetMaintenanceStatus } from '../../api/queries'
 import type { MaintenanceItem } from '../../api/types'
-import { useOpenKey } from '../../components/useOpenKey'
+import { CommentField } from '../../components/CommentField'
+import { FormError } from '../../components/FormError'
+import { ModalDialog } from '../../components/ModalDialog'
 import type { StatusAction } from './MaintenanceTable'
 import { percentText } from './maintenanceText'
-
-export const MAX_COMMENT = 1000
 
 const useStyles = makeStyles({
   form: { display: 'flex', flexDirection: 'column', gap: tokens.spacingVerticalM },
@@ -45,11 +30,10 @@ const TITLES: Record<StatusAction, string> = { planned: 'Plan this visit', done:
 
 /** Editors mark a queue item planned or done, with an optional comment. */
 export function MaintenanceStatusDialog(props: Props) {
-  const key = useOpenKey(!!props.change)
   return (
-    <Dialog key={key} open={!!props.change} modalType="modal" onOpenChange={(_, data) => !data.open && props.onClose()}>
-      <DialogSurface aria-describedby={undefined}>{props.change && <StatusForm {...props} change={props.change} />}</DialogSurface>
-    </Dialog>
+    <ModalDialog open={!!props.change} onClose={props.onClose}>
+      {props.change && <StatusForm {...props} change={props.change} />}
+    </ModalDialog>
   )
 }
 
@@ -86,18 +70,12 @@ function StatusForm({ change: { item, status }, onClose, onChanged }: Props & { 
       <DialogBody>
         <DialogTitle>{TITLES[status]}</DialogTitle>
         <DialogContent className={styles.form}>
-          {errors.form && (
-            <MessageBar intent="error" role="alert">
-              <MessageBarBody>{errors.form}</MessageBarBody>
-            </MessageBar>
-          )}
+          <FormError message={errors.form} />
           <Body1>
             {item.deviceName ?? item.deviceId} ({item.siteId}), intervention probability {percentText(item.probability)}:{' '}
             {status === 'planned' ? 'the visit is planned.' : 'the visit is done; the item leaves the queue.'}
           </Body1>
-          <Field label="Comment" hint={`Optional · ${comment.length}/${MAX_COMMENT} characters`} validationMessage={errors.comment}>
-            <Textarea resize="vertical" maxLength={MAX_COMMENT} value={comment} onChange={(_, d) => setComment(d.value)} />
-          </Field>
+          <CommentField value={comment} error={errors.comment} onChange={setComment} />
         </DialogContent>
         <DialogActions>
           <Button onClick={onClose}>Cancel</Button>

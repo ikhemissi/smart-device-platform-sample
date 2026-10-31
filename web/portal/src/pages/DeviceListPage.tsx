@@ -19,16 +19,16 @@ import {
 } from '@fluentui/react-components'
 import { ChevronLeftRegular, ChevronRightRegular, EditRegular } from '@fluentui/react-icons'
 import { useEffect, useState } from 'react'
-import { Link, useSearchParams } from 'react-router'
-import { useCurrentUser, useDevices, useSites } from '../api/queries'
-import type { DeviceSummary, SortField } from '../api/types'
+import { Link, type SetURLSearchParams, useSearchParams } from 'react-router'
+import { useCanWrite, useDevices, useSites } from '../api/queries'
+import type { DeviceQuery, DeviceSummary, SortField } from '../api/types'
 import { ErrorState } from '../components/ErrorState'
 import { StatusBadge } from '../components/StatusBadge'
 import { Timestamp } from '../components/Timestamp'
 import { numberFormat } from '../format'
 import { useDebouncedValue } from '../useDebouncedValue'
 import { EditDeviceDialog } from './EditDeviceDialog'
-import { nextOrder, readDeviceQuery, updateParams } from './deviceQuery'
+import { type DeviceListChanges, nextOrder, readDeviceQuery, updateParams } from './deviceQuery'
 
 export const SEARCH_DEBOUNCE_MS = 300
 
@@ -55,33 +55,16 @@ export function DeviceListPage() {
   const styles = useStyles()
   const [params, setParams] = useSearchParams()
   const query = readDeviceQuery(params)
-  const me = useCurrentUser()
-  const canWrite = me.data?.canWrite === true
+  const canWrite = useCanWrite()
   const sites = useSites()
   const devices = useDevices(query)
   const [editing, setEditing] = useState<string>()
 
-  // Search: typed text is debounced into the URL; URL changes (back/forward, clear) are reflected in the box.
-  const urlSearch = params.get('search') ?? ''
-  const [searchText, setSearchText] = useState(urlSearch)
-  const debouncedSearch = useDebouncedValue(searchText, SEARCH_DEBOUNCE_MS)
-  useEffect(() => {
-    if (debouncedSearch.trim() !== urlSearch) {
-      setParams((current) => updateParams(current, { search: debouncedSearch.trim() }), { replace: true })
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- only react to the debounced text
-  }, [debouncedSearch])
-  useEffect(() => {
-    if (urlSearch !== debouncedSearch.trim()) {
-      setSearchText(urlSearch)
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- only react to URL changes
-  }, [urlSearch])
+  const [searchText, setSearchText] = useSearchText(params, setParams)
 
-  const change = (changes: Parameters<typeof updateParams>[1]) => setParams((current) => updateParams(current, changes))
+  const change = (changes: DeviceListChanges) => setParams((current) => updateParams(current, changes))
   const hasFilters = !!(query.siteId || query.status || query.search)
   const data = devices.data
-  const pageCount = data ? Math.max(1, Math.ceil(data.total / query.pageSize)) : 1
 
   return (
     <section className={styles.page} aria-labelledby="devices-title">
@@ -135,19 +118,9 @@ export function DeviceListPage() {
           <Table sortable aria-label="Devices" aria-busy={devices.isFetching}>
             <TableHeader>
               <TableRow>
-                {COLUMNS.map((column) =>
-                  column.sort ? (
-                    <TableHeaderCell
-                      key={column.label}
-                      sortDirection={query.sort === column.sort ? (query.order === 'asc' ? 'ascending' : 'descending') : undefined}
-                      onClick={() => change({ sort: column.sort, order: nextOrder(query, column.sort!) })}
-                    >
-                      {column.label}
-                    </TableHeaderCell>
-                  ) : (
-                    <TableHeaderCell key={column.label}>{column.label}</TableHeaderCell>
-                  ),
-                )}
+                {COLUMNS.map((column) => (
+                  <ColumnHeader key={column.label} label={column.label} sort={column.sort} query={query} onSort={change} />
+                ))}
                 {canWrite && <TableHeaderCell><span className="visually-hidden">Actions</span></TableHeaderCell>}
               </TableRow>
             </TableHeader>
@@ -163,34 +136,70 @@ export function DeviceListPage() {
               <Body1 as="p">{hasFilters ? 'No devices match these filters.' : 'No device has reported data yet.'}</Body1>
             </div>
           ) : (
-            <nav className={styles.pager} aria-label="Pages">
-              <Body1 aria-live="polite">
-                {numberFormat.format((query.page - 1) * query.pageSize + 1)}–
-                {numberFormat.format(Math.min(query.page * query.pageSize, data.total))} of {numberFormat.format(data.total)} devices
-                {' · '}page {query.page} of {pageCount}
-              </Body1>
-              <Button
-                icon={<ChevronLeftRegular />}
-                disabled={query.page <= 1}
-                onClick={() => change({ page: String(query.page - 1) })}
-              >
-                Previous
-              </Button>
-              <Button
-                icon={<ChevronRightRegular />}
-                iconPosition="after"
-                disabled={query.page >= pageCount}
-                onClick={() => change({ page: String(query.page + 1) })}
-              >
-                Next
-              </Button>
-            </nav>
+            <Pager query={query} total={data.total} onPage={(page) => change({ page: String(page) })} />
           )}
         </>
       )}
 
       <EditDeviceDialog deviceId={editing} onClose={() => setEditing(undefined)} />
     </section>
+  )
+}
+
+/**
+ * Search box text: typed text is debounced into the URL, and URL changes (back/forward, clear) are reflected in the box.
+ */
+function useSearchText(params: URLSearchParams, setParams: SetURLSearchParams) {
+  const urlSearch = params.get('search') ?? ''
+  const [searchText, setSearchText] = useState(urlSearch)
+  const debouncedSearch = useDebouncedValue(searchText, SEARCH_DEBOUNCE_MS)
+  useEffect(() => {
+    if (debouncedSearch.trim() !== urlSearch) {
+      setParams((current) => updateParams(current, { search: debouncedSearch.trim() }), { replace: true })
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only react to the debounced text
+  }, [debouncedSearch])
+  useEffect(() => {
+    if (urlSearch !== debouncedSearch.trim()) {
+      setSearchText(urlSearch)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only react to URL changes
+  }, [urlSearch])
+  return [searchText, setSearchText] as const
+}
+
+/** Column header, sortable when the column has a sort field. */
+function ColumnHeader({ label, sort, query, onSort }: { label: string; sort?: SortField; query: DeviceQuery; onSort: (changes: DeviceListChanges) => void }) {
+  if (!sort) {
+    return <TableHeaderCell>{label}</TableHeaderCell>
+  }
+  const direction = query.order === 'asc' ? 'ascending' : 'descending'
+  return (
+    <TableHeaderCell sortDirection={query.sort === sort ? direction : undefined} onClick={() => onSort({ sort, order: nextOrder(query, sort) })}>
+      {label}
+    </TableHeaderCell>
+  )
+}
+
+function Pager({ query, total, onPage }: { query: DeviceQuery; total: number; onPage: (page: number) => void }) {
+  const styles = useStyles()
+  const pageCount = Math.max(1, Math.ceil(total / query.pageSize))
+  const first = (query.page - 1) * query.pageSize + 1
+  const last = Math.min(query.page * query.pageSize, total)
+  return (
+    <nav className={styles.pager} aria-label="Pages">
+      <Body1 aria-live="polite">
+        {numberFormat.format(first)}–
+        {numberFormat.format(last)} of {numberFormat.format(total)} devices
+        {' · '}page {query.page} of {pageCount}
+      </Body1>
+      <Button icon={<ChevronLeftRegular />} disabled={query.page <= 1} onClick={() => onPage(query.page - 1)}>
+        Previous
+      </Button>
+      <Button icon={<ChevronRightRegular />} iconPosition="after" disabled={query.page >= pageCount} onClick={() => onPage(query.page + 1)}>
+        Next
+      </Button>
+    </nav>
   )
 }
 

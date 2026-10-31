@@ -1,4 +1,5 @@
 import type { Anomaly, AnomalyClassification, AnomalyStatus, ReviewVerdict } from '../../api/types'
+import { readListParam } from '../../searchParams'
 
 export const CLASSIFICATION_LABELS: Record<AnomalyClassification, string> = {
   real_event: 'Real event',
@@ -30,7 +31,7 @@ export const KIND_LABELS: Record<Anomaly['kind'], string> = { deviation: 'Deviat
 export const VERDICT_LABELS: Record<ReviewVerdict, string> = { correct: 'Classification correct', incorrect: 'Classification incorrect' }
 
 /** Device page window around an anomaly: from an hour before it starts to an hour after it ends (not in the future). */
-export const LINK_MARGIN_MS = 3_600_000
+const LINK_MARGIN_MS = 3_600_000
 
 const number = new Intl.NumberFormat(undefined, { maximumFractionDigits: 2, useGrouping: false })
 
@@ -41,7 +42,7 @@ export function classificationText(anomaly: Pick<Anomaly, 'classification' | 'co
   return anomaly.confidence === null ? label : `${label} · ${Math.round(anomaly.confidence * 100)} %`
 }
 
-export function amount(value: number, unit: string | null): string {
+function amount(value: number, unit: string | null): string {
   return unit ? `${number.format(value)} ${unit}` : number.format(value)
 }
 
@@ -80,6 +81,5 @@ export function deviceLink(anomaly: Pick<Anomaly, 'deviceId' | 'metric' | 'start
 
 /** Statuses of the `status` URL parameter (comma-separated); the default ones when absent or invalid. */
 export function readStatuses(value: string | null): AnomalyStatus[] {
-  const statuses = STATUSES.filter((s) => (value ?? '').split(',').includes(s))
-  return statuses.length > 0 ? statuses : DEFAULT_STATUSES
+  return readListParam(value, STATUSES, DEFAULT_STATUSES)
 }

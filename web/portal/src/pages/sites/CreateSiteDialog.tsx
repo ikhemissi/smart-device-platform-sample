@@ -1,20 +1,19 @@
-import { Button, Dialog, DialogActions, DialogBody, DialogContent, DialogSurface, DialogTitle, Field, Input, MessageBar, MessageBarBody, makeStyles, tokens } from '@fluentui/react-components'
+import { Button, DialogActions, DialogBody, DialogContent, DialogTitle, Field, Input, MessageBar, MessageBarBody, makeStyles, tokens } from '@fluentui/react-components'
 import { type FormEvent, useState } from 'react'
 import { ApiError } from '../../api/client'
 import { explain } from '../../api/errors'
 import { useCreateSite } from '../../api/queries'
+import { FormError } from '../../components/FormError'
+import { ModalDialog } from '../../components/ModalDialog'
 import { SITE_ID_PATTERN } from './trust'
-import { useOpenKey } from '../../components/useOpenKey'
 
 const useStyles = makeStyles({ form: { display: 'flex', flexDirection: 'column', gap: tokens.spacingVerticalM } })
 
-
 export function CreateSiteDialog(props: { open: boolean; onClose: () => void; onCreated: (siteId: string) => void }) {
-  const key = useOpenKey(props.open)
   return (
-    <Dialog key={key} open={props.open} modalType="modal" onOpenChange={(_, data) => !data.open && props.onClose()}>
-      <DialogSurface aria-describedby={undefined}>{props.open && <CreateSiteForm onClose={props.onClose} onCreated={props.onCreated} />}</DialogSurface>
-    </Dialog>
+    <ModalDialog open={props.open} onClose={props.onClose}>
+      {props.open && <CreateSiteForm onClose={props.onClose} onCreated={props.onCreated} />}
+    </ModalDialog>
   )
 }
 
@@ -50,34 +49,28 @@ function CreateSiteForm({ onClose, onCreated }: { onClose: () => void; onCreated
   }
 
   return (
-    <>
-        <form onSubmit={(event) => void submit(event)} noValidate>
-          <DialogBody>
-            <DialogTitle>Create a site</DialogTitle>
-            <DialogContent className={styles.form}>
-              {errors.form && (
-                <MessageBar intent="error" role="alert">
-                  <MessageBarBody>{errors.form}</MessageBarBody>
-                </MessageBar>
-              )}
-              <Field label="Site id" required validationMessage={errors.siteId} hint="Lowercase letters, digits and hyphens. Cannot be changed later.">
-                <Input value={siteId} onChange={(_, d) => setSiteId(d.value)} />
-              </Field>
-              <Field label="Name" required validationMessage={errors.name}>
-                <Input value={name} onChange={(_, d) => setName(d.value)} />
-              </Field>
-              <MessageBar intent="info">
-                <MessageBarBody>No device can join a new site until you add a certificate authority to it.</MessageBarBody>
-              </MessageBar>
-            </DialogContent>
-            <DialogActions>
-              <Button onClick={onClose}>Cancel</Button>
-              <Button appearance="primary" type="submit" disabled={create.isPending}>
-                {create.isPending ? 'Creating…' : 'Create site'}
-              </Button>
-            </DialogActions>
-          </DialogBody>
-        </form>
-      </>
+    <form onSubmit={(event) => void submit(event)} noValidate>
+      <DialogBody>
+        <DialogTitle>Create a site</DialogTitle>
+        <DialogContent className={styles.form}>
+          <FormError message={errors.form} />
+          <Field label="Site id" required validationMessage={errors.siteId} hint="Lowercase letters, digits and hyphens. Cannot be changed later.">
+            <Input value={siteId} onChange={(_, d) => setSiteId(d.value)} />
+          </Field>
+          <Field label="Name" required validationMessage={errors.name}>
+            <Input value={name} onChange={(_, d) => setName(d.value)} />
+          </Field>
+          <MessageBar intent="info">
+            <MessageBarBody>No device can join a new site until you add a certificate authority to it.</MessageBarBody>
+          </MessageBar>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={onClose}>Cancel</Button>
+          <Button appearance="primary" type="submit" disabled={create.isPending}>
+            {create.isPending ? 'Creating…' : 'Create site'}
+          </Button>
+        </DialogActions>
+      </DialogBody>
+    </form>
   )
 }

@@ -1,7 +1,7 @@
 import { Body1, Caption1, Card, Spinner, Subtitle1, makeStyles, tokens } from '@fluentui/react-components'
 import { type ReactNode, useState } from 'react'
-import { useCurrentUser, useDeviceMaintenance } from '../../api/queries'
-import type { DeviceMaintenance } from '../../api/types'
+import { useCanWrite, useDeviceMaintenance } from '../../api/queries'
+import type { MaintenanceAssessment, MaintenanceItem } from '../../api/types'
 import { ErrorState } from '../../components/ErrorState'
 import { Timestamp } from '../../components/Timestamp'
 import { MaintenanceStatusDialog, type StatusChange } from './MaintenanceStatusDialog'
@@ -29,24 +29,23 @@ export function MaintenanceCard({ deviceId }: { deviceId: string }) {
       ) : !maintenance.data.assessment ? (
         <Body1>This device has not been assessed yet.</Body1>
       ) : (
-        <Assessed maintenance={maintenance.data} />
+        <AssessmentView assessment={maintenance.data.assessment} item={maintenance.data.item} />
       )}
     </Card>
   )
 }
 
-function Assessed({ maintenance }: { maintenance: DeviceMaintenance }) {
+function AssessmentView({ assessment, item }: { assessment: MaintenanceAssessment; item: MaintenanceItem | null }) {
   const styles = useStyles()
-  const canWrite = useCurrentUser().data?.canWrite === true
+  const canWrite = useCanWrite()
   const [changing, setChanging] = useState<StatusChange>()
-  const { assessment, item } = maintenance
-  const battery = assessment!.battery
+  const battery = assessment.battery
   const facts: [string, ReactNode][] = [
     ['Battery level', battery ? levelText(battery) : 'No battery reported'],
     ['Trend', battery ? (trendText(battery) ?? 'Not enough history') : '–'],
     ['Days left', daysLeftText(battery)],
-    ['Intervention probability (7 days)', percentText(assessment!.probability)],
-    ['Assessed', <Timestamp key="assessed" value={assessment!.assessedAt} />],
+    ['Intervention probability (7 days)', percentText(assessment.probability)],
+    ['Assessed', <Timestamp key="assessed" value={assessment.assessedAt} />],
   ]
   return (
     <>

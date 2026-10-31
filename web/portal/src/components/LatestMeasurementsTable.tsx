@@ -23,23 +23,22 @@ const useStyles = makeStyles({
   number: { textAlign: 'right', fontVariantNumeric: 'tabular-nums' },
 })
 
-/** Order of columns: metrics as reported (known metrics first, in their API order), then any other keys. */
-function columns(measurements: Measurement[], metrics: ReportedMetric[]): string[] {
+/** Metric columns: metrics as reported (known metrics first, in their API order), then any other keys. */
+function metricColumns(measurements: Measurement[], metrics: ReportedMetric[]): string[] {
   const present = new Set(measurements.flatMap((m) => Object.keys(m.metrics)))
   const known = metrics.map((m) => m.metric).filter((m) => present.has(m))
   return [...known, ...[...present].filter((m) => !known.includes(m)).sort()]
 }
 
-const key = (m: Measurement) => m.measuredAt
+const measurementKey = (m: Measurement) => m.measuredAt
 
-/** Latest measurements, most recent first; rows that appear after a refresh are briefly highlighted. */
-export function LatestMeasurementsTable({ measurements, metrics }: { measurements: Measurement[]; metrics: ReportedMetric[] }) {
-  const styles = useStyles()
+/** Keys of the measurements added since the previous list (none for the first one), kept for HIGHLIGHT_MS. */
+function useFreshKeys(measurements: Measurement[]): Set<string> {
   const seen = useRef<Set<string> | null>(null)
   const [fresh, setFresh] = useState<Set<string>>(new Set())
 
   useEffect(() => {
-    const keys = measurements.map(key)
+    const keys = measurements.map(measurementKey)
     if (seen.current !== null) {
       const added = keys.filter((k) => !seen.current!.has(k))
       if (added.length > 0) {
@@ -52,14 +51,21 @@ export function LatestMeasurementsTable({ measurements, metrics }: { measurement
     seen.current = new Set(keys)
   }, [measurements])
 
+  return fresh
+}
+
+/** Latest measurements, most recent first; rows that appear after a refresh are briefly highlighted. */
+export function LatestMeasurementsTable({ measurements, metrics }: { measurements: Measurement[]; metrics: ReportedMetric[] }) {
+  const styles = useStyles()
+  const fresh = useFreshKeys(measurements)
   const unit = (metric: string) => metrics.find((m) => m.metric === metric)?.unit
-  const cols = columns(measurements, metrics)
+  const columns = metricColumns(measurements, metrics)
   return (
     <Table aria-label="Latest measurements" size="small">
       <TableHeader>
         <TableRow>
           <TableHeaderCell>Measured</TableHeaderCell>
-          {cols.map((c) => (
+          {columns.map((c) => (
             <TableHeaderCell key={c}>
               {c}
               {unit(c) ? ` (${unit(c)})` : ''}
@@ -70,11 +76,15 @@ export function LatestMeasurementsTable({ measurements, metrics }: { measurement
       </TableHeader>
       <TableBody>
         {measurements.map((m) => (
-          <TableRow key={key(m)} className={fresh.has(key(m)) ? styles.fresh : undefined} data-fresh={fresh.has(key(m)) || undefined}>
+          <TableRow
+            key={measurementKey(m)}
+            className={fresh.has(measurementKey(m)) ? styles.fresh : undefined}
+            data-fresh={fresh.has(measurementKey(m)) || undefined}
+          >
             <TableCell>
               <Timestamp value={m.measuredAt} />
             </TableCell>
-            {cols.map((c) => (
+            {columns.map((c) => (
               <TableCell key={c} className={styles.number}>
                 {m.metrics[c] === undefined ? '–' : String(m.metrics[c])}
               </TableCell>

@@ -1,4 +1,4 @@
-import type { CertificateStatus, SiteCertificate } from '../../api/types'
+import type { CertificateChange, CertificateStatus, SiteCertificate } from '../../api/types'
 
 export type TrustStatus = CertificateStatus | 'none'
 
@@ -28,7 +28,7 @@ export function shortFingerprint(fingerprint: string): string {
 
 export const SITE_ID_PATTERN = /^[a-z0-9]+(-[a-z0-9]+)*$/
 
-export const MAX_CERTIFICATE_BYTES = 64 * 1024
+const MAX_CERTIFICATE_BYTES = 64 * 1024
 const EXTENSIONS = ['.pem', '.crt', '.cer', '.der']
 
 /** Quick checks only; the server validates the certificate itself (CA, validity, no private key, duplicates). */
@@ -37,4 +37,16 @@ export function checkFile(file: File | undefined): string | undefined {
   if (!EXTENSIONS.some((ext) => file.name.toLowerCase().endsWith(ext))) return 'Choose a .pem, .crt, .cer or .der certificate file.'
   if (file.size > MAX_CERTIFICATE_BYTES) return 'The file is larger than 64 KB; upload a single certificate.'
   return undefined
+}
+
+/** Outcome of a trust change and of its device operation, e.g. "Certificate 86aa be6f 0d59 7c21 … removed. 3 device(s) disabled." */
+export function certificateChangeText(change: CertificateChange, verb: 'added' | 'removed'): string {
+  const operation = change.deviceOperation
+  const devices =
+    operation === null
+      ? ''
+      : operation.status === 'PENDING'
+        ? ` ${operation.kind === 'DISABLE_DEVICES' ? 'Disabling' : 'Re-enabling'} ${operation.deviceCount} device(s) in the background.`
+        : ` ${operation.deviceCount} device(s) ${operation.kind === 'DISABLE_DEVICES' ? 'disabled' : 're-enabled'}.`
+  return `Certificate ${shortFingerprint(change.certificate.fingerprint)} ${verb}.${devices}`
 }

@@ -6,6 +6,7 @@ import { RouterProvider, createBrowserRouter } from 'react-router'
 import { ApiClient } from './api/client'
 import { loginRequest, msalSession } from './auth/msal'
 import type { RuntimeConfig } from './config'
+import type { Features } from './features'
 import { PortalProviders } from './providers'
 import { createQueryClient } from './queryClient'
 import { routes } from './routes'
@@ -46,9 +47,19 @@ function Portal({ msal, config }: { msal: PublicClientApplication; config: Runti
       session={state.session}
       api={state.api}
       queryClient={state.queryClient}
-      features={{ assistant: config.assistantEnabled, anomalies: config.anomaliesEnabled, anomalySites: config.anomalySites, digests: config.digestsEnabled, maintenance: config.maintenanceEnabled }}
+      features={featuresOf(config)}
     >
       <RouterProvider router={state.router} />
     </PortalProviders>
   )
+}
+
+function featuresOf(config: RuntimeConfig): Features {
+  return {
+    assistant: config.assistantEnabled,
+    anomalies: config.anomaliesEnabled,
+    anomalySites: config.anomalySites,
+    digests: config.digestsEnabled,
+    maintenance: config.maintenanceEnabled,
+  }
 }

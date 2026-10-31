@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { Series } from '../api/types'
-import { buildChartOption, metricLabel } from './chartOption'
+import { metricLabel } from '../metricLabel'
+import { buildChartOption } from './chartOption'
 
 const labels = { temperature: 'Air temperature (°C)', humidity: 'Relative humidity (%)' }
 

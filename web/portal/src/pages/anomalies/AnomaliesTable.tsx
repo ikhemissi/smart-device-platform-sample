@@ -16,8 +16,8 @@ import {
 import { Link } from 'react-router'
 import type { Anomaly, AnomalyStatus } from '../../api/types'
 import { Timestamp } from '../../components/Timestamp'
-import { metricLabel } from '../../components/chartOption'
 import { formatAbsolute, formatRelative } from '../../format'
+import { metricLabel } from '../../metricLabel'
 import { KIND_LABELS, STATUS_LABELS, VERDICT_LABELS, classificationText, deviceLink, durationText, observedText, usualText } from './anomalyText'
 
 const useStyles = makeStyles({
@@ -38,7 +38,7 @@ const BADGES: Record<AnomalyStatus, { appearance: 'filled' | 'tint' | 'outline';
   pending: { appearance: 'outline', color: 'informative' },
 }
 
-export function AnomalyStatusBadge({ status }: { status: AnomalyStatus }) {
+function AnomalyStatusBadge({ status }: { status: AnomalyStatus }) {
   return (
     <Badge shape="rounded" {...BADGES[status]}>
       {STATUS_LABELS[status]}

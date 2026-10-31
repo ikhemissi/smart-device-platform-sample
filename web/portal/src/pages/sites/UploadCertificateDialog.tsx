@@ -1,30 +1,32 @@
-import { Body1, Button, Dialog, DialogActions, DialogBody, DialogContent, DialogSurface, DialogTitle, Field, MessageBar, MessageBarBody, MessageBarTitle, makeStyles, tokens } from '@fluentui/react-components'
+import { Body1, Button, DialogActions, DialogBody, DialogContent, DialogTitle, Field, MessageBar, MessageBarBody, MessageBarTitle, makeStyles, tokens } from '@fluentui/react-components'
 import { type FormEvent, useId, useState } from 'react'
 import { ApiError } from '../../api/client'
 import { explain } from '../../api/errors'
 import { useAddSiteCertificate } from '../../api/queries'
 import type { CertificateChange } from '../../api/types'
+import { ModalDialog } from '../../components/ModalDialog'
 import { checkFile } from './trust'
-import { useOpenKey } from '../../components/useOpenKey'
 
 const useStyles = makeStyles({ form: { display: 'flex', flexDirection: 'column', gap: tokens.spacingVerticalM } })
 
+interface Props {
+  siteId: string
+  onClose: () => void
+  onAdded: (change: CertificateChange) => void
+}
 
-export function UploadCertificateDialog(props: { open: boolean; siteId: string; onClose: () => void; onAdded: (change: CertificateChange) => void }) {
-  const key = useOpenKey(props.open)
+export function UploadCertificateDialog({ open, ...props }: Props & { open: boolean }) {
   return (
-    <Dialog key={key} open={props.open} modalType="modal" onOpenChange={(_, data) => !data.open && props.onClose()}>
-      <DialogSurface aria-describedby={undefined}>
-        {props.open && <UploadCertificateForm siteId={props.siteId} onClose={props.onClose} onAdded={props.onAdded} />}
-      </DialogSurface>
-    </Dialog>
+    <ModalDialog open={open} onClose={props.onClose}>
+      {open && <UploadCertificateForm {...props} />}
+    </ModalDialog>
   )
 }
 
-function UploadCertificateForm(props: { siteId: string; onClose: () => void; onAdded: (change: CertificateChange) => void }) {
+function UploadCertificateForm({ siteId, onClose, onAdded }: Props) {
   const styles = useStyles()
   const inputId = useId()
-  const add = useAddSiteCertificate(props.siteId)
+  const add = useAddSiteCertificate(siteId)
   const [file, setFile] = useState<File>()
   const [error, setError] = useState<{ title: string; detail: string }>()
 
@@ -36,56 +38,59 @@ function UploadCertificateForm(props: { siteId: string; onClose: () => void; onA
       return
     }
     try {
-      props.onAdded(await add.mutateAsync(file!))
+      onAdded(await add.mutateAsync(file!))
     } catch (e) {
-      if (e instanceof ApiError && (e.status === 400 || e.status === 409)) {
-        setError({ title: 'The certificate was not added', detail: e.problem.detail ?? e.message })
-      } else if (e instanceof ApiError && e.status === 503) {
-        setError({ title: 'The certificate was not added', detail: 'Device provisioning could not be updated right now; nothing was changed. Try again in a moment.' })
-      } else {
-        setError({ title: 'The certificate was not added', detail: explain(e) })
-      }
+      setError({ title: 'The certificate was not added', detail: rejectionDetail(e) })
     }
   }
 
   return (
-    <>
-        <form onSubmit={(event) => void submit(event)} noValidate>
-          <DialogBody>
-            <DialogTitle>Add a certificate to {props.siteId}</DialogTitle>
-            <DialogContent className={styles.form}>
-              {error && (
-                <MessageBar intent="error" layout="multiline" role="alert">
-                  <MessageBarBody>
-                    <MessageBarTitle>{error.title}</MessageBarTitle>
-                    {error.detail}
-                  </MessageBarBody>
-                </MessageBar>
-              )}
-              <Body1>
-                Upload the certificate of the authority (CA) that issues this site's device certificates. Devices it issued can
-                join within 5 minutes. Never upload a private key.
-              </Body1>
-              <Field label={{ children: 'Certificate file', htmlFor: inputId }} required hint="PEM or DER, at most 64 KB">
-                <input
-                  id={inputId}
-                  type="file"
-                  accept=".pem,.crt,.cer,.der"
-                  onChange={(event) => {
-                    setFile(event.target.files?.[0])
-                    setError(undefined)
-                  }}
-                />
-              </Field>
-            </DialogContent>
-            <DialogActions>
-              <Button onClick={props.onClose}>Cancel</Button>
-              <Button appearance="primary" type="submit" disabled={add.isPending}>
-                {add.isPending ? 'Adding…' : 'Add certificate'}
-              </Button>
-            </DialogActions>
-          </DialogBody>
-        </form>
-      </>
+    <form onSubmit={(event) => void submit(event)} noValidate>
+      <DialogBody>
+        <DialogTitle>Add a certificate to {siteId}</DialogTitle>
+        <DialogContent className={styles.form}>
+          {error && (
+            <MessageBar intent="error" layout="multiline" role="alert">
+              <MessageBarBody>
+                <MessageBarTitle>{error.title}</MessageBarTitle>
+                {error.detail}
+              </MessageBarBody>
+            </MessageBar>
+          )}
+          <Body1>
+            Upload the certificate of the authority (CA) that issues this site's device certificates. Devices it issued can
+            join within 5 minutes. Never upload a private key.
+          </Body1>
+          <Field label={{ children: 'Certificate file', htmlFor: inputId }} required hint="PEM or DER, at most 64 KB">
+            <input
+              id={inputId}
+              type="file"
+              accept=".pem,.crt,.cer,.der"
+              onChange={(event) => {
+                setFile(event.target.files?.[0])
+                setError(undefined)
+              }}
+            />
+          </Field>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={onClose}>Cancel</Button>
+          <Button appearance="primary" type="submit" disabled={add.isPending}>
+            {add.isPending ? 'Adding…' : 'Add certificate'}
+          </Button>
+        </DialogActions>
+      </DialogBody>
+    </form>
   )
+}
+
+/** Why the API did not add the certificate: its own explanation of an invalid certificate, or a generic one. */
+function rejectionDetail(error: unknown): string {
+  if (error instanceof ApiError && (error.status === 400 || error.status === 409)) {
+    return error.problem.detail ?? error.message
+  }
+  if (error instanceof ApiError && error.status === 503) {
+    return 'Device provisioning could not be updated right now; nothing was changed. Try again in a moment.'
+  }
+  return explain(error)
 }

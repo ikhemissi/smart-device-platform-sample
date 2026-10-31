@@ -1,18 +1,13 @@
 import {
   Body1,
   Button,
-  Dialog,
   DialogActions,
   DialogBody,
   DialogContent,
-  DialogSurface,
   DialogTitle,
   Field,
-  MessageBar,
-  MessageBarBody,
   Radio,
   RadioGroup,
-  Textarea,
   makeStyles,
   tokens,
 } from '@fluentui/react-components'
@@ -21,12 +16,12 @@ import { ApiError } from '../../api/client'
 import { explain } from '../../api/errors'
 import { useReviewAnomaly } from '../../api/queries'
 import type { Anomaly, ReviewVerdict } from '../../api/types'
-import { metricLabel } from '../../components/chartOption'
-import { useOpenKey } from '../../components/useOpenKey'
+import { CommentField } from '../../components/CommentField'
+import { FormError } from '../../components/FormError'
+import { ModalDialog } from '../../components/ModalDialog'
 import { formatAbsolute } from '../../format'
+import { metricLabel } from '../../metricLabel'
 import { VERDICT_LABELS, classificationText } from './anomalyText'
-
-export const MAX_COMMENT = 1000
 
 const useStyles = makeStyles({
   form: { display: 'flex', flexDirection: 'column', gap: tokens.spacingVerticalM },
@@ -42,11 +37,10 @@ interface Props {
 
 /** Editors record whether the automated classification is correct, with an optional comment. */
 export function ReviewAnomalyDialog(props: Props) {
-  const key = useOpenKey(!!props.anomaly)
   return (
-    <Dialog key={key} open={!!props.anomaly} modalType="modal" onOpenChange={(_, data) => !data.open && props.onClose()}>
-      <DialogSurface aria-describedby={undefined}>{props.anomaly && <ReviewForm {...props} anomaly={props.anomaly} />}</DialogSurface>
-    </Dialog>
+    <ModalDialog open={!!props.anomaly} onClose={props.onClose}>
+      {props.anomaly && <ReviewForm {...props} anomaly={props.anomaly} />}
+    </ModalDialog>
   )
 }
 
@@ -89,11 +83,7 @@ function ReviewForm({ anomaly, metricName = metricLabel, onClose, onReviewed }: 
       <DialogBody>
         <DialogTitle>Review this anomaly</DialogTitle>
         <DialogContent className={styles.form}>
-          {errors.form && (
-            <MessageBar intent="error" role="alert">
-              <MessageBarBody>{errors.form}</MessageBarBody>
-            </MessageBar>
-          )}
+          <FormError message={errors.form} />
           <Body1>
             {metricName(anomaly.metric, anomaly.unit)} of {anomaly.deviceName ?? anomaly.deviceId}, from {formatAbsolute(anomaly.startedAt)}: classified as{' '}
             <strong>{classificationText(anomaly) ?? 'not classified'}</strong>.
@@ -104,9 +94,7 @@ function ReviewForm({ anomaly, metricName = metricLabel, onClose, onReviewed }: 
               <Radio value="incorrect" label={VERDICT_LABELS.incorrect} />
             </RadioGroup>
           </Field>
-          <Field label="Comment" hint={`Optional · ${comment.length}/${MAX_COMMENT} characters`} validationMessage={errors.comment}>
-            <Textarea resize="vertical" maxLength={MAX_COMMENT} value={comment} onChange={(_, d) => setComment(d.value)} />
-          </Field>
+          <CommentField value={comment} error={errors.comment} onChange={setComment} />
         </DialogContent>
         <DialogActions>
           <Button onClick={onClose}>Cancel</Button>

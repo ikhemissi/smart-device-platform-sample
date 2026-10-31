@@ -66,35 +66,28 @@ export class ApiClient {
   }
 
   devices(query: DeviceQuery): Promise<DevicePage> {
-    const params = new URLSearchParams()
-    for (const [key, value] of Object.entries(query)) {
-      if (value !== undefined && value !== '') {
-        params.set(key, String(value))
-      }
-    }
-    return this.json(`/devices?${params}`)
+    return this.json(`/devices?${queryParams(query)}`)
   }
 
   async device(deviceId: string): Promise<Versioned<DeviceDetails>> {
-    const response = await this.request(`/devices/${encodeURIComponent(deviceId)}`)
-    return { value: (await response.json()) as DeviceDetails, etag: response.headers.get('ETag') ?? '' }
+    return versioned(await this.request(devicePath(deviceId)))
   }
 
   async updateDevice(deviceId: string, etag: string, edit: Partial<DeviceEdit>): Promise<Versioned<DeviceDetails>> {
-    const response = await this.request(`/devices/${encodeURIComponent(deviceId)}`, {
+    const response = await this.request(devicePath(deviceId), {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/merge-patch+json', 'If-Match': etag },
       body: JSON.stringify(edit),
     })
-    return { value: (await response.json()) as DeviceDetails, etag: response.headers.get('ETag') ?? '' }
+    return versioned(response)
   }
 
   latestMeasurements(deviceId: string, count = 20): Promise<Measurement[]> {
-    return this.json(`/devices/${encodeURIComponent(deviceId)}/measurements/latest?count=${count}`)
+    return this.json(devicePath(deviceId, `/measurements/latest?count=${count}`))
   }
 
   deviceMetrics(deviceId: string): Promise<ReportedMetric[]> {
-    return this.json(`/devices/${encodeURIComponent(deviceId)}/metrics`)
+    return this.json(devicePath(deviceId, '/metrics'))
   }
 
   /** `to` omitted: the server uses its own "now" (no client clock skew). */
@@ -103,15 +96,11 @@ export class ApiClient {
     if (to) {
       params.set('to', to.toISOString())
     }
-    return this.json(`/devices/${encodeURIComponent(deviceId)}/series?${params}`)
+    return this.json(devicePath(deviceId, `/series?${params}`))
   }
 
   async createSite(siteId: string, displayName: string): Promise<void> {
-    await this.request('/sites', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ siteId, displayName }),
-    })
+    await this.request('/sites', jsonRequest('POST', { siteId, displayName }))
   }
 
   allSiteCertificates(): Promise<SiteCertificate[]> {
@@ -119,76 +108,57 @@ export class ApiClient {
   }
 
   siteCertificates(siteId: string): Promise<SiteCertificate[]> {
-    return this.json(`/sites/${encodeURIComponent(siteId)}/certificates`)
+    return this.json(sitePath(siteId, '/certificates'))
   }
 
   siteAudit(siteId: string): Promise<AuditEvent[]> {
-    return this.json(`/sites/${encodeURIComponent(siteId)}/audit?limit=20`)
+    return this.json(sitePath(siteId, '/audit?limit=20'))
   }
 
-  async addSiteCertificate(siteId: string, file: File): Promise<CertificateChange> {
+  addSiteCertificate(siteId: string, file: File): Promise<CertificateChange> {
     const form = new FormData()
     form.append('file', file)
-    const response = await this.request(`/sites/${encodeURIComponent(siteId)}/certificates`, { method: 'POST', body: form })
-    return (await response.json()) as CertificateChange
+    return this.json(sitePath(siteId, '/certificates'), { method: 'POST', body: form })
   }
 
-  async removeSiteCertificate(siteId: string, fingerprint: string): Promise<CertificateChange> {
-    const response = await this.request(`/sites/${encodeURIComponent(siteId)}/certificates/${fingerprint}`, { method: 'DELETE' })
-    return (await response.json()) as CertificateChange
+  removeSiteCertificate(siteId: string, fingerprint: string): Promise<CertificateChange> {
+    return this.json(sitePath(siteId, `/certificates/${fingerprint}`), { method: 'DELETE' })
   }
 
   siteDigest(siteId: string): Promise<SiteDigest> {
-    return this.json(`/sites/${encodeURIComponent(siteId)}/digest`)
+    return this.json(sitePath(siteId, '/digest'))
   }
 
   /** Asks the digest job for a new digest; an existing pending request is returned. */
-  async requestSiteDigest(siteId: string): Promise<DigestRequest> {
-    const response = await this.request(`/sites/${encodeURIComponent(siteId)}/digest/requests`, { method: 'POST' })
-    return (await response.json()) as DigestRequest
+  requestSiteDigest(siteId: string): Promise<DigestRequest> {
+    return this.json(sitePath(siteId, '/digest/requests'), { method: 'POST' })
   }
 
   thresholds(deviceId: string): Promise<Threshold[]> {
-    return this.json(`/devices/${encodeURIComponent(deviceId)}/thresholds`)
+    return this.json(devicePath(deviceId, '/thresholds'))
   }
 
-  async createThreshold(deviceId: string, input: ThresholdInput): Promise<Threshold> {
-    const response = await this.request(`/devices/${encodeURIComponent(deviceId)}/thresholds`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(input),
-    })
-    return (await response.json()) as Threshold
+  createThreshold(deviceId: string, input: ThresholdInput): Promise<Threshold> {
+    return this.json(devicePath(deviceId, '/thresholds'), jsonRequest('POST', input))
   }
 
-  async updateThreshold(deviceId: string, threshold: Threshold, input: ThresholdInput): Promise<Threshold> {
-    const response = await this.request(`/devices/${encodeURIComponent(deviceId)}/thresholds/${threshold.id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json', 'If-Match': threshold.etag },
-      body: JSON.stringify(input),
-    })
-    return (await response.json()) as Threshold
+  updateThreshold(deviceId: string, threshold: Threshold, input: ThresholdInput): Promise<Threshold> {
+    return this.json(devicePath(deviceId, `/thresholds/${threshold.id}`), jsonRequest('PUT', input, { 'If-Match': threshold.etag }))
   }
 
   async deleteThreshold(deviceId: string, threshold: Threshold): Promise<void> {
-    await this.request(`/devices/${encodeURIComponent(deviceId)}/thresholds/${threshold.id}`, {
+    await this.request(devicePath(deviceId, `/thresholds/${threshold.id}`), {
       method: 'DELETE',
       headers: { 'If-Match': threshold.etag },
     })
   }
 
   deviceAlerts(deviceId: string): Promise<Alert[]> {
-    return this.json(`/devices/${encodeURIComponent(deviceId)}/alerts?limit=50`)
+    return this.json(devicePath(deviceId, '/alerts?limit=50'))
   }
 
   anomalies(query: AnomalyQuery): Promise<Anomaly[]> {
-    const params = new URLSearchParams()
-    for (const [key, value] of Object.entries(query)) {
-      if (value !== undefined && value !== '') {
-        params.set(key, Array.isArray(value) ? value.join(',') : String(value))
-      }
-    }
-    return this.json(`/anomalies?${params}`)
+    return this.json(`/anomalies?${queryParams(query)}`)
   }
 
   /** `to` omitted: the server uses its own "now". */
@@ -197,16 +167,11 @@ export class ApiClient {
     if (to) {
       params.set('to', to.toISOString())
     }
-    return this.json(`/devices/${encodeURIComponent(deviceId)}/anomalies?${params}`)
+    return this.json(devicePath(deviceId, `/anomalies?${params}`))
   }
 
-  async reviewAnomaly(id: number, verdict: ReviewVerdict, comment: string | null): Promise<Anomaly> {
-    const response = await this.request(`/anomalies/${id}/review`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ verdict, comment }),
-    })
-    return (await response.json()) as Anomaly
+  reviewAnomaly(id: number, verdict: ReviewVerdict, comment: string | null): Promise<Anomaly> {
+    return this.json(`/anomalies/${id}/review`, jsonRequest('POST', { verdict, comment }))
   }
 
   maintenance(query: MaintenanceQuery): Promise<MaintenanceItem[]> {
@@ -217,20 +182,15 @@ export class ApiClient {
   }
 
   deviceMaintenance(deviceId: string): Promise<DeviceMaintenance> {
-    return this.json(`/devices/${encodeURIComponent(deviceId)}/maintenance`)
+    return this.json(devicePath(deviceId, '/maintenance'))
   }
 
-  async setMaintenanceStatus(id: number, status: 'planned' | 'done', comment: string | null): Promise<MaintenanceItem> {
-    const response = await this.request(`/maintenance/${id}/status`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status, comment }),
-    })
-    return (await response.json()) as MaintenanceItem
+  setMaintenanceStatus(id: number, status: 'planned' | 'done', comment: string | null): Promise<MaintenanceItem> {
+    return this.json(`/maintenance/${id}/status`, jsonRequest('POST', { status, comment }))
   }
 
   createConversation(): Promise<AssistantConversation> {
-    return this.request('/agent/conversations', { method: 'POST' }).then((r) => r.json() as Promise<AssistantConversation>)
+    return this.json('/agent/conversations', { method: 'POST' })
   }
 
   async deleteConversation(id: string): Promise<void> {
@@ -272,8 +232,8 @@ export class ApiClient {
     throw new ApiError(0, { title: 'Interrupted', detail: 'The answer was interrupted. Try again.' })
   }
 
-  private async json<T>(path: string): Promise<T> {
-    return (await (await this.request(path)).json()) as T
+  private async json<T>(path: string, init?: RequestInit): Promise<T> {
+    return (await (await this.request(path, init)).json()) as T
   }
 
   private async request(path: string, init: RequestInit = {}): Promise<Response> {
@@ -306,7 +266,7 @@ export class ApiClient {
 }
 
 /** Server-Sent Events of a fetch response (`event:` and `data:` fields; comments and pings are skipped). */
-export async function* readEvents(response: Response): AsyncGenerator<{ name: string; data: string }> {
+async function* readEvents(response: Response): AsyncGenerator<{ name: string; data: string }> {
   const reader = response.body!.pipeThrough(new TextDecoderStream()).getReader()
   let buffer = ''
   for (;;) {
@@ -333,4 +293,31 @@ export async function* readEvents(response: Response): AsyncGenerator<{ name: st
       }
     }
   }
+}
+
+function devicePath(deviceId: string, rest = ''): string {
+  return `/devices/${encodeURIComponent(deviceId)}${rest}`
+}
+
+function sitePath(siteId: string, rest = ''): string {
+  return `/sites/${encodeURIComponent(siteId)}${rest}`
+}
+
+/** Query string of the set values (lists comma-separated); undefined and empty values are left out. */
+function queryParams(query: object): URLSearchParams {
+  const params = new URLSearchParams()
+  for (const [key, value] of Object.entries(query)) {
+    if (value !== undefined && value !== '') {
+      params.set(key, Array.isArray(value) ? value.join(',') : String(value))
+    }
+  }
+  return params
+}
+
+function jsonRequest(method: string, body: unknown, headers: Record<string, string> = {}): RequestInit {
+  return { method, headers: { 'Content-Type': 'application/json', ...headers }, body: JSON.stringify(body) }
+}
+
+async function versioned(response: Response): Promise<Versioned<DeviceDetails>> {
+  return { value: (await response.json()) as DeviceDetails, etag: response.headers.get('ETag') ?? '' }
 }

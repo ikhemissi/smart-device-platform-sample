@@ -17,13 +17,16 @@ import {
 } from '@fluentui/react-components'
 import { AddRegular, DeleteRegular, EditRegular } from '@fluentui/react-icons'
 import { useState } from 'react'
-import { useCurrentUser, useDeviceAlerts, useThresholds } from '../../api/queries'
+import { useCanWrite, useDeviceAlerts, useThresholds } from '../../api/queries'
 import type { Alert, ReportedMetric, Threshold } from '../../api/types'
 import { Timestamp } from '../../components/Timestamp'
-import { metricLabel } from '../../components/chartOption'
+import { metricLabeler } from '../../metricLabel'
 import { DeleteThresholdDialog } from './DeleteThresholdDialog'
 import { ThresholdDialog } from './ThresholdDialog'
-import { alertSummary, notificationSummary, quantity, rangeText } from './thresholdForm'
+import { alertSummary, notificationSummary, quantity, rangeText } from './alertText'
+
+/** Thresholds per device accepted by the API. */
+const MAX_THRESHOLDS = 20
 
 const useStyles = makeStyles({
   header: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: tokens.spacingHorizontalM },
@@ -31,19 +34,12 @@ const useStyles = makeStyles({
   failed: { color: tokens.colorPaletteRedForeground1 },
 })
 
-function useLabel(metrics: ReportedMetric[]) {
-  return (metric: string, unit?: string | null) => {
-    const m = metrics.find((r) => r.metric === metric)
-    return metricLabel(metric, unit ?? m?.unit, m?.description)
-  }
-}
-
 /** Thresholds of a device: visible to everyone; create, edit, enable/disable and delete for Editors. */
 export function ThresholdsCard({ deviceId, metrics }: { deviceId: string; metrics: ReportedMetric[] }) {
   const styles = useStyles()
-  const canWrite = useCurrentUser().data?.canWrite === true
+  const canWrite = useCanWrite()
   const thresholds = useThresholds(deviceId)
-  const label = useLabel(metrics)
+  const label = metricLabeler(metrics)
   const [editing, setEditing] = useState<{ threshold?: Threshold } | undefined>()
   const [deleting, setDeleting] = useState<Threshold>()
 
@@ -52,7 +48,7 @@ export function ThresholdsCard({ deviceId, metrics }: { deviceId: string; metric
       <div className={styles.header}>
         <Subtitle1 as="h2">Thresholds</Subtitle1>
         {canWrite && (
-          <Button icon={<AddRegular />} onClick={() => setEditing({})} disabled={metrics.length === 0 || (thresholds.data?.length ?? 0) >= 20}>
+          <Button icon={<AddRegular />} onClick={() => setEditing({})} disabled={metrics.length === 0 || (thresholds.data?.length ?? 0) >= MAX_THRESHOLDS}>
             Add threshold
           </Button>
         )}
@@ -78,15 +74,7 @@ export function ThresholdsCard({ deviceId, metrics }: { deviceId: string; metric
                 <TableCell>{label(t.metric, t.unit)}</TableCell>
                 <TableCell>{rangeText(t.min, t.max, t.unit)}</TableCell>
                 <TableCell>{t.recipients.join(', ')}</TableCell>
-                <TableCell>
-                  {!t.enabled ? (
-                    <Badge appearance="tint" color="subtle" shape="rounded">Disabled</Badge>
-                  ) : t.openAlertId ? (
-                    <Badge appearance="filled" color="danger" shape="rounded">Alerting</Badge>
-                  ) : (
-                    <Badge appearance="tint" color="success" shape="rounded">Watching</Badge>
-                  )}
-                </TableCell>
+                <TableCell><ThresholdStatusBadge threshold={t} /></TableCell>
                 {canWrite && (
                   <TableCell>
                     <Button appearance="subtle" icon={<EditRegular />} aria-label={`Edit threshold on ${label(t.metric)}`} onClick={() => setEditing({ threshold: t })} />
@@ -108,6 +96,12 @@ export function ThresholdsCard({ deviceId, metrics }: { deviceId: string; metric
   )
 }
 
+function ThresholdStatusBadge({ threshold }: { threshold: Threshold }) {
+  if (!threshold.enabled) return <Badge appearance="tint" color="subtle" shape="rounded">Disabled</Badge>
+  if (threshold.openAlertId) return <Badge appearance="filled" color="danger" shape="rounded">Alerting</Badge>
+  return <Badge appearance="tint" color="success" shape="rounded">Watching</Badge>
+}
+
 function AlertStatusBadge({ alert }: { alert: Alert }) {
   if (alert.status === 'OPEN') return <Badge appearance="filled" color="danger" shape="rounded">Open</Badge>
   if (alert.status === 'CLOSED') return <Badge appearance="tint" color="success" shape="rounded">Back to normal</Badge>
@@ -118,7 +112,7 @@ function AlertStatusBadge({ alert }: { alert: Alert }) {
 export function AlertsCard({ deviceId, metrics }: { deviceId: string; metrics: ReportedMetric[] }) {
   const styles = useStyles()
   const alerts = useDeviceAlerts(deviceId)
-  const label = useLabel(metrics)
+  const label = metricLabeler(metrics)
 
   return (
     <Card>

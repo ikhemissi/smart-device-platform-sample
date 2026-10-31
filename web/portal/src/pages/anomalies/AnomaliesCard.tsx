@@ -1,10 +1,10 @@
 import { Body1, Card, Spinner, Subtitle1, Switch, makeStyles, tokens } from '@fluentui/react-components'
 import { useState } from 'react'
-import { useCurrentUser, useDeviceAnomalies } from '../../api/queries'
+import { useCanWrite, useDeviceAnomalies } from '../../api/queries'
 import type { Anomaly, ReportedMetric } from '../../api/types'
 import { ErrorState } from '../../components/ErrorState'
-import { metricLabel } from '../../components/chartOption'
 import { useFeatures } from '../../features'
+import { metricLabeler } from '../../metricLabel'
 import { AnomaliesTable } from './AnomaliesTable'
 import { ReviewAnomalyDialog } from './ReviewAnomalyDialog'
 import { DEVICE_STATUSES, DEVICE_STATUSES_WITH_DISMISSED } from './anomalyText'
@@ -42,7 +42,7 @@ export function AnomaliesCard(props: Props) {
 }
 
 function DeviceAnomalies({ deviceId, metrics, period, presetMs, from, to, showDismissed }: Props & { showDismissed: boolean }) {
-  const canWrite = useCurrentUser().data?.canWrite === true
+  const canWrite = useCanWrite()
   const anomalies = useDeviceAnomalies({
     deviceId,
     status: showDismissed ? DEVICE_STATUSES_WITH_DISMISSED : DEVICE_STATUSES,
@@ -52,10 +52,7 @@ function DeviceAnomalies({ deviceId, metrics, period, presetMs, from, to, showDi
     to,
   })
   const [reviewing, setReviewing] = useState<Anomaly>()
-  const metricName = (metric: string, unit: string | null) => {
-    const m = metrics.find((r) => r.metric === metric)
-    return metricLabel(metric, unit ?? m?.unit, m?.description)
-  }
+  const metricName = metricLabeler(metrics)
 
   if (anomalies.isError && !anomalies.data) {
     return <ErrorState title="The anomalies could not be loaded" error={anomalies.error} onRetry={() => void anomalies.refetch()} />

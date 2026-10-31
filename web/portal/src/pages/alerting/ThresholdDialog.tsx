@@ -1,10 +1,8 @@
 import {
   Button,
-  Dialog,
   DialogActions,
   DialogBody,
   DialogContent,
-  DialogSurface,
   DialogTitle,
   Dropdown,
   Field,
@@ -22,8 +20,9 @@ import { ApiError } from '../../api/client'
 import { explain } from '../../api/errors'
 import { useSaveThreshold } from '../../api/queries'
 import type { ReportedMetric, Threshold } from '../../api/types'
-import { metricLabel } from '../../components/chartOption'
-import { useOpenKey } from '../../components/useOpenKey'
+import { FormError } from '../../components/FormError'
+import { ModalDialog } from '../../components/ModalDialog'
+import { metricLabeler } from '../../metricLabel'
 import { type ThresholdFormErrors, initialValues, validate } from './thresholdForm'
 
 const useStyles = makeStyles({
@@ -42,24 +41,23 @@ interface Props {
 
 /** Create or edit a threshold (Editors). The API applies the same rules and stays authoritative. */
 export function ThresholdDialog(props: Props) {
-  const key = useOpenKey(props.open)
   return (
-    <Dialog key={key} open={props.open} modalType="modal" onOpenChange={(_, data) => !data.open && props.onClose()}>
-      <DialogSurface aria-describedby={undefined}>{props.open && <ThresholdForm {...props} />}</DialogSurface>
-    </Dialog>
+    <ModalDialog open={props.open} onClose={props.onClose}>
+      {props.open && <ThresholdForm {...props} />}
+    </ModalDialog>
   )
 }
 
 function ThresholdForm({ deviceId, metrics, threshold, onClose }: Props) {
   const styles = useStyles()
   const save = useSaveThreshold(deviceId)
-  const [values, setValues] = useState(() => initialValues(threshold, metrics.find((m) => m.metric === 'temperature')?.metric ?? metrics[0]?.metric))
+  const [values, setValues] = useState(() => {
+    const defaultMetric = metrics.some((m) => m.metric === 'temperature') ? 'temperature' : metrics[0]?.metric
+    return initialValues(threshold, defaultMetric)
+  })
   const [errors, setErrors] = useState<ThresholdFormErrors & { form?: string }>({})
   const unit = metrics.find((m) => m.metric === values.metric)?.unit
-  const label = (metric: string) => {
-    const m = metrics.find((r) => r.metric === metric)
-    return metricLabel(metric, m?.unit, m?.description)
-  }
+  const label = metricLabeler(metrics)
 
   const submit = async (event: FormEvent) => {
     event.preventDefault()
@@ -86,11 +84,7 @@ function ThresholdForm({ deviceId, metrics, threshold, onClose }: Props) {
       <DialogBody>
         <DialogTitle>{threshold ? 'Edit threshold' : 'Add a threshold'}</DialogTitle>
         <DialogContent className={styles.form}>
-          {errors.form && (
-            <MessageBar intent="error" role="alert">
-              <MessageBarBody>{errors.form}</MessageBarBody>
-            </MessageBar>
-          )}
+          <FormError message={errors.form} />
           <Field label="Metric" required validationMessage={errors.metric}>
             <Dropdown
               value={values.metric ? label(values.metric) : ''}

@@ -2,11 +2,13 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tansta
 import { useApi } from './context'
 import type { AnomalyQuery, AnomalyStatus, DeviceEdit, DeviceQuery, MaintenanceQuery, ReviewVerdict, SiteDigest, Threshold, ThresholdInput } from './types'
 
-export const queryKeys = {
+const queryKeys = {
   me: ['me'] as const,
   sites: ['sites'] as const,
+  deviceLists: ['devices', 'list'] as const,
   devices: (query: DeviceQuery) => ['devices', 'list', query] as const,
   device: (deviceId: string) => ['devices', 'detail', deviceId] as const,
+  /** Also the prefix of every site's certificates. */
   allSiteCertificates: ['site-certificates'] as const,
   siteCertificates: (siteId: string) => ['site-certificates', siteId] as const,
   siteAudit: (siteId: string) => ['site-audit', siteId] as const,
@@ -16,10 +18,12 @@ export const queryKeys = {
     ['devices', 'series', deviceId, metrics, period, from, to] as const,
   thresholds: (deviceId: string) => ['devices', 'thresholds', deviceId] as const,
   deviceAlerts: (deviceId: string) => ['devices', 'alerts', deviceId] as const,
+  allAnomalies: ['anomalies'] as const,
   anomalies: (query: AnomalyQuery) => ['anomalies', 'list', query] as const,
   deviceAnomalies: (deviceId: string, status: AnomalyStatus[], period: string, from?: string, to?: string) =>
     ['anomalies', 'device', deviceId, status, period, from, to] as const,
   siteDigest: (siteId: string) => ['site-digest', siteId] as const,
+  allMaintenance: ['maintenance'] as const,
   maintenance: (query: MaintenanceQuery) => ['maintenance', 'list', query] as const,
   deviceMaintenance: (deviceId: string) => ['maintenance', 'device', deviceId] as const,
 }
@@ -27,6 +31,11 @@ export const queryKeys = {
 export function useCurrentUser() {
   const api = useApi()
   return useQuery({ queryKey: queryKeys.me, queryFn: () => api.me(), staleTime: 5 * 60_000 })
+}
+
+/** Whether the signed-in user may edit (Editors); false while the profile loads. */
+export function useCanWrite(): boolean {
+  return useCurrentUser().data?.canWrite === true
 }
 
 export function useSites(enabled = true) {
@@ -62,13 +71,13 @@ export function useUpdateDevice(deviceId: string) {
     mutationFn: ({ etag, edit }: { etag: string; edit: Partial<DeviceEdit> }) => api.updateDevice(deviceId, etag, edit),
     onSuccess: (updated) => {
       client.setQueryData(queryKeys.device(deviceId), updated)
-      return client.invalidateQueries({ queryKey: ['devices', 'list'] })
+      return client.invalidateQueries({ queryKey: queryKeys.deviceLists })
     },
   })
 }
 
 /** While the page is visible, history refreshes every 30 s (TanStack Query pauses intervals in hidden tabs). */
-export const HISTORY_REFRESH_MS = 30_000
+const HISTORY_REFRESH_MS = 30_000
 
 export function useLatestMeasurements(deviceId: string) {
   const api = useApi()
@@ -133,10 +142,10 @@ function useInvalidateTrust() {
   const client = useQueryClient()
   return (siteId: string) =>
     Promise.all([
-      client.invalidateQueries({ queryKey: ['site-certificates'] }),
+      client.invalidateQueries({ queryKey: queryKeys.allSiteCertificates }),
       client.invalidateQueries({ queryKey: queryKeys.siteAudit(siteId) }),
       client.invalidateQueries({ queryKey: queryKeys.sites }),
-      client.invalidateQueries({ queryKey: ['devices', 'list'] }),
+      client.invalidateQueries({ queryKey: queryKeys.deviceLists }),
     ])
 }
 
@@ -258,7 +267,7 @@ export function useReviewAnomaly() {
   const client = useQueryClient()
   return useMutation({
     mutationFn: ({ id, verdict, comment }: { id: number; verdict: ReviewVerdict; comment: string | null }) => api.reviewAnomaly(id, verdict, comment),
-    onSuccess: () => client.invalidateQueries({ queryKey: ['anomalies'] }),
+    onSuccess: () => client.invalidateQueries({ queryKey: queryKeys.allAnomalies }),
   })
 }
 
@@ -294,7 +303,7 @@ export function useSetMaintenanceStatus() {
   return useMutation({
     mutationFn: ({ id, status, comment }: { id: number; status: 'planned' | 'done'; comment: string | null }) =>
       api.setMaintenanceStatus(id, status, comment),
-    onSuccess: () => client.invalidateQueries({ queryKey: ['maintenance'] }),
+    onSuccess: () => client.invalidateQueries({ queryKey: queryKeys.allMaintenance }),
   })
 }
 
