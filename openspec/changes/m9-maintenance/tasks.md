@@ -36,7 +36,7 @@ Tasks marked **[cloud agent]** are implemented and verified offline (no Azure ac
 
 - [x] 5.1 [cloud agent] `list_maintenance` tool (design D10); verify unit tests
 - [x] 5.2 [cloud agent] Digest figures and brief instructions include the maintenance queue (design D10); verify unit tests (figures with and without maintenance, grounding of the counts)
-- [ ] 5.3 [Azure] Deploy the agent and the job image; verify "Which devices need a visit this week?" and a regenerated digest of a site with a queued device
+- [x] 5.3 [Azure] Deploy the agent and the job image; verify "Which devices need a visit this week?" and a regenerated digest of a site with a queued device
 
 ## 6. CI, documentation and demo
 
