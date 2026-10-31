@@ -43,7 +43,7 @@ Devices authenticate with X.509 certificates issued by their site CA; DPS enroll
 
 ## Tenant governance
 
-The tenant's *MCAPSGov* policies would force public network access to *Disabled* on Storage and Key Vault and apply cost controls. As ADR-0008 uses public endpoints protected by Entra authentication, every resource carries the opt-out tags `SecurityControl=Ignore` and `CostControl=Ignore`; local authentication remains disabled everywhere.
+Some tenants' policies force public network access to *Disabled* on Storage and Key Vault, or apply other controls, unless resources carry specific tags. As ADR-0008 uses public endpoints protected by Entra authentication, set the tags your tenant requires in the azd environment (`azd env set RESOURCE_TAGS "key=value,key=value"`): they are applied to every resource, the resource groups and the Terraform state, and never stored in the repository. Local authentication remains disabled everywhere.
 
 ## Verifying
 

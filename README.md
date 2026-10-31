@@ -281,7 +281,7 @@ One trace follows a device message from the decoder to the alert email, and a qu
 | AI access | Models reached with workload identities (no keys); the assistant calls the platform API with the user's token, read-only |
 | Least privilege | One identity per workload with data-plane roles only |
 
-Details: [docs/security.md](docs/security.md). All resources carry the tenant tags `SecurityControl=Ignore` and `CostControl=Ignore`.
+Details: [docs/security.md](docs/security.md).
 
 ## Repository
 
@@ -371,6 +371,7 @@ flowchart LR
 
 | Setting | Default | Effect |
 |---|---|---|
+| `RESOURCE_TAGS` | none | Extra tags on every resource, e.g. `owner=team-a,costCenter=42` (for tags your tenant's policies require) |
 | `ALERTING_SUBSCRIPTION_FILTER` | `siteId = 'paris-01'` | Devices monitored for alerts, e.g. `siteId IN ('paris-01','lyon-01')` |
 | `AGENT_MODEL_NAME` / `AGENT_MODEL_VERSION` | `gpt-6-luna` / `2026-09-22` | AI assistant model |
 | `AGENT_MODEL_SKU` / `AGENT_MODEL_CAPACITY` | `DataZoneStandard` / `50` | Deployment SKU (EU data zone) and thousands of tokens per minute |
@@ -437,7 +438,7 @@ This is a demonstrator: several choices favour a quick, low-cost deployment from
 
 | Area | Recommendation | Why |
 |---|---|---|
-| Network | Private networking: Container Apps environment in a VNet, private endpoints and DNS for PostgreSQL, Redis, Key Vault, Event Hubs, Service Bus (Premium) and Foundry, API Management Standard v2 or Premium, no "allow Azure services" PostgreSQL rule; drop the `SecurityControl=Ignore` / `CostControl=Ignore` tags | Every endpoint is public today, protected by Entra ID only ([ADR-0008](docs/adr/ADR-0008-infrastructure-as-code.md)) |
+| Network | Private networking: Container Apps environment in a VNet, private endpoints and DNS for PostgreSQL, Redis, Key Vault, Event Hubs, Service Bus (Premium) and Foundry, API Management Standard v2 or Premium, no "allow Azure services" PostgreSQL rule | Every endpoint is public today, protected by Entra ID only ([ADR-0008](docs/adr/ADR-0008-infrastructure-as-code.md)) |
 | Device identity | Site CAs from the customer's PKI or an HSM, never readable by the platform; certificate renewal and revocation; no simulator | The demo CA private keys are in Key Vault, readable by the simulator ([security](docs/security.md)) |
 | Real devices | Test with real devices and firmware versions: payload variants, clock drift, intermittent connectivity, battery behaviour across temperatures | Decoders, thresholds and analyses were tuned on simulated devices |
 | Time-series storage | Plan the database capacity from devices × metrics × message rate × retention; consider TimescaleDB (if available on the chosen PostgreSQL offer) or a data platform such as Azure Data Explorer or Fabric Real-Time Intelligence for long history and heavy analytics | Measurements are in partitioned PostgreSQL tables with hourly rollups and a 30-day retention (`SDP_RETENTION`) |

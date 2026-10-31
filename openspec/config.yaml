@@ -14,7 +14,7 @@ context: |
   Devices authenticate with X.509 certificates issued by a per-site CA (DPS enrollment group per site).
   Telemetry/traces/logs/metrics go to Application Insights via OpenTelemetry.
   Infrastructure is Terraform deployed via azd. Region francecentral for everything except Static Web Apps (eastus2; westeurope is blocked by tenant policy).
-  Every resource carries the tenant governance tags SecurityControl=Ignore and CostControl=Ignore.
+  Tags required by a tenant's policies come from the azd environment (RESOURCE_TAGS), never from code.
   A single long-lived Azure environment (azd env sdp-dev) is updated incrementally; tasks verify against it and do
   not create or tear down environments unless explicitly requested.
   Users authenticate with Entra ID; two app roles: DeviceData.Read (query) and DeviceData.Write (edit).

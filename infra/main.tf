@@ -14,13 +14,11 @@ locals {
   token = substr(sha1("${var.subscription_id}-${var.environment_name}"), 0, 8)
   # Alphanumeric prefix for resources that do not accept hyphens (storage, registry).
   compact = substr(replace(lower(var.environment_name), "/[^a-z0-9]/", ""), 0, 10)
-  # Tenant governance (implementation guidelines §7): both tags are required on every resource of the
-  # demonstrator; SecurityControl=Ignore keeps public endpoints (Entra-only access) on Storage and Key Vault.
-  tags = {
-    "azd-env-name"    = var.environment_name
-    "SecurityControl" = "Ignore"
-    "CostControl"     = "Ignore"
-  }
+  # Extra tags from RESOURCE_TAGS ("key=value,key=value"), e.g. those required by a tenant's policies.
+  tags = merge(
+    { for pair in split(",", var.tags) : trimspace(split("=", pair)[0]) => trimspace(join("=", slice(split("=", pair), 1, length(split("=", pair))))) if trimspace(pair) != "" },
+    { "azd-env-name" = var.environment_name },
+  )
   anomaly_detection_enabled = lower(coalesce(var.anomaly_detection_enabled, "true")) != "false"
   anomaly_sites             = coalesce(var.anomaly_sites, "paris-01")
   digest_enabled            = lower(coalesce(var.digest_enabled, "true")) != "false"

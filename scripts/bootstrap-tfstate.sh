@@ -15,8 +15,16 @@ ACCOUNT="${RS_STORAGE_ACCOUNT:-sttfsdp${SUBSCRIPTION_ID:0:8}}"
 CONTAINER="${RS_CONTAINER_NAME:-tfstate}"
 ME="$(az ad signed-in-user show --query id -o tsv)"
 
-# Tenant governance: both tags are required on every resource of this demonstrator (implementation guidelines §7).
-TAGS=(purpose=terraform-state SecurityControl=Ignore CostControl=Ignore)
+# Extra tags from the azd environment's RESOURCE_TAGS ("key=value,key=value"), like the platform's resources.
+ENV_ARGS=()
+[[ -n "${AZURE_ENV_NAME:-}" ]] && ENV_ARGS=(-e "$AZURE_ENV_NAME")
+RESOURCE_TAGS="${RESOURCE_TAGS:-$(azd env get-value "${ENV_ARGS[@]}" RESOURCE_TAGS 2>/dev/null || true)}"
+TAGS=(purpose=terraform-state)
+IFS=',' read -ra EXTRA_TAGS <<< "$RESOURCE_TAGS"
+for tag in "${EXTRA_TAGS[@]}"; do
+  tag="$(echo "$tag" | xargs)"
+  [[ -n "$tag" ]] && TAGS+=("$tag")
+done
 
 az group create -n "$RG" -l "$LOCATION" --tags "${TAGS[@]}" -o none
 if ! az storage account show -n "$ACCOUNT" -g "$RG" -o none 2>/dev/null; then
@@ -36,8 +44,6 @@ fi
 az storage container create -n "$CONTAINER" --account-name "$ACCOUNT" --auth-mode login -o none
 
 # Inside azd hooks AZURE_ENV_NAME designates the environment being provisioned.
-ENV_ARGS=()
-[[ -n "${AZURE_ENV_NAME:-}" ]] && ENV_ARGS=(-e "$AZURE_ENV_NAME")
 if azd env get-values "${ENV_ARGS[@]}" >/dev/null 2>&1; then
   azd env set "${ENV_ARGS[@]}" RS_RESOURCE_GROUP "$RG" >/dev/null
   azd env set "${ENV_ARGS[@]}" RS_STORAGE_ACCOUNT "$ACCOUNT" >/dev/null

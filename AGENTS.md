@@ -28,7 +28,7 @@ How to work on this repository. These rules come from how the demonstrator was b
 - **Always preview before applying:** `azd provision --preview`, read the plan (only expected adds/changes, no unexpected destroy), then `azd provision`. Deploy services with `azd deploy <service>`.
 - **Terraform owns the infrastructure** (`infra/`, deployed by azd). Manual changes (e.g. container app environment variables) are reverted by the next provision; make them in Terraform.
 - azd does not pass `TF_VAR_*` to Terraform: expose settings as azd environment values mapped in `infra/main.tfvars.json` (empty value → default through `coalesce`).
-- Region `francecentral` for everything except Static Web Apps (`eastus2`). Every resource carries the tags `SecurityControl=Ignore` and `CostControl=Ignore`.
+- Region `francecentral` for everything except Static Web Apps (`eastus2`). Tags required by a tenant's policies come from the azd environment value `RESOURCE_TAGS` (`key=value,key=value`), never from code.
 - API Management: Basic v2 by default (Standard v2 only for VNet integration or private endpoints).
 - AI model: `gpt-6-luna` (DataZoneStandard, EU) on the environment's Foundry account; check quota before changing it.
 - Decision model: `Microsoft-Decision-1` (deployment `decision-1`, DataZoneStandard) for anomaly detection; switch it off with `ANOMALY_DETECTION_ENABLED=false`. Tune detection with dry runs, not by trial in the environment.

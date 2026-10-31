@@ -250,3 +250,14 @@ variable "digest_metrics" {
   type        = string
   default     = ""
 }
+
+variable "tags" {
+  description = "Extra tags on every resource, as comma-separated key=value pairs (RESOURCE_TAGS), e.g. tags required by your tenant's policies. Empty: none."
+  type        = string
+  default     = ""
+
+  validation {
+    condition     = alltrue([for pair in split(",", var.tags) : trimspace(pair) == "" || can(regex("^[^=]+=.*$", trimspace(pair)))])
+    error_message = "tags must be comma-separated key=value pairs."
+  }
+}
