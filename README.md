@@ -6,7 +6,7 @@
 
 ![Smart Device Platform architecture](docs/architecture/architecture.svg)
 
-**Contents:** [Why it matters](#why-it-matters) · [What it shows](#what-it-shows) · [Architecture](#architecture) · [How it works](#how-it-works) · [Security](#security) · [Repository](#repository) · [Build and test](#build-and-test) · [Continuous integration](#continuous-integration) · [Deploy to Azure](#deploy-to-azure) · [Operate](#operate) · [Before production](#before-production) · [Contributing](#contributing)
+**Contents:** [Why it matters](#why-it-matters) · [What it shows](#what-it-shows) · [Architecture](#architecture) · [How it works](#how-it-works) · [Security](#security) · [Repository](#repository) · [Build and test](#build-and-test) · [Continuous integration](#continuous-integration) · [Deploy to Azure](#deploy-to-azure) · [Operate](#operate) · [Demonstrator costs](#demonstrator-costs) · [Before production](#before-production) · [Contributing](#contributing)
 
 ## Why it matters
 
@@ -406,6 +406,30 @@ flowchart LR
 | `scripts/agent-env.sh` | Write the AI agent's local `.env` from the azd environment |
 | `scripts/anomaly-env.sh` | Write the local `.env` of the anomaly detector, site digest and maintenance jobs (dry runs with your identity) |
 | `scripts/build-anomaly-detector-image.sh` | Build the detector image in ACR and point the anomaly, digest and maintenance jobs at it (also run by `postprovision`) |
+
+## Demonstrator costs
+
+What the `sdp-dev` environment costs to run, as calculated on **31 October 2026** from the actual billed costs (Cost Management, USD, list prices) in `francecentral`. The figures average the full days of 28–30 October, with the simulator sending data for three sites continuously.
+
+**Overall: about $19.50 per day, about $592 per month.**
+
+| Service | Per day | Per month (×30.4) |
+|---|---:|---:|
+| API Management | $4.93 | $150 |
+| Container Apps | $4.57 | $139 |
+| Log Analytics | $4.09 | $124 |
+| PostgreSQL | $1.96 | $60 |
+| Defender for Cloud | $1.22 | $37 |
+| IoT Hub | $1.05 | $32 |
+| Event Hubs | $0.72 | $22 |
+| Container Registry | $0.41 | $12 |
+| Managed Redis | $0.39 | $12 |
+| Storage, Service Bus, Email, Key Vault | $0.14 | $4 |
+| Foundry models in production (assistant, analysis jobs) | $0.01 | $0.30 |
+| **Platform total** | **$19.49** | **$592** |
+| **Evaluations** (about 3 assistant eval runs, agent answers plus judges; one-off, about $0.05 per run) | $0.16 in total | — |
+
+Other live tests and dry runs cost about $0.01 in total; unit tests, CI and the cloud agent mock the models. API Management, Container Apps and Log Analytics make up about 70 % of the cost; Defender for Cloud is a subscription plan rather than part of the platform. Production sizing (see below) costs more.
 
 ## Before production
 
