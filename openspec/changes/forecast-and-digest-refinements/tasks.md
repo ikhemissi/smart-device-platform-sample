@@ -11,7 +11,7 @@
 
 ## 3. Work orders
 
-- [ ] 3.1 Rewrite the work-order instructions (D3); test; dry run with models on marseille-01: a plain instruction without rule names or thresholds, no unsupported numbers
+- [x] 3.1 Rewrite the work-order instructions (D3); test; dry run with models on marseille-01: a plain instruction without rule names or thresholds, no unsupported numbers
 
 ## 4. Delivery
 

@@ -91,7 +91,10 @@ DATA = {
     "reasons": [{"rule": "battery_days_left", "value": 3.0, "threshold": 7, "unit": "days"}],
     "probability": 0.93,
 }
-TEXT = "Replace the battery of paris-01-ruuvi5-003 at paris-01: it is at 2.65 V and reaches 2.5 V in 3 days."
+TEXT = (
+    "Replace the battery of paris-01-ruuvi5-003 (Cold room 3) at paris-01. Its battery is at 2.65 V and will run out "
+    "in about 3 days. Visit before the battery runs out."
+)
 
 
 def response(text=TEXT):
@@ -125,6 +128,12 @@ def test_work_order_prompt_holds_the_figures_only():
     assert span.name == "sdp.maintenance.work_order"
     assert span.attributes["sdp.maintenance.unsupported_numbers"] == 0
     assert span.attributes["gen_ai.usage.output_tokens"] == 60
+
+
+def test_work_order_instructions_ask_for_plain_words():
+    assert WORK_ORDER_INSTRUCTIONS.startswith("You write the work order")
+    assert "Do not mention rules, rule names, thresholds, probabilities or reason numbers." in WORK_ORDER_INSTRUCTIONS
+    assert "Use numbers exactly as they appear in the input." in WORK_ORDER_INSTRUCTIONS
 
 
 def test_grounding_check_counts_numbers_not_in_the_input():

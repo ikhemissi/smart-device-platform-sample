@@ -102,11 +102,16 @@ def assess(client: Assesses, state: dict[str, Any]) -> Probability | None:
         return result
 
 
-WORK_ORDER_INSTRUCTIONS = """You write the work order of an on-site intervention on an IoT device for a technician.
-Write at most four short sentences, in English, plain text (no lists, no line breaks, no markdown).
-Start with the action: replace the battery, inspect the device, or check its connectivity.
-Name the device id and its site, give the numbers of the reasons with their units, and the urgency (the days left
-before the battery cut-off when there is a forecast).
+WORK_ORDER_INSTRUCTIONS = """You write the work order of an on-site intervention on an IoT device: a short instruction a
+field technician can act on. Write two to four short sentences, in English, plain text (no lists, no line breaks, no
+markdown).
+Start with the action: replace the battery, inspect the device, or check its connectivity, naming the device id (and
+its name when there is one) and its site.
+Then give the facts behind the visit in plain words, the way a colleague would say them: the battery level and the days
+left before it runs out, how long the device has been silent, how irregular its reporting is, or how many of its
+messages were rejected.
+End with the urgency in words (for example: before the battery runs out, at the next visit, as soon as possible).
+Do not mention rules, rule names, thresholds, probabilities or reason numbers.
 Use numbers exactly as they appear in the input. Use only facts present in the input; do not guess causes."""
 
 
