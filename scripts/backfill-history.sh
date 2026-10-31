@@ -19,19 +19,21 @@ done
 
 eval "$(azd env get-values)"
 export AZURE_RESOURCE_GROUP AZURE_CONTAINER_REGISTRY_NAME AZURE_CONTAINER_REGISTRY_ENDPOINT MIGRATOR_JOB_NAME MAINTENANCE_JOB_NAME
+JOB_ARGS=(-n "$MIGRATOR_JOB_NAME" -g "$AZURE_RESOURCE_GROUP")
 IMAGE="$("$ROOT/scripts/build-migrator-image.sh")"
 
 # An execution override replaces the container definition: pass the job's own environment plus the backfill settings.
-mapfile -t ENV < <(az containerapp job show -n "$MIGRATOR_JOB_NAME" -g "$AZURE_RESOURCE_GROUP" \
+mapfile -t ENV < <(az containerapp job show "${JOB_ARGS[@]}" \
   --query "properties.template.containers[0].env[?name!='SDP_MIGRATOR_TASKS'].join('=', [name, value])" -o tsv)
 ENV+=("SDP_MIGRATOR_TASKS=backfill" "SDP_BACKFILL_DAYS=$DAYS")
 [[ -n "$SITES" ]] && ENV+=("SDP_BACKFILL_SITES=$SITES")
 
-EXECUTION="$(az containerapp job start -n "$MIGRATOR_JOB_NAME" -g "$AZURE_RESOURCE_GROUP" \
+EXECUTION="$(az containerapp job start "${JOB_ARGS[@]}" \
   --container-name db-migrator --image "$IMAGE" --cpu 1 --memory 2Gi --env-vars "${ENV[@]}" --query name -o tsv)"
 echo "History backfill started ($DAYS days, sites: ${SITES:-all}): $EXECUTION"
+# Up to 30 minutes (180 polls, 10 s apart).
 for _ in $(seq 1 180); do
-  STATUS="$(az containerapp job execution show -n "$MIGRATOR_JOB_NAME" -g "$AZURE_RESOURCE_GROUP" \
+  STATUS="$(az containerapp job execution show "${JOB_ARGS[@]}" \
             --job-execution-name "$EXECUTION" --query properties.status -o tsv)"
   case "$STATUS" in
     Succeeded) echo "History backfill succeeded"; break ;;

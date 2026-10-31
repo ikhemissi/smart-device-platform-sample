@@ -5,7 +5,7 @@
 # Needs python3, and for their sections ./mvnw (JDK 25), uv and the GitHub CLI (gh, authenticated or GH_TOKEN).
 #   scripts/report-outdated.sh
 set -uo pipefail
-cd "$(dirname "$0")/.."
+cd "$(dirname "$0")/.." || exit 0
 
 MAVEN_LOG="$(mktemp)"
 UV_LOG="$(mktemp)"
@@ -19,9 +19,12 @@ PRERELEASE='(?i).+[-.](alpha|beta|m|rc|cr|milestone|preview|snapshot)[-.]?[0-9]*
   >"$MAVEN_LOG" 2>&1 || echo "MAVEN-FAILED" >>"$MAVEN_LOG"
 ./mvnw -B -ntp org.codehaus.mojo:versions-maven-plugin:2.23.0:display-parent-updates -Dmaven.version.ignore="$PRERELEASE" \
   >>"$MAVEN_LOG" 2>&1 || true
-(cd agents/device-analyst && uv tree --outdated --depth 1 --frozen) >"$UV_LOG" 2>&1 || echo "UV-FAILED" >>"$UV_LOG"
-(cd agents/anomaly-detector && uv tree --outdated --depth 1 --frozen) >"$DETECTOR_UV_LOG" 2>&1 ||
-  echo "UV-FAILED" >>"$DETECTOR_UV_LOG"
+# uv_outdated <project> <log>
+uv_outdated() {
+  (cd "agents/$1" && uv tree --outdated --depth 1 --frozen) >"$2" 2>&1 || echo "UV-FAILED" >>"$2"
+}
+uv_outdated device-analyst "$UV_LOG"
+uv_outdated anomaly-detector "$DETECTOR_UV_LOG"
 
 python3 - "$MAVEN_LOG" "$UV_LOG" "$DETECTOR_UV_LOG" <<'PY' || echo "_Outdated report failed unexpectedly._"
 import json, re, subprocess, sys, urllib.request

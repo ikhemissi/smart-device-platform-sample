@@ -4,9 +4,10 @@
 #   scripts/agent-env.sh [-e <environment>]
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-value() { azd env get-value "$@" "${ENV_ARGS[@]}" 2>/dev/null; }
 ENV_ARGS=()
 [[ "${1:-}" == "-e" ]] && ENV_ARGS=(-e "$2")
+value() { azd env get-value "$@" "${ENV_ARGS[@]}" 2>/dev/null; }
+
 client_id="$(value API_CLIENT_ID)"
 cat > "$ROOT/agents/device-analyst/.env" <<ENV
 SDP_ENTRA_TENANT_ID=$(value ENTRA_TENANT_ID)

@@ -51,8 +51,9 @@ variable "simulator_settings" {
 }
 
 variable "postgres_sku" {
-  type    = string
-  default = "B_Standard_B2s"
+  description = "PostgreSQL Flexible Server compute SKU."
+  type        = string
+  default     = "B_Standard_B2s"
 }
 
 variable "device_api_image" {
@@ -190,13 +191,13 @@ variable "anomaly_metrics" {
 }
 
 variable "anomaly_deviation" {
-  description = "Deviation score (in spreads from the usual value) that makes a reading a candidate (ANOMALY_DEVIATION). Empty: see main.tf."
+  description = "Deviation score (in spreads from the usual value) that makes a reading a candidate (ANOMALY_DEVIATION). Empty: 4."
   type        = string
   default     = ""
 }
 
 variable "anomaly_confidence" {
-  description = "Probability from which Microsoft-Decision-1's classification is applied without review (ANOMALY_CONFIDENCE). Empty: see main.tf."
+  description = "Probability from which Microsoft-Decision-1's classification is applied without review (ANOMALY_CONFIDENCE). Empty: 0.7."
   type        = string
   default     = ""
 }
@@ -246,7 +247,7 @@ variable "digest_sites" {
 }
 
 variable "digest_metrics" {
-  description = "Comma-separated metrics summarised in digests (DIGEST_METRICS). Empty: see main.tf."
+  description = "Comma-separated metrics summarised in digests (DIGEST_METRICS). Empty: temperature,humidity,pressure,co2,illuminance."
   type        = string
   default     = ""
 }

@@ -44,8 +44,9 @@ variable "agent_messages_per_minute" {
   default     = 20
 }
 variable "rate_limit_calls_per_minute" {
-  type    = number
-  default = 600
+  description = "API calls per minute per caller (the token's oid claim, otherwise the client IP address)."
+  type        = number
+  default     = 600
 }
 variable "tags" { type = map(string) }
 
@@ -194,6 +195,7 @@ resource "azurerm_api_management_backend" "device_analyst" {
   description         = "AI device analyst (M6)"
 }
 
+# Operations that need no role still get a policy when they are routed to another backend than the device API.
 resource "azurerm_api_management_api_operation_policy" "role" {
   for_each = {
     for id, role in local.operation_roles : id => role

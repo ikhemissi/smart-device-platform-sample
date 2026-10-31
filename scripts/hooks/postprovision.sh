@@ -14,6 +14,7 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 # 2. Migrate (migrate + maintain) and wait for the outcome.
 EXECUTION="$(az containerapp job start -n "$MIGRATOR_JOB_NAME" -g "$AZURE_RESOURCE_GROUP" --query name -o tsv)"
 echo "Database migration started: $EXECUTION"
+# Up to 20 minutes (120 polls, 10 s apart).
 for _ in $(seq 1 120); do
   STATUS="$(az containerapp job execution show -n "$MIGRATOR_JOB_NAME" -g "$AZURE_RESOURCE_GROUP" \
             --job-execution-name "$EXECUTION" --query properties.status -o tsv)"
@@ -27,8 +28,8 @@ for _ in $(seq 1 120); do
 done
 [[ "${STATUS:-}" == "Succeeded" ]] || { echo "Database migration timed out ($STATUS)" >&2; exit 1; }
 
-# 3. Anomaly detector, site digest and maintenance image (M7, M8, M9), after the migration: their schema and database principal must
-#    exist first.
+# 3. Anomaly detector, site digest and maintenance image (M7, M8, M9), after the migration: their schema and database
+#    principal must exist first.
 "$ROOT/scripts/build-anomaly-detector-image.sh" >/dev/null
 
 # 4. Demo sites: CAs in Key Vault and DPS enrollment groups.

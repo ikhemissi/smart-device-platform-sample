@@ -45,10 +45,22 @@ else
 fi
 export SDP_MIGRATOR_TASKS="$TASKS"
 
-jar="$(ls "$ROOT"/services/db-migrator/target/db-migrator-*.jar 2>/dev/null | grep -v '\.original$' | head -n1 || true)"
+# Prints the first packaged db-migrator jar, if any.
+find_jar() {
+  local candidate
+  for candidate in "$ROOT"/services/db-migrator/target/db-migrator-*.jar; do
+    if [[ -f "$candidate" ]]; then
+      echo "$candidate"
+      return
+    fi
+  done
+}
+
+jar="$(find_jar)"
 if [[ -z "$jar" ]]; then
   (cd "$ROOT" && ./mvnw -q -B -pl services/db-migrator -am package -DskipTests)
-  jar="$(ls "$ROOT"/services/db-migrator/target/db-migrator-*.jar | grep -v '\.original$' | head -n1)"
+  jar="$(find_jar)"
+  [[ -n "$jar" ]] || { echo "No db-migrator jar in services/db-migrator/target after the build" >&2; exit 1; }
 fi
 
 echo "Running db-migrator (tasks: $TASKS) against ${SDP_DB_URL%%\?*} as ${SDP_DB_USERNAME}"

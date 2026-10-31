@@ -12,12 +12,14 @@ variable "deployer_object_id" {
   default     = null
 }
 variable "reader_group_object_ids" {
-  type    = list(string)
-  default = []
+  description = "Entra groups granted DeviceData.Read."
+  type        = list(string)
+  default     = []
 }
 variable "editor_group_object_ids" {
-  type    = list(string)
-  default = []
+  description = "Entra groups granted DeviceData.Write."
+  type        = list(string)
+  default     = []
 }
 variable "preauthorize_azure_cli" {
   description = "Pre-authorize the Azure CLI on the API scope so operators can get tokens with az (dev only)."
@@ -27,6 +29,7 @@ variable "preauthorize_azure_cli" {
 
 locals {
   azure_cli_client_id = "04b07795-8ddb-461a-bbee-02f9e1bf7b46"
+  app_role_ids        = { read = random_uuid.role_read.result, write = random_uuid.role_write.result }
 }
 
 resource "random_uuid" "scope" {}
@@ -130,7 +133,7 @@ resource "azuread_application_pre_authorized" "azure_cli" {
 }
 
 resource "azuread_app_role_assignment" "deployer" {
-  for_each            = var.deployer_object_id == null ? {} : { read = random_uuid.role_read.result, write = random_uuid.role_write.result }
+  for_each            = var.deployer_object_id == null ? {} : local.app_role_ids
   app_role_id         = each.value
   principal_object_id = var.deployer_object_id
   resource_object_id  = azuread_service_principal.api.object_id
@@ -155,6 +158,4 @@ output "api_identifier_uri" { value = azuread_application_identifier_uri.api.ide
 output "api_scope" { value = "${azuread_application_identifier_uri.api.identifier_uri}/user_impersonation" }
 output "api_service_principal_object_id" { value = azuread_service_principal.api.object_id }
 output "web_client_id" { value = azuread_application.web.client_id }
-output "role_ids" {
-  value = { read = random_uuid.role_read.result, write = random_uuid.role_write.result }
-}
+output "role_ids" { value = local.app_role_ids }

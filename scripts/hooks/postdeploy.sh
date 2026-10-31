@@ -4,14 +4,18 @@
 # enable them. Later deployments skip this (probes already present).
 set -euo pipefail
 : "${AZURE_RESOURCE_GROUP:?}" "${DECODER_APP_NAME:?}"
+# Image Terraform gives a container app until azd deploys the service (infra/modules/apps).
+PLACEHOLDER_IMAGE="mcr.microsoft.com/k8se/quickstart:latest"
+
 pending=()
 for app in "$DECODER_APP_NAME" "${DEVICE_API_APP_NAME:-}" "${PROVISIONING_API_APP_NAME:-}" "${ALERT_SERVICE_APP_NAME:-}"; do
   [[ -n "$app" ]] || continue
   image="$(az containerapp show -n "$app" -g "$AZURE_RESOURCE_GROUP" --query 'properties.template.containers[0].image' -o tsv)"
+  # shellcheck disable=SC2016 # `[]` is a JMESPath literal, not a command substitution
   probes="$(az containerapp show -n "$app" -g "$AZURE_RESOURCE_GROUP" \
              --query 'length(properties.template.containers[0].probes || `[]`)' -o tsv)"
   # Apps still on the placeholder image are not deployed yet (e.g. `azd deploy <other-service>`).
-  if [[ "$image" != "mcr.microsoft.com/k8se/quickstart:latest" && "${probes:-0}" -eq 0 ]]; then
+  if [[ "$image" != "$PLACEHOLDER_IMAGE" && "${probes:-0}" -eq 0 ]]; then
     pending+=("$app")
   fi
 done

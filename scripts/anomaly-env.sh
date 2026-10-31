@@ -7,6 +7,7 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 ENV_ARGS=()
 [[ "${1:-}" == "-e" ]] && ENV_ARGS=(-e "$2")
 value() { azd env get-value "$@" "${ENV_ARGS[@]}" 2>/dev/null; }
+
 cat > "$ROOT/agents/anomaly-detector/.env" <<ENV
 SDP_DB_HOST=$(value POSTGRES_HOST)
 SDP_DB_NAME=$(value POSTGRES_DATABASE)

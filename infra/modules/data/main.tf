@@ -16,8 +16,9 @@ variable "developer_admin" {
   default     = null
 }
 variable "developer_ip" {
-  type    = string
-  default = null
+  description = "Deployer's public IP address opened in the firewall for local tooling (dev only); null to skip."
+  type        = string
+  default     = null
 }
 variable "tags" { type = map(string) }
 
@@ -75,7 +76,10 @@ resource "azurerm_postgresql_flexible_server_active_directory_administrator" "mi
   object_id           = var.migrator_identity.principal_id
   principal_name      = var.migrator_identity.name
   principal_type      = "ServicePrincipal"
-  depends_on          = [azurerm_postgresql_flexible_server_firewall_rule.developer, azurerm_postgresql_flexible_server_firewall_rule.azure_services]
+  depends_on = [
+    azurerm_postgresql_flexible_server_firewall_rule.developer,
+    azurerm_postgresql_flexible_server_firewall_rule.azure_services,
+  ]
 }
 
 resource "azurerm_postgresql_flexible_server_active_directory_administrator" "developer" {

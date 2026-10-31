@@ -37,87 +37,81 @@ locals {
     { id = "6c1b1e6c-3f0e-4b8e-9a52-1f3a8c3e0d04", name = "DeviceId", label = "Device ID" },
   ]
 
+  time_range_parameter = {
+    id         = "6c1b1e6c-3f0e-4b8e-9a52-1f3a8c3e0d01"
+    version    = "KqlParameterItem/1.0"
+    name       = "TimeRange"
+    label      = "Time range"
+    type       = 4
+    isRequired = true
+    value      = { durationMs = local.day_ms }
+    typeSettings = {
+      allowCustom      = true
+      selectableValues = [for ms in [3600000, 14400000, 43200000, local.day_ms, 3 * local.day_ms, 7 * local.day_ms, 30 * local.day_ms] : { durationMs = ms }]
+    }
+  }
+
+  filter_parameters = [for f in local.filters : {
+    id                       = f.id
+    version                  = "KqlParameterItem/1.0"
+    name                     = f.name
+    label                    = f.label
+    type                     = 2
+    isRequired               = false
+    multiSelect              = true
+    quote                    = "'"
+    delimiter                = ","
+    query                    = file("${path.module}/parameters/${f.name}.kql")
+    value                    = ["value::all"]
+    typeSettings             = { additionalResourceOptions = ["value::all"], selectAllValue = "*", showDefault = false }
+    timeContextFromParameter = "TimeRange"
+    timeContext              = { durationMs = local.day_ms }
+    queryType                = 0
+    resourceType             = "microsoft.insights/components"
+    crossComponentResources  = [local.appi]
+  }]
+
   parameters = {
     type = 9
     name = "parameters"
     content = {
-      version = "KqlParameterItem/1.0"
-      style   = "pills"
-      parameters = concat([{
-        id         = "6c1b1e6c-3f0e-4b8e-9a52-1f3a8c3e0d01"
-        version    = "KqlParameterItem/1.0"
-        name       = "TimeRange"
-        label      = "Time range"
-        type       = 4
-        isRequired = true
-        value      = { durationMs = local.day_ms }
-        typeSettings = {
-          allowCustom      = true
-          selectableValues = [for ms in [3600000, 14400000, 43200000, local.day_ms, 3 * local.day_ms, 7 * local.day_ms, 30 * local.day_ms] : { durationMs = ms }]
-        }
-        }], [for f in local.filters : {
-        id                       = f.id
-        version                  = "KqlParameterItem/1.0"
-        name                     = f.name
-        label                    = f.label
-        type                     = 2
-        isRequired               = false
-        multiSelect              = true
-        quote                    = "'"
-        delimiter                = ","
-        query                    = file("${path.module}/parameters/${f.name}.kql")
-        value                    = ["value::all"]
-        typeSettings             = { additionalResourceOptions = ["value::all"], selectAllValue = "*", showDefault = false }
-        timeContextFromParameter = "TimeRange"
-        timeContext              = { durationMs = local.day_ms }
-        queryType                = 0
-        resourceType             = "microsoft.insights/components"
-        crossComponentResources  = [local.appi]
-      }])
+      version    = "KqlParameterItem/1.0"
+      style      = "pills"
+      parameters = concat([local.time_range_parameter], local.filter_parameters)
     }
   }
 
+  # Display settings shared by several queries.
+  indicator_tiles = {
+    tileSettings = {
+      showBorder      = true
+      titleContent    = { columnMatch = "Indicator", formatter = 1 }
+      leftContent     = { columnMatch = "Value", formatter = 1 }
+      subtitleContent = { columnMatch = "Detail", formatter = 1 }
+    }
+  }
+  operation_grid = {
+    gridSettings = { rowLimit = 50, filter = true, formatters = [{ columnMatch = "Operation id", formatter = 1 }] }
+  }
+
+  # The workbook's KQL queries: queries/<name>.kql with its title, visualization, width (%) and extra settings.
+  kql_items = {
+    key-indicators        = { title = "", visualization = "tiles", width = "100", extra = local.indicator_tiles }
+    ingestion-trend       = { title = "Device messages per 15 minutes", visualization = "timechart", width = "50", extra = {} }
+    api-trend             = { title = "API requests and failures per 15 minutes", visualization = "timechart", width = "50", extra = {} }
+    latest-errors         = { title = "Latest errors (exceptions, failed requests and dependencies)", visualization = "table", width = "100", extra = local.operation_grid }
+    rejections            = { title = "Device messages rejected per hour, by reason", visualization = "barchart", width = "100", extra = {} }
+    assistant-indicators  = { title = "", visualization = "tiles", width = "100", extra = local.indicator_tiles }
+    assistant-trend       = { title = "Questions and failed questions per hour", visualization = "timechart", width = "50", extra = {} }
+    assistant-first-text  = { title = "Time to first answer text per hour (s)", visualization = "timechart", width = "50", extra = {} }
+    assistant-tokens      = { title = "Model tokens per hour", visualization = "timechart", width = "50", extra = {} }
+    assistant-tools       = { title = "Tool calls by tool", visualization = "barchart", width = "50", extra = {} }
+    assistant-tool-errors = { title = "Failed tool calls by kind", visualization = "piechart", width = "50", extra = {} }
+    assistant-failures    = { title = "Latest failed questions and rejected requests", visualization = "table", width = "50", extra = local.operation_grid }
+  }
+
   # A KQL query on Application Insights, bound to the time range.
-  kql = { for name, item in {
-    key-indicators = {
-      title = "", visualization = "tiles", size = 0, width = "100", extra = {
-        tileSettings = {
-          showBorder      = true
-          titleContent    = { columnMatch = "Indicator", formatter = 1 }
-          leftContent     = { columnMatch = "Value", formatter = 1 }
-          subtitleContent = { columnMatch = "Detail", formatter = 1 }
-        }
-      }
-    }
-    ingestion-trend = { title = "Device messages per 15 minutes", visualization = "timechart", size = 0, width = "50", extra = {} }
-    api-trend       = { title = "API requests and failures per 15 minutes", visualization = "timechart", size = 0, width = "50", extra = {} }
-    latest-errors = {
-      title = "Latest errors (exceptions, failed requests and dependencies)", visualization = "table", size = 0, width = "100", extra = {
-        gridSettings = { rowLimit = 50, filter = true, formatters = [{ columnMatch = "Operation id", formatter = 1 }] }
-      }
-    }
-    rejections = { title = "Device messages rejected per hour, by reason", visualization = "barchart", size = 0, width = "100", extra = {} }
-    assistant-indicators = {
-      title = "", visualization = "tiles", size = 0, width = "100", extra = {
-        tileSettings = {
-          showBorder      = true
-          titleContent    = { columnMatch = "Indicator", formatter = 1 }
-          leftContent     = { columnMatch = "Value", formatter = 1 }
-          subtitleContent = { columnMatch = "Detail", formatter = 1 }
-        }
-      }
-    }
-    assistant-trend       = { title = "Questions and failed questions per hour", visualization = "timechart", size = 0, width = "50", extra = {} }
-    assistant-first-text  = { title = "Time to first answer text per hour (s)", visualization = "timechart", size = 0, width = "50", extra = {} }
-    assistant-tokens      = { title = "Model tokens per hour", visualization = "timechart", size = 0, width = "50", extra = {} }
-    assistant-tools       = { title = "Tool calls by tool", visualization = "barchart", size = 0, width = "50", extra = {} }
-    assistant-tool-errors = { title = "Failed tool calls by kind", visualization = "piechart", size = 0, width = "50", extra = {} }
-    assistant-failures = {
-      title = "Latest failed questions and rejected requests", visualization = "table", size = 0, width = "50", extra = {
-        gridSettings = { rowLimit = 50, filter = true, formatters = [{ columnMatch = "Operation id", formatter = 1 }] }
-      }
-    }
-    } : name => {
+  kql = { for name, item in local.kql_items : name => {
     type        = 3
     name        = name
     customWidth = item.width
@@ -125,7 +119,7 @@ locals {
       version                  = "KqlItem/1.0"
       query                    = file("${path.module}/queries/${name}.kql")
       title                    = item.title
-      size                     = item.size
+      size                     = 0
       timeContextFromParameter = "TimeRange"
       timeContext              = { durationMs = local.day_ms }
       queryType                = 0

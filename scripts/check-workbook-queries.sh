@@ -19,6 +19,8 @@ while [[ $# -gt 0 ]]; do
 done
 eval "$(azd env get-values)"
 export AZURE_EXTENSION_USE_DYNAMIC_INSTALL=yes_without_prompt
+ERRORS="$(mktemp)"
+trap 'rm -f "$ERRORS"' EXIT
 APP="$(az resource list -g "$AZURE_RESOURCE_GROUP" --resource-type microsoft.insights/components --query '[0].name' -o tsv)"
 # Queries that may legitimately be empty (no error or rejection in the period, no assistant activity, or a filter
 # matching nothing).
@@ -42,8 +44,8 @@ for file in infra/modules/monitoring/parameters/*.kql infra/modules/monitoring/q
   name="$(basename "$file" .kql)"
   for offset in 24h 7d; do
     if ! result="$(az monitor app-insights query -g "$AZURE_RESOURCE_GROUP" --app "$APP" --offset "$offset" \
-                    --analytics-query "$(render "$file")" --query 'tables[0].rows' -o json 2>/tmp/workbook-query.err)"; then
-      echo "FAIL  $name ($offset): $(grep -v WARNING /tmp/workbook-query.err | head -3)"
+                    --analytics-query "$(render "$file")" --query 'tables[0].rows' -o json 2>"$ERRORS")"; then
+      echo "FAIL  $name ($offset): $(grep -v WARNING "$ERRORS" | head -3)"
       status=1
       continue
     fi
@@ -59,5 +61,4 @@ for file in infra/modules/monitoring/parameters/*.kql infra/modules/monitoring/q
     fi
   done
 done
-rm -f /tmp/workbook-query.err
 exit "$status"

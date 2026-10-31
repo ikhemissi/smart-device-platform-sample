@@ -105,15 +105,19 @@ variable "tags" { type = map(string) }
 
 locals {
   placeholder_image = "mcr.microsoft.com/k8se/quickstart:latest"
+  # Token audiences accepted by the services that validate platform API tokens (ADR-0007).
+  api_audiences = "${var.entra.api_client_id},${var.entra.api_identifier_uri}"
 
-  # Shared by all Java workloads: OpenTelemetry export with Entra authentication (ADR-0005, guidelines §5).
+  # Shared by every workload: OpenTelemetry export to Application Insights.
   observability_env = {
     APPLICATIONINSIGHTS_CONNECTION_STRING = var.application_insights.connection_string
     OTEL_RESOURCE_ATTRIBUTES              = "deployment.environment=${var.environment_name}"
-    LOGGING_STRUCTURED_FORMAT_CONSOLE     = "ecs"
   }
 
-  decoder_env = merge(local.observability_env, {
+  # Java workloads: each sets its Entra authentication string (ADR-0005, guidelines §5) and logs in ECS format.
+  java_observability_env = merge(local.observability_env, { LOGGING_STRUCTURED_FORMAT_CONSOLE = "ecs" })
+
+  decoder_env = merge(local.java_observability_env, {
     AZURE_CLIENT_ID                           = var.identities.decoder.client_id
     APPLICATIONINSIGHTS_AUTHENTICATION_STRING = "Authorization=AAD;ClientId=${var.identities.decoder.client_id}"
     APPLICATIONINSIGHTS_ROLE_NAME             = "sdp-telemetry-decoder"
@@ -128,7 +132,7 @@ locals {
     SDP_SERVICEBUS_TOPIC                      = var.alerting.topic_name
   })
 
-  simulator_env = merge(local.observability_env, {
+  simulator_env = merge(local.java_observability_env, {
     AZURE_CLIENT_ID                           = var.identities.simulator.client_id
     APPLICATIONINSIGHTS_AUTHENTICATION_STRING = "Authorization=AAD;ClientId=${var.identities.simulator.client_id}"
     APPLICATIONINSIGHTS_ROLE_NAME             = "sdp-device-simulator"
@@ -136,7 +140,7 @@ locals {
     SDP_KEYVAULT_URI                          = var.key_vault_uri
   }, var.simulator_settings)
 
-  migrator_env = merge(local.observability_env, {
+  migrator_env = merge(local.java_observability_env, {
     AZURE_CLIENT_ID                           = var.identities.migrator.client_id
     APPLICATIONINSIGHTS_AUTHENTICATION_STRING = "Authorization=AAD;ClientId=${var.identities.migrator.client_id}"
     APPLICATIONINSIGHTS_ROLE_NAME             = "sdp-db-migrator"
@@ -154,14 +158,14 @@ locals {
     SDP_ANOMALY_DETECTOR_PRINCIPAL_OBJECT_ID  = var.identities.anomaly_detector.principal_id
   })
 
-  device_api_env = merge(local.observability_env, {
+  device_api_env = merge(local.java_observability_env, {
     AZURE_CLIENT_ID                           = var.identities.device_api.client_id
     APPLICATIONINSIGHTS_AUTHENTICATION_STRING = "Authorization=AAD;ClientId=${var.identities.device_api.client_id}"
     APPLICATIONINSIGHTS_ROLE_NAME             = "sdp-device-api"
     SDP_DB_URL                                = var.postgres.jdbc_url
     SDP_DB_USERNAME                           = var.identities.device_api.name
     SDP_ENTRA_TENANT_ID                       = var.entra.tenant_id
-    SDP_API_AUDIENCES                         = "${var.entra.api_client_id},${var.entra.api_identifier_uri}"
+    SDP_API_AUDIENCES                         = local.api_audiences
     SDP_EVENTHUB_PARTITIONS                   = tostring(var.eventhubs.partition_count)
     SDP_REDIS_HOST                            = var.redis.host
     SDP_REDIS_PORT                            = tostring(var.redis.port)
@@ -171,20 +175,20 @@ locals {
     SDP_MAINTENANCE_SITES                     = var.maintenance.sites
   })
 
-  provisioning_api_env = merge(local.observability_env, {
+  provisioning_api_env = merge(local.java_observability_env, {
     AZURE_CLIENT_ID                           = var.identities.provisioning_api.client_id
     APPLICATIONINSIGHTS_AUTHENTICATION_STRING = "Authorization=AAD;ClientId=${var.identities.provisioning_api.client_id}"
     APPLICATIONINSIGHTS_ROLE_NAME             = "sdp-provisioning-api"
     SDP_DB_URL                                = var.postgres.jdbc_url
     SDP_DB_USERNAME                           = var.identities.provisioning_api.name
     SDP_ENTRA_TENANT_ID                       = var.entra.tenant_id
-    SDP_API_AUDIENCES                         = "${var.entra.api_client_id},${var.entra.api_identifier_uri}"
+    SDP_API_AUDIENCES                         = local.api_audiences
     SDP_DPS_RESOURCE_ID                       = var.provisioning.dps_resource_id
     SDP_DPS_HOST                              = var.provisioning.dps_service_host
     SDP_IOTHUB_HOST                           = var.provisioning.iothub_hostname
   })
 
-  alert_service_env = merge(local.observability_env, {
+  alert_service_env = merge(local.java_observability_env, {
     AZURE_CLIENT_ID                           = var.identities.alert_service.client_id
     APPLICATIONINSIGHTS_AUTHENTICATION_STRING = "Authorization=AAD;ClientId=${var.identities.alert_service.client_id}"
     APPLICATIONINSIGHTS_ROLE_NAME             = "sdp-alert-service"
@@ -198,78 +202,61 @@ locals {
     SDP_PORTAL_BASE_URL                       = var.portal_base_url
   })
 
-  # Python agent (M6 design D1/D7): the Azure Monitor distro takes the credential in code, so no authentication string.
-  device_analyst_env = {
-    APPLICATIONINSIGHTS_CONNECTION_STRING = var.application_insights.connection_string
-    OTEL_RESOURCE_ATTRIBUTES              = "deployment.environment=${var.environment_name}"
-    OTEL_SERVICE_NAME                     = "sdp-device-analyst"
-    AZURE_CLIENT_ID                       = var.identities.device_analyst.client_id
-    FOUNDRY_PROJECT_ENDPOINT              = var.foundry.project_endpoint
-    AZURE_OPENAI_ENDPOINT                 = var.foundry.openai_endpoint
-    FOUNDRY_MODEL_DEPLOYMENT_NAME         = var.foundry.model_deployment_name
-    SDP_ENTRA_TENANT_ID                   = var.entra.tenant_id
-    SDP_API_AUDIENCES                     = "${var.entra.api_client_id},${var.entra.api_identifier_uri}"
-    SDP_API_BASE_URL                      = var.api_base_url
-    SDP_REDIS_HOST                        = var.redis.host
-    SDP_REDIS_PORT                        = tostring(var.redis.port)
-    SDP_AGENT_CAPTURE_CONTENT             = tostring(var.foundry.capture_content)
-    SDP_ANOMALIES_ENABLED                 = tostring(var.anomaly_detection.enabled)
-    SDP_DIGESTS_ENABLED                   = tostring(var.site_digest.enabled)
-    SDP_MAINTENANCE_ENABLED               = tostring(var.maintenance.enabled)
-  }
+  # Python workloads (M6 design D1/D7): the Azure Monitor distro takes the credential in code, so no authentication
+  # string.
+  device_analyst_env = merge(local.observability_env, {
+    OTEL_SERVICE_NAME             = "sdp-device-analyst"
+    AZURE_CLIENT_ID               = var.identities.device_analyst.client_id
+    FOUNDRY_PROJECT_ENDPOINT      = var.foundry.project_endpoint
+    AZURE_OPENAI_ENDPOINT         = var.foundry.openai_endpoint
+    FOUNDRY_MODEL_DEPLOYMENT_NAME = var.foundry.model_deployment_name
+    SDP_ENTRA_TENANT_ID           = var.entra.tenant_id
+    SDP_API_AUDIENCES             = local.api_audiences
+    SDP_API_BASE_URL              = var.api_base_url
+    SDP_REDIS_HOST                = var.redis.host
+    SDP_REDIS_PORT                = tostring(var.redis.port)
+    SDP_AGENT_CAPTURE_CONTENT     = tostring(var.foundry.capture_content)
+    SDP_ANOMALIES_ENABLED         = tostring(var.anomaly_detection.enabled)
+    SDP_DIGESTS_ENABLED           = tostring(var.site_digest.enabled)
+    SDP_MAINTENANCE_ENABLED       = tostring(var.maintenance.enabled)
+  })
 
-  # Python job (M7 design D1/D10): PostgreSQL with an Entra token as password, models with the workload identity.
-  anomaly_detector_env = {
-    APPLICATIONINSIGHTS_CONNECTION_STRING = var.application_insights.connection_string
-    OTEL_RESOURCE_ATTRIBUTES              = "deployment.environment=${var.environment_name}"
-    OTEL_SERVICE_NAME                     = "sdp-anomaly-detector"
-    AZURE_CLIENT_ID                       = var.identities.anomaly_detector.client_id
-    SDP_DB_HOST                           = var.postgres.host
-    SDP_DB_NAME                           = var.postgres.database
-    SDP_DB_USER                           = var.identities.anomaly_detector.name
-    AZURE_OPENAI_ENDPOINT                 = var.foundry.openai_endpoint
-    FOUNDRY_MODEL_DEPLOYMENT_NAME         = var.foundry.model_deployment_name
-    SDP_DECISION_ENDPOINT                 = var.anomaly_detection.decision_endpoint
-    SDP_DECISION_DEPLOYMENT               = var.anomaly_detection.decision_deployment
-    SDP_ANOMALY_SITES                     = var.anomaly_detection.sites
-    SDP_ANOMALY_METRICS                   = var.anomaly_detection.metrics
-    SDP_ANOMALY_DEVIATION                 = var.anomaly_detection.deviation
-    SDP_ANOMALY_CONFIDENCE                = var.anomaly_detection.confidence
-  }
+  # Model-based analysis jobs (M7 design D1/D10, M8 design D1, M9 design D1): one image and one identity, an entry
+  # point per job. PostgreSQL with an Entra token as password, models with the workload identity.
+  analysis_job_env = merge(local.observability_env, {
+    AZURE_CLIENT_ID               = var.identities.anomaly_detector.client_id
+    SDP_DB_HOST                   = var.postgres.host
+    SDP_DB_NAME                   = var.postgres.database
+    SDP_DB_USER                   = var.identities.anomaly_detector.name
+    AZURE_OPENAI_ENDPOINT         = var.foundry.openai_endpoint
+    FOUNDRY_MODEL_DEPLOYMENT_NAME = var.foundry.model_deployment_name
+  })
 
-  # Same image and identity as the anomaly detector, another entry point (M8 design D1).
-  site_digest_env = {
-    APPLICATIONINSIGHTS_CONNECTION_STRING = var.application_insights.connection_string
-    OTEL_RESOURCE_ATTRIBUTES              = "deployment.environment=${var.environment_name}"
-    OTEL_SERVICE_NAME                     = "sdp-site-digest"
-    AZURE_CLIENT_ID                       = var.identities.anomaly_detector.client_id
-    SDP_DB_HOST                           = var.postgres.host
-    SDP_DB_NAME                           = var.postgres.database
-    SDP_DB_USER                           = var.identities.anomaly_detector.name
-    AZURE_OPENAI_ENDPOINT                 = var.foundry.openai_endpoint
-    FOUNDRY_MODEL_DEPLOYMENT_NAME         = var.foundry.model_deployment_name
-    SDP_DIGEST_SITES                      = var.site_digest.sites
-    SDP_DIGEST_METRICS                    = var.site_digest.metrics
-    SDP_MAINTENANCE_ENABLED               = tostring(var.maintenance.enabled)
-    SDP_MAINTENANCE_SITES                 = var.maintenance.sites
-  }
+  anomaly_detector_env = merge(local.analysis_job_env, {
+    OTEL_SERVICE_NAME       = "sdp-anomaly-detector"
+    SDP_DECISION_ENDPOINT   = var.anomaly_detection.decision_endpoint
+    SDP_DECISION_DEPLOYMENT = var.anomaly_detection.decision_deployment
+    SDP_ANOMALY_SITES       = var.anomaly_detection.sites
+    SDP_ANOMALY_METRICS     = var.anomaly_detection.metrics
+    SDP_ANOMALY_DEVIATION   = var.anomaly_detection.deviation
+    SDP_ANOMALY_CONFIDENCE  = var.anomaly_detection.confidence
+  })
 
-  # Same image and identity, a third entry point (M9 design D1).
-  upkeep_env = {
-    APPLICATIONINSIGHTS_CONNECTION_STRING = var.application_insights.connection_string
-    OTEL_RESOURCE_ATTRIBUTES              = "deployment.environment=${var.environment_name}"
-    OTEL_SERVICE_NAME                     = "sdp-maintenance"
-    AZURE_CLIENT_ID                       = var.identities.anomaly_detector.client_id
-    SDP_DB_HOST                           = var.postgres.host
-    SDP_DB_NAME                           = var.postgres.database
-    SDP_DB_USER                           = var.identities.anomaly_detector.name
-    AZURE_OPENAI_ENDPOINT                 = var.foundry.openai_endpoint
-    FOUNDRY_MODEL_DEPLOYMENT_NAME         = var.foundry.model_deployment_name
-    SDP_DECISION_ENDPOINT                 = var.maintenance.decision_endpoint
-    SDP_DECISION_DEPLOYMENT               = var.maintenance.decision_deployment
-    SDP_MAINTENANCE_SITES                 = var.maintenance.sites
-    SDP_MAINTENANCE_CONFIDENCE            = var.maintenance.confidence
-  }
+  site_digest_env = merge(local.analysis_job_env, {
+    OTEL_SERVICE_NAME       = "sdp-site-digest"
+    SDP_DIGEST_SITES        = var.site_digest.sites
+    SDP_DIGEST_METRICS      = var.site_digest.metrics
+    SDP_MAINTENANCE_ENABLED = tostring(var.maintenance.enabled)
+    SDP_MAINTENANCE_SITES   = var.maintenance.sites
+  })
+
+  upkeep_env = merge(local.analysis_job_env, {
+    OTEL_SERVICE_NAME          = "sdp-maintenance"
+    SDP_DECISION_ENDPOINT      = var.maintenance.decision_endpoint
+    SDP_DECISION_DEPLOYMENT    = var.maintenance.decision_deployment
+    SDP_MAINTENANCE_SITES      = var.maintenance.sites
+    SDP_MAINTENANCE_CONFIDENCE = var.maintenance.confidence
+  })
 }
 
 # --- Telemetry decoder ----------------------------------------------------------------------------------------

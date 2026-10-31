@@ -29,25 +29,25 @@ IMAGES=(
 # Maven dependencies are resolved by Maven into the local repository first; Trivy then reads them offline (resolving
 # them itself from Maven Central gets rate-limited on shared CI runners).
 ./mvnw -B -ntp -q dependency:go-offline
-COMMON=(--scanners vuln --offline-scan --ignorefile .trivyignore.yaml --skip-dirs "**/node_modules,**/.venv,**/target,**/dist" --quiet)
+SCAN_DEPENDENCIES=(trivy fs --scanners vuln --offline-scan --ignorefile .trivyignore.yaml
+  --skip-dirs "**/node_modules,**/.venv,**/target,**/dist" --quiet)
+SCAN_IMAGE=(trivy image --scanners vuln --ignorefile .trivyignore.yaml --quiet)
 
 status=0
 if [[ -n "$SARIF_DIR" ]]; then
   mkdir -p "$SARIF_DIR"
-  trivy fs "${COMMON[@]}" --format sarif --output "$SARIF_DIR/dependencies.sarif" .
+  "${SCAN_DEPENDENCIES[@]}" --format sarif --output "$SARIF_DIR/dependencies.sarif" .
   for entry in "${IMAGES[@]}"; do
     # shellcheck disable=SC2086 # "--input <tar>" is two words on purpose
-    trivy image --scanners vuln --ignorefile .trivyignore.yaml --quiet --format sarif \
-      --output "$SARIF_DIR/image-${entry%%=*}.sarif" ${entry#*=}
+    "${SCAN_IMAGE[@]}" --format sarif --output "$SARIF_DIR/image-${entry%%=*}.sarif" ${entry#*=}
   done
 fi
 
 echo "== Dependencies (Maven, npm, Python): High and Critical findings with a fix"
-trivy fs "${COMMON[@]}" --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 . || status=1
+"${SCAN_DEPENDENCIES[@]}" --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 . || status=1
 for entry in "${IMAGES[@]}"; do
   echo "== Image ${entry%%=*} (${entry#*=}): High and Critical findings with a fix"
   # shellcheck disable=SC2086
-  trivy image --scanners vuln --ignorefile .trivyignore.yaml --quiet --severity HIGH,CRITICAL --ignore-unfixed \
-    --exit-code 1 ${entry#*=} || status=1
+  "${SCAN_IMAGE[@]}" --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 ${entry#*=} || status=1
 done
-exit $status
+exit "$status"

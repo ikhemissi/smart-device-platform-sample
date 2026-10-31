@@ -14,11 +14,15 @@ set -euo pipefail
 : "${KEY_VAULT_NAME:?}" "${DPS_NAME:?}" "${AZURE_RESOURCE_GROUP:?}"
 SITES="${DEMO_SITES:-paris-01,lyon-01,marseille-01}"
 
+DPS_ARGS=(--dps-name "$DPS_NAME" -g "$AZURE_RESOURCE_GROUP")
 WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
 
-for site in ${SITES//,/ }; do
-  secret="site-${site}-ca"
+# ensure_site_ca <site>: creates the site's CA in Key Vault unless present, then writes its certificate (without the
+# key) to $WORK/<site>-ca.pem.
+ensure_site_ca() {
+  local site="$1"
+  local secret="site-${site}-ca"
   if az keyvault secret show --vault-name "$KEY_VAULT_NAME" -n "$secret" -o none 2>/dev/null; then
     echo "[$site] CA already in Key Vault (kept)"
   else
@@ -38,23 +42,32 @@ for site in ${SITES//,/ }; do
 
   az keyvault secret show --vault-name "$KEY_VAULT_NAME" -n "$secret" --query value -o tsv \
     | awk '/-----BEGIN CERTIFICATE-----/,/-----END CERTIFICATE-----/' > "$WORK/$site-ca.pem"
+}
 
-  ca_name="site-$site"
+# ensure_enrollment_group <site>: registers the site's CA in DPS (verified) and creates its enrollment group, unless
+# the enrollment group exists.
+ensure_enrollment_group() {
+  local site="$1"
+  local name="site-$site"
   # Only a missing site is bootstrapped: once its enrollment group exists, its trust is managed through the provisioning
   # API (M4), and certificates an Editor removed must not come back on the next deployment.
-  if az iot dps enrollment-group show --dps-name "$DPS_NAME" -g "$AZURE_RESOURCE_GROUP" --enrollment-id "site-$site" \
-       --auth-type login -o none 2>/dev/null; then
+  if az iot dps enrollment-group show "${DPS_ARGS[@]}" --enrollment-id "$name" --auth-type login -o none 2>/dev/null; then
     echo "[$site] DPS enrollment group exists (trust managed by the provisioning API)"
-    continue
+    return
   fi
-  if ! az iot dps certificate show --dps-name "$DPS_NAME" -g "$AZURE_RESOURCE_GROUP" --certificate-name "$ca_name" -o none 2>/dev/null; then
-    az iot dps certificate create --dps-name "$DPS_NAME" -g "$AZURE_RESOURCE_GROUP" --certificate-name "$ca_name" \
+  if ! az iot dps certificate show "${DPS_ARGS[@]}" --certificate-name "$name" -o none 2>/dev/null; then
+    az iot dps certificate create "${DPS_ARGS[@]}" --certificate-name "$name" \
       --path "$WORK/$site-ca.pem" --verified true -o none
     echo "[$site] CA registered in DPS (verified)"
   fi
-  az iot dps enrollment-group create --dps-name "$DPS_NAME" -g "$AZURE_RESOURCE_GROUP" \
-    --enrollment-id "site-$site" --ca-name "$ca_name" \
+  az iot dps enrollment-group create "${DPS_ARGS[@]}" \
+    --enrollment-id "$name" --ca-name "$name" \
     --initial-twin-tags "{\"siteId\":\"$site\"}" --provisioning-status enabled \
     --auth-type login -o none
   echo "[$site] DPS enrollment group created"
+}
+
+for site in ${SITES//,/ }; do
+  ensure_site_ca "$site"
+  ensure_enrollment_group "$site"
 done

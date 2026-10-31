@@ -11,22 +11,53 @@ data "http" "deployer_ip" {
 }
 
 locals {
+  # Suffix that keeps globally unique resource names unique per subscription and environment.
   token = substr(sha1("${var.subscription_id}-${var.environment_name}"), 0, 8)
   # Alphanumeric prefix for resources that do not accept hyphens (storage, registry).
   compact = substr(replace(lower(var.environment_name), "/[^a-z0-9]/", ""), 0, 10)
-  # Extra tags from RESOURCE_TAGS ("key=value,key=value"), e.g. those required by a tenant's policies.
-  tags = merge(
-    { for pair in split(",", var.tags) : trimspace(split("=", pair)[0]) => trimspace(join("=", slice(split("=", pair), 1, length(split("=", pair))))) if trimspace(pair) != "" },
-    { "azd-env-name" = var.environment_name },
-  )
+
+  # Extra tags from RESOURCE_TAGS ("key=value,key=value"), e.g. those required by a tenant's policies. Everything
+  # after the first "=" is the value, so values may contain "=".
+  extra_tag_pairs = [for pair in split(",", var.tags) : split("=", pair) if trimspace(pair) != ""]
+  extra_tags = {
+    for pair in local.extra_tag_pairs : trimspace(pair[0]) => trimspace(join("=", slice(pair, 1, length(pair))))
+  }
+  tags = merge(local.extra_tags, { "azd-env-name" = var.environment_name })
+
+  # Optional azd environment values: an empty value selects the default below. scripts/check-model-quota.sh mirrors
+  # the model defaults.
+  agent_model = {
+    name     = coalesce(var.agent_model_name, "gpt-6-luna")
+    version  = coalesce(var.agent_model_version, "2026-09-22")
+    sku      = coalesce(var.agent_model_sku, "DataZoneStandard")
+    capacity = tonumber(coalesce(var.agent_model_capacity, "50"))
+  }
+  agent_capture_content        = lower(coalesce(var.agent_capture_content, "false")) == "true"
+  alerting_subscription_filter = coalesce(var.alerting_subscription_filter, "siteId = 'paris-01'")
+  default_metrics              = "temperature,humidity,pressure,co2,illuminance"
+
   anomaly_detection_enabled = lower(coalesce(var.anomaly_detection_enabled, "true")) != "false"
   anomaly_sites             = coalesce(var.anomaly_sites, "paris-01")
-  digest_enabled            = lower(coalesce(var.digest_enabled, "true")) != "false"
-  maintenance_enabled       = lower(coalesce(var.maintenance_enabled, "true")) != "false"
+  anomaly_metrics           = coalesce(var.anomaly_metrics, local.default_metrics)
+  anomaly_deviation         = coalesce(var.anomaly_deviation, "4")
+  anomaly_confidence        = coalesce(var.anomaly_confidence, "0.7")
+  decision_model_capacity   = coalesce(var.decision_model_capacity, "30")
+
+  # Empty digest or maintenance sites: every site.
+  digest_enabled = lower(coalesce(var.digest_enabled, "true")) != "false"
+  digest_sites   = trimspace(var.digest_sites)
+  digest_metrics = coalesce(var.digest_metrics, local.default_metrics)
+
+  maintenance_enabled    = lower(coalesce(var.maintenance_enabled, "true")) != "false"
+  maintenance_sites      = trimspace(var.maintenance_sites)
+  maintenance_confidence = coalesce(var.maintenance_confidence, "0.4")
+
   # Microsoft-Decision-1 serves both anomaly detection (M7) and maintenance (M9).
   decision_model_enabled = local.anomaly_detection_enabled || local.maintenance_enabled
+
   # Empty: one aging Ruuvi device per demo site (M9 design D11).
-  simulator_aging_devices = coalesce(trimspace(var.simulator_aging_devices), join(",", [for site in var.demo_sites : "${site}-ruuvi5-003"]))
+  default_aging_devices   = join(",", [for site in var.demo_sites : "${site}-ruuvi5-003"])
+  simulator_aging_devices = coalesce(trimspace(var.simulator_aging_devices), local.default_aging_devices)
 }
 
 resource "azurerm_resource_group" "main" {
@@ -70,7 +101,7 @@ module "alerting" {
   location            = var.location
   environment_name    = var.environment_name
   token               = local.token
-  subscription_filter = coalesce(var.alerting_subscription_filter, "siteId = 'paris-01'")
+  subscription_filter = local.alerting_subscription_filter
   tags                = local.tags
 }
 
@@ -214,7 +245,7 @@ module "apps" {
     project_endpoint      = module.foundry.project_endpoint
     openai_endpoint       = module.foundry.openai_endpoint
     model_deployment_name = module.foundry.model_deployment_name
-    capture_content       = lower(coalesce(var.agent_capture_content, "false")) == "true"
+    capture_content       = local.agent_capture_content
   }
   api_base_url    = module.api.api_base_url
   portal_base_url = module.web.origin
@@ -226,23 +257,21 @@ module "apps" {
   anomaly_detection = {
     enabled             = local.anomaly_detection_enabled
     sites               = local.anomaly_sites
-    metrics             = coalesce(var.anomaly_metrics, "temperature,humidity,pressure,co2,illuminance")
-    deviation           = coalesce(var.anomaly_deviation, "4")
-    confidence          = coalesce(var.anomaly_confidence, "0.7")
+    metrics             = local.anomaly_metrics
+    deviation           = local.anomaly_deviation
+    confidence          = local.anomaly_confidence
     decision_endpoint   = module.foundry.account_endpoint
     decision_deployment = module.foundry.decision_model_deployment_name
   }
   site_digest = {
     enabled = local.digest_enabled
-    # Empty: every site.
-    sites   = trimspace(var.digest_sites)
-    metrics = coalesce(var.digest_metrics, "temperature,humidity,pressure,co2,illuminance")
+    sites   = local.digest_sites
+    metrics = local.digest_metrics
   }
   maintenance = {
-    enabled = local.maintenance_enabled
-    # Empty: every site.
-    sites               = trimspace(var.maintenance_sites)
-    confidence          = coalesce(var.maintenance_confidence, "0.4")
+    enabled             = local.maintenance_enabled
+    sites               = local.maintenance_sites
+    confidence          = local.maintenance_confidence
     decision_endpoint   = module.foundry.account_endpoint
     decision_deployment = module.foundry.decision_model_deployment_name
   }
@@ -275,14 +304,9 @@ module "foundry" {
   location          = var.location
   environment_name  = var.environment_name
   token             = local.token
-  model = {
-    name     = coalesce(var.agent_model_name, "gpt-6-luna")
-    version  = coalesce(var.agent_model_version, "2026-09-22")
-    sku      = coalesce(var.agent_model_sku, "DataZoneStandard")
-    capacity = tonumber(coalesce(var.agent_model_capacity, "50"))
-  }
+  model             = local.agent_model
   decision_model = local.decision_model_enabled ? {
-    capacity = tonumber(coalesce(var.decision_model_capacity, "30"))
+    capacity = tonumber(local.decision_model_capacity)
   } : null
   application_insights = {
     id                = module.core.application_insights_id

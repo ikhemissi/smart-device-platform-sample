@@ -9,24 +9,25 @@ site="${1:?usage: $0 <site-id>}"
 [[ "$site" =~ ^(e2e|test)-[a-z0-9-]+$ ]] || { echo "Refusing to remove '$site': only e2e-* and test-* sites can be removed" >&2; exit 1; }
 eval "$(azd env get-values)"
 export AZURE_EXTENSION_USE_DYNAMIC_INSTALL=yes_without_prompt
+DPS_ARGS=(--dps-name "$DPS_NAME" -g "$AZURE_RESOURCE_GROUP")
+HUB_ARGS=(--hub-name "$IOTHUB_NAME" --auth-type login)
+ENROLLMENT_ARGS=("${DPS_ARGS[@]}" --enrollment-id "site-$site" --auth-type login)
 
-if az iot dps enrollment-group show --dps-name "$DPS_NAME" -g "$AZURE_RESOURCE_GROUP" --enrollment-id "site-$site" \
-     --auth-type login -o none 2>/dev/null; then
-  az iot dps enrollment-group delete --dps-name "$DPS_NAME" -g "$AZURE_RESOURCE_GROUP" --enrollment-id "site-$site" \
-    --auth-type login -o none
+if az iot dps enrollment-group show "${ENROLLMENT_ARGS[@]}" -o none 2>/dev/null; then
+  az iot dps enrollment-group delete "${ENROLLMENT_ARGS[@]}" -o none
   echo "[$site] DPS enrollment group deleted"
 fi
 
-for name in $(az iot dps certificate list --dps-name "$DPS_NAME" -g "$AZURE_RESOURCE_GROUP" \
+# The bootstrap CA (site-<site>) and the CAs added through the provisioning API (site-<site>-<fingerprint>).
+for name in $(az iot dps certificate list "${DPS_ARGS[@]}" \
                 --query "value[?starts_with(name, 'site-$site-') || name == 'site-$site'].name" -o tsv); do
-  etag="$(az iot dps certificate show --dps-name "$DPS_NAME" -g "$AZURE_RESOURCE_GROUP" --certificate-name "$name" --query etag -o tsv)"
-  az iot dps certificate delete --dps-name "$DPS_NAME" -g "$AZURE_RESOURCE_GROUP" --certificate-name "$name" --etag "$etag" -o none
+  etag="$(az iot dps certificate show "${DPS_ARGS[@]}" --certificate-name "$name" --query etag -o tsv)"
+  az iot dps certificate delete "${DPS_ARGS[@]}" --certificate-name "$name" --etag "$etag" -o none
   echo "[$site] DPS certificate $name deleted"
 done
 
-for device in $(az iot hub device-identity list --hub-name "$IOTHUB_NAME" --auth-type login \
-                  --query "[?tags.siteId == '$site'].deviceId" -o tsv); do
-  az iot hub device-identity delete --hub-name "$IOTHUB_NAME" --auth-type login --device-id "$device" -o none
+for device in $(az iot hub device-identity list "${HUB_ARGS[@]}" --query "[?tags.siteId == '$site'].deviceId" -o tsv); do
+  az iot hub device-identity delete "${HUB_ARGS[@]}" --device-id "$device" -o none
   echo "[$site] IoT Hub device $device deleted"
 done
 
