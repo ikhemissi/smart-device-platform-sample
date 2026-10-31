@@ -4,7 +4,7 @@
 
 An end-to-end Azure sample of a sensor platform. Simulated devices send binary measurements, the platform decodes and stores them, people browse them in a web portal, get email alerts, manage which devices may connect, ask an AI assistant about the data, review the anomalies a decision model finds in it, read a daily brief of each site, and see which devices need a visit before their battery runs out.
 
-> **Status:** milestones M1–M8 and the operations workbook are delivered and archived; M9 (predictive maintenance) is in progress ([change](openspec/changes/m9-maintenance/proposal.md)). Baseline specifications are in [`openspec/specs/`](openspec/specs).
+> **Status:** all milestones (M1–M9) and the operations workbook are delivered and archived. Baseline specifications are in [`openspec/specs/`](openspec/specs).
 
 **Contents:** [What it shows](#what-it-shows) · [Architecture](#architecture) · [How it works](#how-it-works) · [Security](#security) · [Repository](#repository) · [Build and test](#build-and-test) · [Continuous integration](#continuous-integration) · [Deploy to Azure](#deploy-to-azure) · [Operate](#operate) · [Contributing](#contributing)
 

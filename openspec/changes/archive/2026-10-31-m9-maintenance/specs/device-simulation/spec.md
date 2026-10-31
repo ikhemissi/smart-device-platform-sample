@@ -3,7 +3,7 @@
 ## MODIFIED Requirements
 
 ### Requirement: Realistic readings
-Simulated readings SHALL evolve plausibly over time: temperature and humidity follow a daily cycle with noise per device, pressure drifts slowly like the weather, battery voltage/level decreases slowly, sequence/packet counters increase, and all values stay within each format's valid range. Pressure and battery SHALL be computed from the time so that they stay continuous when the simulator restarts. Configured aging devices SHALL drain their battery from full to their cut-off in about two weeks, then restart with a new battery.
+Simulated readings SHALL evolve plausibly within each format's valid range: a daily cycle with noise for temperature and humidity, a slow weather-like drift for pressure, a slowly decreasing battery, increasing counters. Pressure and battery SHALL stay continuous across simulator restarts; configured aging devices SHALL drain their battery to the cut-off in about two weeks, then get a new one.
 
 #### Scenario: Continuous series
 - **WHEN** a device reports 100 consecutive readings

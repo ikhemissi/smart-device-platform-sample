@@ -36,7 +36,7 @@ The simulator SHALL encode each reading in the device's configured format exactl
 - **THEN** the message body starts with `0xCA` followed by a valid Cayenne LPP frame
 
 ### Requirement: Realistic readings
-Simulated readings SHALL evolve plausibly over time: temperature and humidity follow a daily cycle with noise per device, pressure drifts slowly like the weather and stays continuous when the simulator restarts, battery voltage/level decreases slowly, sequence/packet counters increase, and all values stay within each format's valid range.
+Simulated readings SHALL evolve plausibly within each format's valid range: a daily cycle with noise for temperature and humidity, a slow weather-like drift for pressure, a slowly decreasing battery, increasing counters. Pressure and battery SHALL stay continuous across simulator restarts; configured aging devices SHALL drain their battery to the cut-off in about two weeks, then get a new one.
 
 #### Scenario: Continuous series
 - **WHEN** a device reports 100 consecutive readings
@@ -44,7 +44,11 @@ Simulated readings SHALL evolve plausibly over time: temperature and humidity fo
 
 #### Scenario: Restart
 - **WHEN** the simulator restarts (for example to inject an anomaly)
-- **THEN** each device's pressure continues from its previous level instead of jumping, so that anomaly detection does not flag the restart
+- **THEN** each device's pressure and battery continue from their previous levels instead of jumping, so that anomaly detection and maintenance forecasts do not flag the restart
+
+#### Scenario: Aging device
+- **WHEN** a device is configured as aging
+- **THEN** its battery falls by about 0.035 V a day until it reaches its cut-off (about two weeks from a new battery), then rises to a new battery's level
 
 ### Requirement: Message identity and trace context
 Each message SHALL carry a unique message id (reused if the same message is resent) and a W3C `traceparent` application property.

@@ -94,7 +94,7 @@ uv run site-digest --dry-run --site paris-01 --no-brief  # figures only, no mode
 
 A third entry point, `maintenance`, run by the job `caj-upkeep-<token>` (hourly, 10-minute timeout, same image and
 identity) ([PRD-009](../../docs/prd/PRD-009-m9-maintenance.md),
-[design](../../openspec/changes/m9-maintenance/design.md)). One run assesses every device of the configured sites,
+[design](../../openspec/changes/archive/2026-10-31-m9-maintenance/design.md)). One run assesses every device of the configured sites,
 then updates the queue (`sdp.device_maintenance`, `sdp.maintenance_items`):
 
 | Step | Who | What |

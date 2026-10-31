@@ -21,7 +21,7 @@ Every day, once 06:00 UTC has passed, the platform SHALL generate one digest per
 - **THEN** the site's digest of the day is shown, with its period and generation time
 
 ### Requirement: Figures
-Each digest SHALL hold figures computed from the platform's data, never by a model, covering the site's devices (reporting and silent), each reported metric (average over the period and over the comparison period, and the change), alerts, anomalies, rejected messages and site certificates expiring within 30 days.
+Each digest SHALL hold figures computed from the platform's data, never by a model, covering the site's devices (reporting and silent), each reported metric (average over the period and over the comparison period, and the change), alerts, anomalies, rejected messages, site certificates expiring within 30 days and, when maintenance is enabled, the site's maintenance queue.
 
 #### Scenario: Silent device
 - **WHEN** a device of the site has not reported for more than 15 minutes at generation time
@@ -30,6 +30,10 @@ Each digest SHALL hold figures computed from the platform's data, never by a mod
 #### Scenario: Alerts and anomalies
 - **WHEN** alerts opened and anomalies were recorded at the site during the period
 - **THEN** the figures list each alert (device, metric, status) and the anomalies by status (device, metric, classification, confidence)
+
+#### Scenario: Maintenance queue
+- **WHEN** devices of the site are in the maintenance queue at generation time
+- **THEN** the figures give the number of items by status and the most urgent devices with their probability and days left
 
 ### Requirement: Brief
 Each digest SHALL include a brief of at most six sentences, in English, generated from the digest's figures only: every number it contains SHALL appear in the figures, and every device it mentions SHALL be named by its id.

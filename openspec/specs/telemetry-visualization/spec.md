@@ -72,3 +72,10 @@ When anomaly detection is enabled, the device page SHALL show the device's anoma
 #### Scenario: Device of a site that is not analysed
 - **WHEN** the device's site is not analysed
 - **THEN** the card says that anomalies are not analysed for this site
+
+### Requirement: Device battery forecast
+When maintenance is enabled, the device page SHALL show the device's latest assessment: battery level, trend per day and estimated days left when the device reports a battery, the intervention probability, the assessment time, and its queue item (status, work order) if any.
+
+#### Scenario: Aging device page
+- **WHEN** a user opens the page of a device whose battery has about 3 days left
+- **THEN** the page shows the battery level, the daily trend, "about 3 days left", the probability and the open queue item
