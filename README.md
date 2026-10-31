@@ -4,7 +4,7 @@
 
 **From sensor bytes to decisions, on Azure.** A complete, deployable sample of an IoT platform: devices send binary measurements; the platform stores them reliably, shows them to the right people and alerts on thresholds — and uses AI to tell people what deserves their attention: unusual readings, a daily brief per site, and the devices to visit before their battery dies.
 
-> **Status:** all milestones (M1–M9) and the operations workbook are delivered and archived. Baseline specifications are in [`openspec/specs/`](openspec/specs).
+![Smart Device Platform architecture](docs/architecture/architecture.svg)
 
 **Contents:** [Why it matters](#why-it-matters) · [What it shows](#what-it-shows) · [Architecture](#architecture) · [How it works](#how-it-works) · [Security](#security) · [Repository](#repository) · [Build and test](#build-and-test) · [Continuous integration](#continuous-integration) · [Deploy to Azure](#deploy-to-azure) · [Operate](#operate) · [Contributing](#contributing)
 
@@ -40,10 +40,6 @@
 | — | Operations workbook | KPIs, latest errors, AI assistant usage, PostgreSQL / IoT Hub / Event Hubs metrics | [Operate](#operate) |
 
 ## Architecture
-
-![Smart Device Platform architecture](docs/architecture/architecture.svg)
-
-The same flows as a Mermaid diagram:
 
 ```mermaid
 flowchart LR
