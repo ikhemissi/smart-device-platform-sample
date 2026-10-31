@@ -2,11 +2,27 @@
 
 [![CI](https://github.com/ikhemissi/smart-device-platform-sample/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/ikhemissi/smart-device-platform-sample/actions/workflows/ci.yml)
 
-An end-to-end Azure sample of a sensor platform. Simulated devices send binary measurements, the platform decodes and stores them, people browse them in a web portal, get email alerts, manage which devices may connect, ask an AI assistant about the data, review the anomalies a decision model finds in it, read a daily brief of each site, and see which devices need a visit before their battery runs out.
+**From sensor bytes to decisions, on Azure.** A complete, deployable sample of an IoT platform: devices send binary measurements; the platform stores them reliably, shows them to the right people and alerts on thresholds — and uses AI to tell people what deserves their attention: unusual readings, a daily brief per site, and the devices to visit before their battery dies.
 
 > **Status:** all milestones (M1–M9) and the operations workbook are delivered and archived. Baseline specifications are in [`openspec/specs/`](openspec/specs).
 
-**Contents:** [What it shows](#what-it-shows) · [Architecture](#architecture) · [How it works](#how-it-works) · [Security](#security) · [Repository](#repository) · [Build and test](#build-and-test) · [Continuous integration](#continuous-integration) · [Deploy to Azure](#deploy-to-azure) · [Operate](#operate) · [Contributing](#contributing)
+**Contents:** [Why it matters](#why-it-matters) · [What it shows](#what-it-shows) · [Architecture](#architecture) · [How it works](#how-it-works) · [Security](#security) · [Repository](#repository) · [Build and test](#build-and-test) · [Continuous integration](#continuous-integration) · [Deploy to Azure](#deploy-to-azure) · [Operate](#operate) · [Contributing](#contributing)
+
+## Why it matters
+
+| For… | The platform… | So that… |
+|---|---|---|
+| **Operators** | alerts on thresholds without flooding inboxes, and flags unusual readings nobody configured, saying how sure it is | they act on real problems, not on noise |
+| **Site managers** | writes a short daily brief per site from figures it computes | they know a site's state at a glance |
+| **Field teams** | forecasts every battery and ranks the devices likely to need a visit within 7 days, with a work order | visits are planned before devices go silent |
+| **Everyone** | answers questions in plain language, grounded in the data, with sources and within the user's permissions | data is useful without dashboards or SQL |
+| **Architects** | wires Azure building blocks end to end: passwordless, observable, deployed with one command, specified and tested | they reuse working patterns, not slideware |
+
+### AI you can trust
+
+- **Code computes, models judge, language models write** ([ADR-0011](docs/adr/ADR-0011-model-based-analysis.md)): statistics and figures are computed in code; `Microsoft-Decision-1` returns a probability for a closed question; `gpt-6-luna` only puts computed figures into words, and every number it writes is checked against them.
+- **Thresholds are settings tuned on real data** with dry runs that write nothing, and every automated decision is recorded with its probabilities, threshold and model version.
+- **People stay in charge:** Editors review anomalies and close maintenance items; the assistant is read-only and sees only what the signed-in user may see.
 
 ## What it shows
 
@@ -17,11 +33,11 @@ An end-to-end Azure sample of a sensor platform. Simulated devices send binary m
 | M3 | Device data and chart | Latest 20 measurements, chart up to 30 days, Redis cache | [m3-device-data-and-chart](docs/demo/m3-device-data-and-chart.md) |
 | M4 | Site certificates | Add or remove a site's CA certificates in DPS from the portal | [m4-site-certificates](docs/demo/m4-site-certificates.md) |
 | M5 | Threshold alerting | Thresholds per device, emails without floods, alert history | [m5-threshold-alerting](docs/demo/m5-threshold-alerting.md) |
-| — | Operations workbook | KPIs, latest errors, PostgreSQL / IoT Hub / Event Hubs metrics | [Operate](#operate) |
 | M6 | AI assistant | Questions in natural language, grounded answers with sources, `gpt-6-luna` | [m6-ai-analyst](docs/demo/m6-ai-analyst.md) |
 | M7 | Anomaly detection | Statistics select, `Microsoft-Decision-1` classifies (real event, sensor fault, …) with a confidence, `gpt-6-luna` explains; reviews in the portal | [m7-anomaly-detection](docs/demo/m7-anomaly-detection.md) |
 | M8 | Site digest | A daily brief per site written by `gpt-6-luna` from figures the platform computes; regenerated on request | [m8-site-digest](docs/demo/m8-site-digest.md) |
-| M9 | Predictive maintenance | Battery forecasts and reporting signals computed in code, `Microsoft-Decision-1` gives the probability of a visit within 7 days, `gpt-6-luna` writes the work order; a maintenance queue in the portal | [m9-maintenance](docs/demo/m9-maintenance.md) (draft) |
+| M9 | Predictive maintenance | Battery forecasts and reporting signals computed in code, `Microsoft-Decision-1` gives the probability of a visit within 7 days, `gpt-6-luna` writes the work order; a maintenance queue in the portal | [m9-maintenance](docs/demo/m9-maintenance.md) |
+| — | Operations workbook | KPIs, latest errors, AI assistant usage, PostgreSQL / IoT Hub / Event Hubs metrics | [Operate](#operate) |
 
 ## Architecture
 
@@ -65,7 +81,7 @@ flowchart LR
 | Layer | Technology |
 |---|---|
 | Platform services | Java 25, Spring Boot 4 |
-| AI agent and anomaly detector | Python 3.13, Microsoft Agent Framework, Foundry (`gpt-6-luna`, `Microsoft-Decision-1`, EU data zone) |
+| AI agent and analysis jobs | Python 3.13, Microsoft Agent Framework, Foundry (`gpt-6-luna`, `Microsoft-Decision-1`, EU data zone) |
 | Portal | React, TypeScript, Fluent UI, MSAL, on Azure Static Web Apps |
 | Infrastructure | Terraform, deployed with azd |
 | Observability | OpenTelemetry → Application Insights, Azure Monitor workbook |
@@ -262,6 +278,7 @@ One trace follows a device message from the decoder to the alert email, and a qu
 | No secrets | Nothing in code, configuration, IaC outputs or CI ([ADR-0005](docs/adr/ADR-0005-passwordless-identity.md)) |
 | Device identity | X.509 certificates per site CA, enrolled in DPS ([ADR-0006](docs/adr/ADR-0006-device-identity-per-site-ca.md)) |
 | User access | Entra ID app roles, checked by API Management **and** by each service |
+| AI access | Models reached with workload identities (no keys); the assistant calls the platform API with the user's token, read-only |
 | Least privilege | One identity per workload with data-plane roles only |
 
 Details: [docs/security.md](docs/security.md). All resources carry the tenant tags `SecurityControl=Ignore` and `CostControl=Ignore`.
@@ -308,7 +325,7 @@ Every push to `main` and every pull request targeting it runs [`.github/workflow
 
 ```mermaid
 flowchart LR
-  P["push to main"] --> J["java<br/>build, unit +<br/>integration tests"]
+  P["push to main<br/>or pull request"] --> J["java<br/>build, unit +<br/>integration tests"]
   P --> W["portal<br/>lint, types, tests,<br/>build, Playwright"]
   P --> A["Python (agent, detector)<br/>ruff, pytest,<br/>image build"]
   P --> I["infra-specs<br/>Terraform, actionlint,<br/>OpenSpec"]
@@ -342,7 +359,7 @@ azd up
 ```mermaid
 flowchart LR
   A["preprovision<br/>model quota check,<br/>Terraform state store"] --> B["Terraform<br/>all resources"]
-  B --> C["postprovision<br/>migrate database,<br/>build detector image,<br/>prepare demo sites"]
+  B --> C["postprovision<br/>migrate database,<br/>build the analysis jobs' image,<br/>prepare demo sites"]
   C --> D["deploy<br/>6 services + portal"]
 ```
 
@@ -393,7 +410,7 @@ flowchart LR
 ## Contributing
 
 - **Spec-driven:** every functional change is an [OpenSpec](https://github.com/Fission-AI/OpenSpec) change (propose → apply → archive). Install the CLI with `npm i -g @fission-ai/openspec`; in GitHub Copilot use `/opsx-propose`, `/opsx-apply` and `/opsx-archive`.
-- **Coding agents** follow [AGENTS.md](AGENTS.md).
+- **Coding agents** follow [AGENTS.md](AGENTS.md). Offline work (code and tests) can be delegated to the GitHub Copilot cloud agent, whose environment is [`copilot-setup-steps.yml`](.github/workflows/copilot-setup-steps.yml); tasks needing Azure stay with a session that can reach the environment (see [M9](openspec/changes/archive/2026-10-31-m9-maintenance/tasks.md) for an example).
 
 | Document | Purpose |
 |---|---|
