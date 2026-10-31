@@ -1,0 +1,198 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1650" height="1075" viewBox="0 0 1650 1075">
+<defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+<path d="M0,0 L10,5 L0,10 z" fill="#5B6470"/></marker>
+<style>
+text { font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif; }
+.h { font-size: 26px; font-weight: 700; fill: #1B1B1B; }
+.sub { font-size: 15px; fill: #666; }
+.t { font-size: 15px; font-weight: 700; }
+.m { font-size: 13.5px; font-weight: 700; }
+.s { font-size: 12.5px; fill: #444; }
+.l { font-size: 12px; fill: #3A4350; font-style: italic; paint-order: stroke; stroke: #FFFFFF; stroke-width: 4px; }
+</style></defs>
+<rect width="100%" height="100%" fill="#FFFFFF"/>
+<text x="40" y="48" class="h">Smart Device Platform — architecture</text>
+<text x="1610" y="48" class="sub" text-anchor="end">From sensor bytes to decisions, on Azure</text>
+<rect x="310" y="100" width="220" height="80" rx="10" fill="#F1F1F1" stroke="#555555" stroke-width="1.6"/>
+<rect x="310" y="100" width="6" height="80" rx="3" fill="#555555"/>
+<text x="328" y="126" class="t" fill="#555555">Microsoft Entra ID</text>
+<text x="328" y="145" class="s">sign-in, app roles</text>
+<text x="328" y="162" class="s">DeviceData.Read / .Write</text>
+<rect x="40" y="210" width="220" height="80" rx="10" fill="#F1F1F1" stroke="#555555" stroke-width="1.6"/>
+<rect x="40" y="210" width="6" height="80" rx="3" fill="#555555"/>
+<text x="58" y="236" class="t" fill="#555555">Users</text>
+<text x="58" y="255" class="s">operators, site managers,</text>
+<text x="58" y="272" class="s">field teams</text>
+<rect x="310" y="210" width="220" height="80" rx="10" fill="#FFF2E3" stroke="#C25E00" stroke-width="1.6"/>
+<rect x="310" y="210" width="6" height="80" rx="3" fill="#C25E00"/>
+<text x="328" y="236" class="t" fill="#C25E00">Portal</text>
+<text x="328" y="255" class="s">Static Web Apps</text>
+<text x="328" y="272" class="s">React · Fluent UI · MSAL</text>
+<rect x="580" y="210" width="220" height="80" rx="10" fill="#FFF2E3" stroke="#C25E00" stroke-width="1.6"/>
+<rect x="580" y="210" width="6" height="80" rx="3" fill="#C25E00"/>
+<text x="598" y="236" class="t" fill="#C25E00">API Management</text>
+<text x="598" y="255" class="s">single entry point</text>
+<text x="598" y="272" class="s">validates tokens and roles</text>
+<rect x="850" y="100" width="220" height="80" rx="10" fill="#E8F1FB" stroke="#0F6CBD" stroke-width="1.6"/>
+<rect x="850" y="100" width="6" height="80" rx="3" fill="#0F6CBD"/>
+<text x="868" y="126" class="t" fill="#0F6CBD">device-analyst</text>
+<text x="868" y="145" class="s">AI assistant (read-only)</text>
+<text x="868" y="162" class="s">Python · Agent Framework</text>
+<rect x="850" y="210" width="220" height="80" rx="10" fill="#E8F1FB" stroke="#0F6CBD" stroke-width="1.6"/>
+<rect x="850" y="210" width="6" height="80" rx="3" fill="#0F6CBD"/>
+<text x="868" y="236" class="t" fill="#0F6CBD">device-api</text>
+<text x="868" y="255" class="s">devices, history, alerts,</text>
+<text x="868" y="272" class="s">digests, maintenance · Java</text>
+<rect x="850" y="320" width="220" height="80" rx="10" fill="#E8F1FB" stroke="#0F6CBD" stroke-width="1.6"/>
+<rect x="850" y="320" width="6" height="80" rx="3" fill="#0F6CBD"/>
+<text x="868" y="346" class="t" fill="#0F6CBD">provisioning-api</text>
+<text x="868" y="365" class="s">site certificates (DPS)</text>
+<text x="868" y="382" class="s">Java 25 · Spring Boot 4</text>
+<rect x="1120" y="210" width="220" height="80" rx="10" fill="#EAF5E6" stroke="#2E7D32" stroke-width="1.6"/>
+<rect x="1120" y="210" width="6" height="80" rx="3" fill="#2E7D32"/>
+<text x="1138" y="236" class="t" fill="#2E7D32">Azure Managed Redis</text>
+<text x="1138" y="255" class="s">history cache,</text>
+<text x="1138" y="272" class="s">assistant sessions</text>
+<rect x="1390" y="100" width="220" height="190" rx="10" fill="#F3ECFB" stroke="#6B3FA0" stroke-width="1.6"/>
+<rect x="1390" y="100" width="6" height="190" rx="3" fill="#6B3FA0"/>
+<text x="1408" y="126" class="t" fill="#6B3FA0">Microsoft Foundry</text>
+<rect x="1404" y="140" width="194" height="64" rx="7" fill="#FFFFFF" stroke="#6B3FA0" stroke-opacity="0.5"/>
+<text x="1416" y="161" class="m" fill="#6B3FA0">gpt-6-luna</text>
+<text x="1416" y="179" class="s">assistant, briefs,</text>
+<text x="1416" y="195" class="s">explanations, work orders</text>
+<rect x="1404" y="212" width="194" height="64" rx="7" fill="#FFFFFF" stroke="#6B3FA0" stroke-opacity="0.5"/>
+<text x="1416" y="233" class="m" fill="#6B3FA0">Microsoft-Decision-1</text>
+<text x="1416" y="251" class="s">anomaly decisions,</text>
+<text x="1416" y="267" class="s">intervention probability</text>
+<rect x="1390" y="420" width="220" height="320" rx="12" fill="#F6FAFE" stroke="#0F6CBD" stroke-width="1.6" stroke-dasharray="5 4"/>
+<text x="1404" y="444" class="t" fill="#0F6CBD">Analysis jobs</text>
+<rect x="1402" y="458" width="196" height="80" rx="10" fill="#E8F1FB" stroke="#0F6CBD" stroke-width="1.6"/>
+<rect x="1402" y="458" width="6" height="80" rx="3" fill="#0F6CBD"/>
+<text x="1420" y="484" class="t" fill="#0F6CBD">anomaly-detector</text>
+<text x="1420" y="503" class="s">every 5 min</text>
+<text x="1420" y="520" class="s">Python · Container Apps job</text>
+<rect x="1402" y="550" width="196" height="80" rx="10" fill="#E8F1FB" stroke="#0F6CBD" stroke-width="1.6"/>
+<rect x="1402" y="550" width="6" height="80" rx="3" fill="#0F6CBD"/>
+<text x="1420" y="576" class="t" fill="#0F6CBD">site-digest</text>
+<text x="1420" y="595" class="s">daily 06:00 + on request</text>
+<text x="1420" y="612" class="s">Python · Container Apps job</text>
+<rect x="1402" y="642" width="196" height="80" rx="10" fill="#E8F1FB" stroke="#0F6CBD" stroke-width="1.6"/>
+<rect x="1402" y="642" width="6" height="80" rx="3" fill="#0F6CBD"/>
+<text x="1420" y="668" class="t" fill="#0F6CBD">maintenance</text>
+<text x="1420" y="687" class="s">hourly battery forecast</text>
+<text x="1420" y="704" class="s">Python · Container Apps job</text>
+<rect x="40" y="540" width="220" height="80" rx="10" fill="#F1F1F1" stroke="#555555" stroke-width="1.6"/>
+<rect x="40" y="540" width="6" height="80" rx="3" fill="#555555"/>
+<text x="58" y="566" class="t" fill="#555555">Key Vault</text>
+<text x="58" y="585" class="s">demo site CAs</text>
+<text x="58" y="602" class="s">(RBAC, simulator only)</text>
+<rect x="40" y="650" width="220" height="80" rx="10" fill="#E8F1FB" stroke="#0F6CBD" stroke-width="1.6"/>
+<rect x="40" y="650" width="6" height="80" rx="3" fill="#0F6CBD"/>
+<text x="58" y="676" class="t" fill="#0F6CBD">device-simulator</text>
+<text x="58" y="695" class="s">emulated sensors: provision,</text>
+<text x="58" y="712" class="s">then send MQTT telemetry</text>
+<rect x="310" y="540" width="220" height="80" rx="10" fill="#E3F5F2" stroke="#0E7C70" stroke-width="1.6"/>
+<rect x="310" y="540" width="6" height="80" rx="3" fill="#0E7C70"/>
+<text x="328" y="566" class="t" fill="#0E7C70">Device Provisioning</text>
+<text x="328" y="585" class="s">enrollment group per site</text>
+<text x="328" y="602" class="s">X.509 attestation</text>
+<rect x="310" y="650" width="220" height="80" rx="10" fill="#E3F5F2" stroke="#0E7C70" stroke-width="1.6"/>
+<rect x="310" y="650" width="6" height="80" rx="3" fill="#0E7C70"/>
+<text x="328" y="676" class="t" fill="#0E7C70">IoT Hub</text>
+<text x="328" y="695" class="s">MQTT telemetry</text>
+<text x="328" y="712" class="s">site enrichment, routing</text>
+<rect x="580" y="650" width="220" height="80" rx="10" fill="#E3F5F2" stroke="#0E7C70" stroke-width="1.6"/>
+<rect x="580" y="650" width="6" height="80" rx="3" fill="#0E7C70"/>
+<text x="598" y="676" class="t" fill="#0E7C70">Event Hubs</text>
+<text x="598" y="695" class="s">telemetry stream</text>
+<text x="598" y="712" class="s">checkpoints in Storage</text>
+<rect x="850" y="650" width="220" height="80" rx="10" fill="#E8F1FB" stroke="#0F6CBD" stroke-width="1.6"/>
+<rect x="850" y="650" width="6" height="80" rx="3" fill="#0F6CBD"/>
+<text x="868" y="676" class="t" fill="#0F6CBD">telemetry-decoder</text>
+<text x="868" y="695" class="s">binary → JSON, in batches</text>
+<text x="868" y="712" class="s">Ruuvi, BTHome, Cayenne</text>
+<rect x="1120" y="650" width="220" height="80" rx="10" fill="#EAF5E6" stroke="#2E7D32" stroke-width="1.6"/>
+<rect x="1120" y="650" width="6" height="80" rx="3" fill="#2E7D32"/>
+<text x="1138" y="676" class="t" fill="#2E7D32">PostgreSQL</text>
+<text x="1138" y="695" class="s">Flexible Server</text>
+<text x="1138" y="712" class="s">Entra auth, per-service roles</text>
+<rect x="850" y="760" width="220" height="80" rx="10" fill="#E3F5F2" stroke="#0E7C70" stroke-width="1.6"/>
+<rect x="850" y="760" width="6" height="80" rx="3" fill="#0E7C70"/>
+<text x="868" y="786" class="t" fill="#0E7C70">Service Bus</text>
+<text x="868" y="805" class="s">measurements topic</text>
+<text x="868" y="822" class="s">monitored devices only</text>
+<rect x="1120" y="760" width="220" height="80" rx="10" fill="#E8F1FB" stroke="#0F6CBD" stroke-width="1.6"/>
+<rect x="1120" y="760" width="6" height="80" rx="3" fill="#0F6CBD"/>
+<text x="1138" y="786" class="t" fill="#0F6CBD">alert-service</text>
+<text x="1138" y="805" class="s">threshold alerts</text>
+<text x="1138" y="822" class="s">Java 25 · Spring Boot 4</text>
+<rect x="1390" y="760" width="220" height="80" rx="10" fill="#E3F5F2" stroke="#0E7C70" stroke-width="1.6"/>
+<rect x="1390" y="760" width="6" height="80" rx="3" fill="#0E7C70"/>
+<text x="1408" y="786" class="t" fill="#0E7C70">Communication Services</text>
+<text x="1408" y="805" class="s">Email</text>
+<text x="1408" y="822" class="s">alert notifications</text>
+<polyline points="260,250.0 310,250.0" fill="none" stroke="#5B6470" stroke-width="1.7" marker-end="url(#a)"/>
+<polyline points="420.0,210 420.0,180" fill="none" stroke="#5B6470" stroke-width="1.7" marker-end="url(#a)"/>
+<text x="428.0" y="201" class="l" text-anchor="start">sign in</text>
+<polyline points="530,250.0 580,250.0" fill="none" stroke="#5B6470" stroke-width="1.7" marker-end="url(#a)"/>
+<text x="555" y="242.0" class="l" text-anchor="middle">token</text>
+<polyline points="800,250.0 850,250.0" fill="none" stroke="#5B6470" stroke-width="1.7" marker-end="url(#a)"/>
+<polyline points="825,250.0 825,140.0 850,140.0" fill="none" stroke="#5B6470" stroke-width="1.7" marker-end="url(#a)"/>
+<polyline points="825,250.0 825,360.0 850,360.0" fill="none" stroke="#5B6470" stroke-width="1.7" marker-end="url(#a)"/>
+<polyline points="960.0,100 960.0,74 690.0,74 690.0,210" fill="none" stroke="#5B6470" stroke-width="1.7" stroke-dasharray="6 5" marker-end="url(#a)"/>
+<text x="825.0" y="68" class="l" text-anchor="middle">tools call the API with the user&#x27;s token</text>
+<polyline points="1070,140.0 1390,140.0" fill="none" stroke="#5B6470" stroke-width="1.7" marker-end="url(#a)"/>
+<text x="1230.0" y="132.0" class="l" text-anchor="middle">chat</text>
+<polyline points="1070,240.0 1120,240.0" fill="none" stroke="#5B6470" stroke-width="1.7" marker-end="url(#a)"/>
+<text x="1095" y="232.0" class="l" text-anchor="middle">cache</text>
+<polyline points="1070,270.0 1095,270.0 1095,625 1230.0,625 1230.0,650" fill="none" stroke="#5B6470" stroke-width="1.7" marker-end="url(#a)"/>
+<text x="1089" y="485.0" class="l" text-anchor="end">queries</text>
+<polyline points="960.0,400 960.0,515 420.0,515 420.0,540" fill="none" stroke="#5B6470" stroke-width="1.7" marker-end="url(#a)"/>
+<text x="690.0" y="509" class="l" text-anchor="middle">manage site enrollments</text>
+<polyline points="150,650 150,620" fill="none" stroke="#5B6470" stroke-width="1.7" marker-end="url(#a)"/>
+<text x="158" y="641" class="l" text-anchor="start">site CA</text>
+<polyline points="260,670.0 285,670.0 285,580.0 310,580.0" fill="none" stroke="#5B6470" stroke-width="1.7" marker-end="url(#a)"/>
+<polyline points="260,705.0 310,705.0" fill="none" stroke="#5B6470" stroke-width="1.7" marker-end="url(#a)"/>
+<polyline points="420.0,620 420.0,650" fill="none" stroke="#5B6470" stroke-width="1.7" marker-end="url(#a)"/>
+<text x="428.0" y="641" class="l" text-anchor="start">assign</text>
+<polyline points="530,690.0 580,690.0" fill="none" stroke="#5B6470" stroke-width="1.7" marker-end="url(#a)"/>
+<polyline points="800,690.0 850,690.0" fill="none" stroke="#5B6470" stroke-width="1.7" marker-end="url(#a)"/>
+<polyline points="1070,690.0 1120,690.0" fill="none" stroke="#5B6470" stroke-width="1.7" marker-end="url(#a)"/>
+<text x="1095" y="682.0" class="l" text-anchor="middle">store</text>
+<polyline points="960.0,730 960.0,760" fill="none" stroke="#5B6470" stroke-width="1.7" marker-end="url(#a)"/>
+<text x="968.0" y="751" class="l" text-anchor="start">publish</text>
+<polyline points="1070,800.0 1120,800.0" fill="none" stroke="#5B6470" stroke-width="1.7" marker-end="url(#a)"/>
+<polyline points="1230.0,760 1230.0,730" fill="none" stroke="#5B6470" stroke-width="1.7" marker-end="url(#a)"/>
+<text x="1238.0" y="751" class="l" text-anchor="start">thresholds</text>
+<polyline points="1340,800.0 1390,800.0" fill="none" stroke="#5B6470" stroke-width="1.7" marker-end="url(#a)"/>
+<text x="1365" y="792.0" class="l" text-anchor="middle">email</text>
+<polyline points="1390,695.0 1340,695.0" fill="none" stroke="#5B6470" stroke-width="1.7" marker-end="url(#a)"/>
+<text x="1365" y="687.0" class="l" text-anchor="middle">data</text>
+<polyline points="1500.0,420 1500.0,290" fill="none" stroke="#5B6470" stroke-width="1.7" marker-end="url(#a)"/>
+<rect x="40" y="880" width="1570" height="120" rx="12" fill="#FAFAFA" stroke="#D0D0D0"/>
+<text x="60" y="908" class="t" fill="#333">Across the platform</text>
+<text x="60" y="940" class="m" fill="#333">Passwordless</text>
+<text x="60" y="960" class="s">managed identities and Entra ID for every</text>
+<text x="60" y="977" class="s">data and control plane; no keys or secrets</text>
+<text x="448" y="940" class="m" fill="#333">Observability</text>
+<text x="448" y="960" class="s">OpenTelemetry → Application Insights,</text>
+<text x="448" y="977" class="s">operations workbook, AI usage and evaluations</text>
+<text x="836" y="940" class="m" fill="#333">Infrastructure as code</text>
+<text x="836" y="960" class="s">Terraform deployed with azd,</text>
+<text x="836" y="977" class="s">images built in Azure Container Registry</text>
+<text x="1224" y="940" class="m" fill="#333">Regions</text>
+<text x="1224" y="960" class="s">francecentral, Foundry models in the EU</text>
+<text x="1224" y="977" class="s">data zone (Static Web Apps: eastus2)</text>
+<rect x="40" y="1030" width="16" height="16" rx="4" fill="#E8F1FB" stroke="#0F6CBD" stroke-width="1.6"/>
+<text x="64" y="1043" class="s">Azure Container Apps (apps and jobs)</text>
+<rect x="346" y="1030" width="16" height="16" rx="4" fill="#E3F5F2" stroke="#0E7C70" stroke-width="1.6"/>
+<text x="370" y="1043" class="s">Ingestion and messaging</text>
+<rect x="561" y="1030" width="16" height="16" rx="4" fill="#EAF5E6" stroke="#2E7D32" stroke-width="1.6"/>
+<text x="585" y="1043" class="s">Data</text>
+<rect x="643" y="1030" width="16" height="16" rx="4" fill="#F3ECFB" stroke="#6B3FA0" stroke-width="1.6"/>
+<text x="667" y="1043" class="s">AI models</text>
+<rect x="760" y="1030" width="16" height="16" rx="4" fill="#FFF2E3" stroke="#C25E00" stroke-width="1.6"/>
+<text x="784" y="1043" class="s">Web and API</text>
+<rect x="891" y="1030" width="16" height="16" rx="4" fill="#F1F1F1" stroke="#555555" stroke-width="1.6"/>
+<text x="915" y="1043" class="s">Users, identity and secrets</text>
+</svg>

@@ -41,6 +41,10 @@
 
 ## Architecture
 
+![Smart Device Platform architecture](docs/architecture/architecture.svg)
+
+The same flows as a Mermaid diagram:
+
 ```mermaid
 flowchart LR
   subgraph Field
