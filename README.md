@@ -6,7 +6,7 @@
 
 ![Smart Device Platform architecture](docs/architecture/architecture.svg)
 
-**Contents:** [Why it matters](#why-it-matters) · [What it shows](#what-it-shows) · [Architecture](#architecture) · [How it works](#how-it-works) · [Security](#security) · [Repository](#repository) · [Build and test](#build-and-test) · [Continuous integration](#continuous-integration) · [Deploy to Azure](#deploy-to-azure) · [Operate](#operate) · [Contributing](#contributing)
+**Contents:** [Why it matters](#why-it-matters) · [What it shows](#what-it-shows) · [Architecture](#architecture) · [How it works](#how-it-works) · [Security](#security) · [Repository](#repository) · [Build and test](#build-and-test) · [Continuous integration](#continuous-integration) · [Deploy to Azure](#deploy-to-azure) · [Operate](#operate) · [Before production](#before-production) · [Contributing](#contributing)
 
 ## Why it matters
 
@@ -406,6 +406,25 @@ flowchart LR
 | `scripts/agent-env.sh` | Write the AI agent's local `.env` from the azd environment |
 | `scripts/anomaly-env.sh` | Write the local `.env` of the anomaly detector, site digest and maintenance jobs (dry runs with your identity) |
 | `scripts/build-anomaly-detector-image.sh` | Build the detector image in ACR and point the anomaly, digest and maintenance jobs at it (also run by `postprovision`) |
+
+## Before production
+
+This is a demonstrator: several choices favour a quick, low-cost deployment from scratch over production needs. Review at least the following before using it in production; the first rows are the hardest to change later.
+
+| Area | Recommendation | Why |
+|---|---|---|
+| Network | Private networking: Container Apps environment in a VNet, private endpoints and DNS for PostgreSQL, Redis, Key Vault, Event Hubs, Service Bus (Premium) and Foundry, API Management Standard v2 or Premium, no "allow Azure services" PostgreSQL rule; drop the `SecurityControl=Ignore` / `CostControl=Ignore` tags | Every endpoint is public today, protected by Entra ID only ([ADR-0008](docs/adr/ADR-0008-infrastructure-as-code.md)) |
+| Device identity | Site CAs from the customer's PKI or an HSM, never readable by the platform; certificate renewal and revocation; no simulator | The demo CA private keys are in Key Vault, readable by the simulator ([security](docs/security.md)) |
+| Real devices | Test with real devices and firmware versions: payload variants, clock drift, intermittent connectivity, battery behaviour across temperatures | Decoders, thresholds and analyses were tuned on simulated devices |
+| Time-series storage | Plan the database capacity from devices × metrics × message rate × retention; consider TimescaleDB (if available on the chosen PostgreSQL offer) or a data platform such as Azure Data Explorer or Fabric Real-Time Intelligence for long history and heavy analytics | Measurements are in partitioned PostgreSQL tables with hourly rollups and a 30-day retention (`SDP_RETENTION`) |
+| Ingestion capacity | Size IoT Hub units, Event Hubs partitions and throughput units, and the decoder replicas with a load test | IoT Hub S1 × 1, Event Hubs Standard with 1 throughput unit; partitions cannot change on Standard |
+| Resilience | PostgreSQL General Purpose with zone-redundant HA, longer and geo-redundant backups; Redis HA; zone-redundant Container Apps; Key Vault purge protection; agree on RTO/RPO and a multi-region strategy | Sized for a demo: burstable PostgreSQL without HA, 7-day backups, one region |
+| Environments and delivery | Separate dev/test/prod (ideally subscriptions); deploy from CI/CD with workload identity federation; turn off `deployer_is_user` and `allow_deployer_ip` | One environment (`sdp-dev`) deployed with azd from a workstation |
+| Access | Assign the app roles through groups only (`reader_group_object_ids`, `editor_group_object_ids`) and remove the deployer's assignment; Conditional Access, PIM for operators; review the API Management rate limits; Front Door with WAF and a custom domain for the portal | The deployer gets both roles for demos; limits are set for a handful of users |
+| Monitoring | Alert rules (decoder lag, job failures, dead letters, PostgreSQL load, API errors, Foundry throttling), SLOs, runbooks and budgets | Telemetry and the workbook exist, alert rules do not |
+| AI | Re-tune detection and maintenance on real data with dry runs; pin model versions and track deprecations; re-run evaluations on every model or prompt change; size Foundry quotas and watch costs | Confidence levels and thresholds were chosen from simulated data |
+| Data protection | Retention from legal needs, archival, GDPR handling of user names and email recipients | Retention defaults are demo values |
+| Email | Custom domain with SPF and DKIM, recipient management | The Azure-managed email domain has low sending limits |
 
 ## Contributing
 
