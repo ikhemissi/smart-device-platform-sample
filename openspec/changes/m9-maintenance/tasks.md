@@ -25,7 +25,7 @@ Tasks marked **[cloud agent]** are implemented and verified offline (no Azure ac
 ## 3. Platform API
 
 - [x] 3.1 [cloud agent] device-api: queue list, device assessment and status change (design D8), OpenAPI regenerated; verify integration tests (default statuses, filters, ordering, device without battery, maintenance off or site not configured, 403 for Readers, 409 for done or resolved items, comment length)
-- [ ] 3.2 [Azure] Deploy device-api, provision (API Management operations); verify the operations through API Management
+- [x] 3.2 [Azure] Deploy device-api, provision (API Management operations); verify the operations through API Management
 
 ## 4. Portal
 
