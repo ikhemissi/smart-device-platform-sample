@@ -6,7 +6,7 @@ readme = "README.md"
 authors = [
     { name = "Iheb Khemissi", email = "iheb.khemissi@gmail.com" }
 ]
-requires-python = ">=3.13"
+requires-python = ">=3.12"
 dependencies = [
     "azure-identity>=1.27.0",
     "azure-monitor-opentelemetry>=1.8.11",
@@ -35,7 +35,7 @@ dev = [
 
 [tool.ruff]
 line-length = 120
-target-version = "py313"
+target-version = "py312"
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "UP", "B", "SIM", "RUF", "N", "ASYNC", "BLE", "PIE", "FURB"]

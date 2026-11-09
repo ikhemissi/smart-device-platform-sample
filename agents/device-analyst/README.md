@@ -1,7 +1,7 @@
 # Device analyst (M6)
 
 Conversational assistant of the Smart Device Platform: answers questions about devices, measurements and alerts with
-data read through the platform API **as the signed-in user**, and never modifies anything. Python 3.13,
+data read through the platform API **as the signed-in user**, and never modifies anything. Python 3.12,
 [Microsoft Agent Framework](https://github.com/microsoft/agent-framework) over the `gpt-6-luna` deployment of the
 environment's Foundry account, FastAPI with Server-Sent Events, conversations in Azure Managed Redis
 ([ADR-0010](../../docs/adr/ADR-0010-ai-agent.md), spec `device-analyst-agent`).
