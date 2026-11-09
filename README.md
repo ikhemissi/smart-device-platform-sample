@@ -90,7 +90,7 @@ flowchart LR
 | Layer | Technology |
 |---|---|
 | Platform services | Java 25, Spring Boot 4 |
-| AI agent and analysis jobs | Python 3.13, Microsoft Agent Framework, Foundry (`gpt-6-luna`, `Microsoft-Decision-1`, EU data zone) |
+| AI agent and analysis jobs | Python 3.12, Microsoft Agent Framework, Foundry (`gpt-6-luna`, `Microsoft-Decision-1`, EU data zone) |
 | Portal | React, TypeScript, Fluent UI, MSAL, on Azure Static Web Apps |
 | Infrastructure | Terraform, deployed with azd |
 | Observability | OpenTelemetry → Application Insights, Azure Monitor workbook |
@@ -313,7 +313,7 @@ Details: [docs/security.md](docs/security.md).
 - Owner (or Contributor + User Access Administrator) on the subscription. No local container engine is needed to
   deploy: images are built in Azure Container Registry.
 - Azure CLI (with the `azure-iot` extension), azd, Terraform and OpenSSL.
-- To build and test locally: JDK 25, Podman (or Docker), Node.js 22+, Python 3.13 with [uv](https://docs.astral.sh/uv/).
+- To build and test locally: JDK 25, Podman (or Docker), Node.js 22+, Python 3.12 with [uv](https://docs.astral.sh/uv/).
 
 ### 2. Deploy to Azure
 
@@ -440,7 +440,7 @@ flowchart LR
 | Azure API Management, Container Apps | The API in front of the services, the services and jobs | |
 | Microsoft Foundry | The assistant and analysis models | `gpt-6-luna`, `Microsoft-Decision-1` |
 | [Spring Boot](https://spring.io/projects/spring-boot) on Java | The services | 4.1, Java 25 |
-| [Microsoft Agent Framework](https://github.com/microsoft/agent-framework) on Python | The AI assistant (the analysis jobs are Python too) | 1.23+, Python 3.13 |
+| [Microsoft Agent Framework](https://github.com/microsoft/agent-framework) on Python | The AI assistant (the analysis jobs are Python too) | 1.23+, Python 3.12 |
 | [React](https://react.dev), [Vite](https://vite.dev), [MSAL](https://github.com/AzureAD/microsoft-authentication-library-for-js) | The web portal | 19, 8, 5 |
 | [Terraform](https://www.terraform.io) and [azd](https://learn.microsoft.com/azure/developer/azure-developer-cli/) | The infrastructure and its deployment | |
 
