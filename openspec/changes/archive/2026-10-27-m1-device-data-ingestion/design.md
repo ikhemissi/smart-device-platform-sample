@@ -89,7 +89,7 @@ Java services ship `applicationinsights-agent-3.x.jar` in the image (`JAVA_TOOL_
 
 ## Findings from the first deployment
 
-- Tenant policies (*MCAPSGov*) force public network access off on Storage/Key Vault and block `westeurope`: resources carry `SecurityControl=Ignore` and `CostControl=Ignore` (guidelines §7); Static Web Apps moves to `eastus2` (ADR-0008).
+- The tenant's policies can force public network access off on Storage and Key Vault and restrict regions: resources carry the tags those policies require, set through `RESOURCE_TAGS` (guidelines §7); Static Web Apps moves to `eastus2` (ADR-0008).
 - DPS rejects device chains that do not end at a verified CA (`401002`): site CAs are registered as verified CA certificates and referenced by enrollment groups (ADR-0006).
 - Entra principals must be created from the `postgres` database (see D4).
 - `az acr build` only honours `.dockerignore` rules without trailing slashes, and the ACR classic builder can fail on consecutive `COPY --from` steps: the shared Dockerfile copies the merged Spring Boot layers once.
