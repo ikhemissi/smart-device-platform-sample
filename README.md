@@ -1,12 +1,21 @@
+<div align="center">
+
 # Smart Device Platform — demonstrator
 
-[![CI](https://github.com/ikhemissi/smart-device-platform-sample/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/ikhemissi/smart-device-platform-sample/actions/workflows/ci.yml)
+**From sensor bytes to decisions, on Azure.**
 
-**From sensor bytes to decisions, on Azure.** A complete, deployable sample of an IoT platform: devices send binary measurements; the platform stores them reliably, shows them to the right people and alerts on thresholds — and uses AI to tell people what deserves their attention: unusual readings, a daily brief per site, and the devices to visit before their battery dies.
+[![CI](https://github.com/ikhemissi/smart-device-platform-sample/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/ikhemissi/smart-device-platform-sample/actions/workflows/ci.yml)
+[![IaC: Terraform](https://img.shields.io/badge/IaC-Terraform-623CE4?style=flat-square&logo=terraform)](infra)
+[![Deploy: azd](https://img.shields.io/badge/deploy-azd-0078D4?style=flat-square)](azure.yaml)
+[![Java 25](https://img.shields.io/badge/Java-25-E76F00?style=flat-square)](pom.xml)
+
+[**Quick start**](#quick-start) · [**What it shows**](#what-it-shows) · [**Architecture**](#architecture) · [**Costs**](#demonstrator-costs) · [**Production considerations**](#production-considerations) · [**Documentation**](#documentation)
+
+</div>
+
+A complete, deployable sample of an IoT platform: devices send binary measurements; the platform stores them reliably, shows them to the right people and alerts on thresholds — and uses AI to tell people what deserves their attention: unusual readings, a daily brief per site, and the devices to visit before their battery dies.
 
 ![Smart Device Platform architecture](docs/architecture/architecture.svg)
-
-**Contents:** [Why it matters](#why-it-matters) · [What it shows](#what-it-shows) · [Architecture](#architecture) · [How it works](#how-it-works) · [Security](#security) · [Repository](#repository) · [Build and test](#build-and-test) · [Continuous integration](#continuous-integration) · [Deploy to Azure](#deploy-to-azure) · [Operate](#operate) · [Demonstrator costs](#demonstrator-costs) · [Production considerations](#production-considerations) · [Contributing](#contributing)
 
 ## Why it matters
 
@@ -283,7 +292,7 @@ One trace follows a device message from the decoder to the alert email, and a qu
 
 Details: [docs/security.md](docs/security.md).
 
-## Repository
+## What runs where
 
 | Path | Content |
 |---|---|
@@ -297,9 +306,69 @@ Details: [docs/security.md](docs/security.md).
 | `docs/` | PRDs, ADRs, implementation guidelines, demo guides, security |
 | `openspec/` | Specifications and change history |
 
-## Build and test
+## Quick start
 
-**Prerequisites:** JDK 25, Podman (or Docker), Node.js 22+, Python 3.13 with [uv](https://docs.astral.sh/uv/), and for deployment Azure CLI (with the `azure-iot` extension), azd, Terraform, OpenSSL.
+### 1. Prerequisites
+
+- Owner (or Contributor + User Access Administrator) on the subscription. No local container engine is needed to
+  deploy: images are built in Azure Container Registry.
+- Azure CLI (with the `azure-iot` extension), azd, Terraform and OpenSSL.
+- To build and test locally: JDK 25, Podman (or Docker), Node.js 22+, Python 3.13 with [uv](https://docs.astral.sh/uv/).
+
+### 2. Deploy to Azure
+
+It takes about 30 minutes.
+
+```bash
+az login && azd auth login
+azd env new sdp-dev --location francecentral --subscription <subscription-id>
+azd up
+```
+
+```mermaid
+flowchart LR
+  A["preprovision<br/>model quota check,<br/>Terraform state store"] --> B["Terraform<br/>all resources"]
+  B --> C["postprovision<br/>migrate database,<br/>build the analysis jobs' image,<br/>prepare demo sites"]
+  C --> D["deploy<br/>6 services + portal"]
+```
+
+- The simulator starts at once: 3 sites × 10 devices, every 30 s.
+- `azd up` is idempotent; `azd deploy <service>` redeploys one service; `azd provision --preview` shows the plan.
+
+### 3. Settings
+
+Set with `azd env set <name> <value>`, then `azd provision`:
+
+| Setting | Default | Effect |
+|---|---|---|
+| `RESOURCE_TAGS` | none | Extra tags on every resource, e.g. `owner=team-a,costCenter=42` (for tags your tenant's policies require) |
+| `ALERTING_SUBSCRIPTION_FILTER` | `siteId = 'paris-01'` | Devices monitored for alerts, e.g. `siteId IN ('paris-01','lyon-01')` |
+| `AGENT_MODEL_NAME` / `AGENT_MODEL_VERSION` | `gpt-6-luna` / `2026-09-22` | AI assistant model |
+| `AGENT_MODEL_SKU` / `AGENT_MODEL_CAPACITY` | `DataZoneStandard` / `50` | Deployment SKU (EU data zone) and thousands of tokens per minute |
+| `AGENT_CAPTURE_CONTENT` | `false` | `true` records prompts and answers in traces (demos only) |
+| `PORTAL_ASSISTANT` | on when the agent is deployed | `false` hides the Assistant button |
+| `ANOMALY_DETECTION_ENABLED` | `true` | `false` removes the detector job and the `Microsoft-Decision-1` deployment (data kept) |
+| `ANOMALY_SITES` | `paris-01` | Sites analysed for anomalies (comma-separated) |
+| `ANOMALY_METRICS` | `temperature,humidity,pressure,co2,illuminance` | Metrics analysed |
+| `ANOMALY_DEVIATION` / `ANOMALY_CONFIDENCE` | `4` / `0.7` | Distance from the usual value that makes a candidate; probability from which a classification is applied without review |
+| `DECISION_MODEL_CAPACITY` | `30` | `Microsoft-Decision-1` capacity (1 request and 1,000 tokens per minute per unit) |
+| `PORTAL_ANOMALIES` | on when the detector is deployed | `false` hides the anomaly card and page |
+| `DIGEST_ENABLED` | `true` | `false` removes the site digest job; the portal card and the assistant tool follow |
+| `DIGEST_SITES` | every site | Sites that get a daily digest (comma-separated) |
+| `DIGEST_METRICS` | `temperature,humidity,pressure,co2,illuminance` | Metrics compared in digests (batteries are covered by the maintenance figures) |
+| `PORTAL_DIGESTS` | on when the digest job is deployed | `false` hides the Digest card |
+| `MAINTENANCE_ENABLED` | `true` | `false` removes the maintenance job; the portal, the assistant tool and the digest figures follow (data kept) |
+| `MAINTENANCE_SITES` | every site | Sites assessed for maintenance (comma-separated) |
+| `MAINTENANCE_CONFIDENCE` | `0.4` | Probability of a visit within 7 days from which a device enters the queue |
+| `SIMULATOR_AGING_DEVICES` | `<site>-ruuvi5-003` per demo site | Simulated devices whose battery drains in about two weeks |
+| `PORTAL_MAINTENANCE` | on when the maintenance job is deployed | `false` hides the Maintenance page and the device page's *Battery and maintenance* card |
+
+### 4. Try the demos
+
+Each capability in [What it shows](#what-it-shows) has a demo guide in [docs/demo](docs/demo), with the steps and the
+expected result.
+
+## Build and test
 
 With Podman, expose its socket to Testcontainers:
 
@@ -346,53 +415,6 @@ flowchart LR
 - **Vulnerability policy:** the run fails on **High or Critical** findings that have a fixed version, in the Maven, npm and Python lock files and in the shipped images (Java runtime base image, AI agent and anomaly detector images). All findings, including lower severities and unfixed ones, are listed in the repository's **Security → Code scanning** tab. To accept a finding temporarily, add it to [`.trivyignore.yaml`](.trivyignore.yaml) with a justification and an expiry date; after that date it fails the run again.
 - **Outdated dependencies:** newer stable versions of direct dependencies (Maven, npm, Python, Terraform providers, actions) are listed in each run's summary. This report never fails the run.
 
-## Deploy to Azure
-
-**Needs:** Owner (or Contributor + User Access Administrator) on the subscription. No local container engine: images are built in Azure Container Registry.
-
-```bash
-az login && azd auth login
-azd env new sdp-dev --location francecentral --subscription <subscription-id>
-azd up
-```
-
-```mermaid
-flowchart LR
-  A["preprovision<br/>model quota check,<br/>Terraform state store"] --> B["Terraform<br/>all resources"]
-  B --> C["postprovision<br/>migrate database,<br/>build the analysis jobs' image,<br/>prepare demo sites"]
-  C --> D["deploy<br/>6 services + portal"]
-```
-
-- The simulator starts at once: 3 sites × 10 devices, every 30 s.
-- `azd up` is idempotent; `azd deploy <service>` redeploys one service; `azd provision --preview` shows the plan.
-- `azd down --purge` removes everything.
-
-**Settings** (`azd env set <name> <value>`, then `azd provision`):
-
-| Setting | Default | Effect |
-|---|---|---|
-| `RESOURCE_TAGS` | none | Extra tags on every resource, e.g. `owner=team-a,costCenter=42` (for tags your tenant's policies require) |
-| `ALERTING_SUBSCRIPTION_FILTER` | `siteId = 'paris-01'` | Devices monitored for alerts, e.g. `siteId IN ('paris-01','lyon-01')` |
-| `AGENT_MODEL_NAME` / `AGENT_MODEL_VERSION` | `gpt-6-luna` / `2026-09-22` | AI assistant model |
-| `AGENT_MODEL_SKU` / `AGENT_MODEL_CAPACITY` | `DataZoneStandard` / `50` | Deployment SKU (EU data zone) and thousands of tokens per minute |
-| `AGENT_CAPTURE_CONTENT` | `false` | `true` records prompts and answers in traces (demos only) |
-| `PORTAL_ASSISTANT` | on when the agent is deployed | `false` hides the Assistant button |
-| `ANOMALY_DETECTION_ENABLED` | `true` | `false` removes the detector job and the `Microsoft-Decision-1` deployment (data kept) |
-| `ANOMALY_SITES` | `paris-01` | Sites analysed for anomalies (comma-separated) |
-| `ANOMALY_METRICS` | `temperature,humidity,pressure,co2,illuminance` | Metrics analysed |
-| `ANOMALY_DEVIATION` / `ANOMALY_CONFIDENCE` | `4` / `0.7` | Distance from the usual value that makes a candidate; probability from which a classification is applied without review |
-| `DECISION_MODEL_CAPACITY` | `30` | `Microsoft-Decision-1` capacity (1 request and 1,000 tokens per minute per unit) |
-| `PORTAL_ANOMALIES` | on when the detector is deployed | `false` hides the anomaly card and page |
-| `DIGEST_ENABLED` | `true` | `false` removes the site digest job; the portal card and the assistant tool follow |
-| `DIGEST_SITES` | every site | Sites that get a daily digest (comma-separated) |
-| `DIGEST_METRICS` | `temperature,humidity,pressure,co2,illuminance` | Metrics compared in digests (batteries are covered by the maintenance figures) |
-| `PORTAL_DIGESTS` | on when the digest job is deployed | `false` hides the Digest card |
-| `MAINTENANCE_ENABLED` | `true` | `false` removes the maintenance job; the portal, the assistant tool and the digest figures follow (data kept) |
-| `MAINTENANCE_SITES` | every site | Sites assessed for maintenance (comma-separated) |
-| `MAINTENANCE_CONFIDENCE` | `0.4` | Probability of a visit within 7 days from which a device enters the queue |
-| `SIMULATOR_AGING_DEVICES` | `<site>-ruuvi5-003` per demo site | Simulated devices whose battery drains in about two weeks |
-| `PORTAL_MAINTENANCE` | on when the maintenance job is deployed | `false` hides the Maintenance page and the device page's *Battery and maintenance* card |
-
 ## Operate
 
 - **Operations workbook** *Smart Device Platform — operations*: devices reporting, measurements, ingestion latency, API traffic and errors, cache, alerts, latest errors, the metrics of PostgreSQL, IoT Hub, Event Hubs, Service Bus and API Management, and an **AI assistant** section (questions, users, time to first text, tokens, tool usage, failures and rate limiting). Filters: time range, site, device type, device. Open it with `azd env get-value OPERATIONS_WORKBOOK_URL`.
@@ -407,6 +429,36 @@ flowchart LR
 | `scripts/agent-env.sh` | Write the AI agent's local `.env` from the azd environment |
 | `scripts/anomaly-env.sh` | Write the local `.env` of the anomaly detector, site digest and maintenance jobs (dry runs with your identity) |
 | `scripts/build-anomaly-detector-image.sh` | Build the detector image in ACR and point the anomaly, digest and maintenance jobs at it (also run by `postprovision`) |
+
+## Tech stack
+
+| Technology | Role | Version |
+|---|---|---|
+| Azure IoT Hub and Device Provisioning Service | Device connections, X.509 enrollment per site CA | IoT Hub S1 |
+| Azure Event Hubs, Service Bus | Ingestion stream, alert messages | Event Hubs Standard |
+| Azure Database for PostgreSQL, Azure Managed Redis | Measurements and rollups, cache | |
+| Azure API Management, Container Apps | The API in front of the services, the services and jobs | |
+| Microsoft Foundry | The assistant and analysis models | `gpt-6-luna`, `Microsoft-Decision-1` |
+| [Spring Boot](https://spring.io/projects/spring-boot) on Java | The services | 4.1, Java 25 |
+| [Microsoft Agent Framework](https://github.com/microsoft/agent-framework) on Python | The AI assistant (the analysis jobs are Python too) | 1.23+, Python 3.13 |
+| [React](https://react.dev), [Vite](https://vite.dev), [MSAL](https://github.com/AzureAD/microsoft-authentication-library-for-js) | The web portal | 19, 8, 5 |
+| [Terraform](https://www.terraform.io) and [azd](https://learn.microsoft.com/azure/developer/azure-developer-cli/) | The infrastructure and its deployment | |
+
+## Documentation
+
+| Document | Purpose |
+|---|---|
+| [docs/prd](docs/prd/PRD-000-product-overview.md) | Business requirements and milestones |
+| [docs/adr](docs/adr/README.md) | Hard-to-reverse architecture decisions |
+| [docs/architecture](docs/architecture/implementation-guidelines.md) | Reversible, cross-cutting conventions |
+| [openspec/specs](openspec/specs) | Current specifications |
+| [docs/ideas](docs/ideas/smart-platform.md) | Brainstorm: LLMs and decision models for anomalies, maintenance, alerting and site insights |
+| [docs/demo](docs/demo) | One demo guide per capability |
+| [docs/security.md](docs/security.md) | The security model in detail |
+
+## Clean up
+
+`azd down --purge` removes everything.
 
 ## Demonstrator costs
 
@@ -455,11 +507,3 @@ This is a demonstrator: several choices favour a quick, low-cost deployment from
 
 - **Spec-driven:** every functional change is an [OpenSpec](https://github.com/Fission-AI/OpenSpec) change (propose → apply → archive). Install the CLI with `npm i -g @fission-ai/openspec`; in GitHub Copilot use `/opsx-propose`, `/opsx-apply` and `/opsx-archive`.
 - **Coding agents** follow [AGENTS.md](AGENTS.md). Offline work (code and tests) can be delegated to the GitHub Copilot cloud agent, whose environment is [`copilot-setup-steps.yml`](.github/workflows/copilot-setup-steps.yml); tasks needing Azure stay with a session that can reach the environment (see [M9](openspec/changes/archive/2026-10-31-m9-maintenance/tasks.md) for an example).
-
-| Document | Purpose |
-|---|---|
-| [docs/prd](docs/prd/PRD-000-product-overview.md) | Business requirements and milestones |
-| [docs/adr](docs/adr/README.md) | Hard-to-reverse architecture decisions |
-| [docs/architecture](docs/architecture/implementation-guidelines.md) | Reversible, cross-cutting conventions |
-| [openspec/specs](openspec/specs) | Current specifications |
-| [docs/ideas](docs/ideas/smart-platform.md) | Brainstorm: LLMs and decision models for anomalies, maintenance, alerting and site insights |

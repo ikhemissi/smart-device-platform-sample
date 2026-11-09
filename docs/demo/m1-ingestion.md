@@ -4,7 +4,7 @@ Shows that measurements from devices of different makes, each using its own bina
 
 ## Before the demo
 
-Deploy (about 30 minutes; see the [README](../../README.md#deploy-to-azure)) or reuse a running environment:
+Deploy (about 30 minutes; see the [README](../../README.md#2-deploy-to-azure)) or reuse a running environment:
 
 ```bash
 azd env select sdp-dev            # or: azd env new <name> --location francecentral && azd up
