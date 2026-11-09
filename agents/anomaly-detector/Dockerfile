@@ -11,7 +11,9 @@ RUN uv sync --locked --no-dev --no-editable
 
 FROM python:3.13-slim
 # pip is not needed at runtime; removing it also removes the libraries it vendors from the shipped image.
-RUN python -m pip uninstall --yes --quiet pip && useradd --uid 10001 --create-home detector
+# Debian security updates published since the base image was built (e.g. zlib), then no package lists left behind.
+RUN apt-get update && apt-get upgrade --yes --no-install-recommends && rm -rf /var/lib/apt/lists/* \
+    && python -m pip uninstall --yes --quiet pip && useradd --uid 10001 --create-home detector
 COPY --from=build --chown=detector /app/.venv /app/.venv
 ENV PATH="/app/.venv/bin:$PATH" PYTHONUNBUFFERED=1
 USER 10001
