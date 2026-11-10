@@ -56,9 +56,17 @@
             <groupId>com.github.ben-manes.caffeine</groupId>
             <artifactId>caffeine</artifactId>
         </dependency>
+        <!-- Thymeleaf with Spring EL (SpringTemplateEngine) instead of OGNL, which is excluded: the OGNL version that
+             fixes its vulnerability does not run with Thymeleaf 3.1. -->
         <dependency>
             <groupId>org.thymeleaf</groupId>
-            <artifactId>thymeleaf</artifactId>
+            <artifactId>thymeleaf-spring6</artifactId>
+            <exclusions>
+                <exclusion>
+                    <groupId>ognl</groupId>
+                    <artifactId>ognl</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
         <dependency>
             <groupId>io.opentelemetry</groupId>

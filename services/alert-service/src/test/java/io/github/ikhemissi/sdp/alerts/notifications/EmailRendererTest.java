@@ -1,6 +1,7 @@
 package io.github.ikhemissi.sdp.alerts.notifications;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import io.github.ikhemissi.sdp.alerts.AlertingProperties;
 import java.io.IOException;
@@ -58,6 +59,12 @@ class EmailRendererTest {
                 n.thresholdMin(), n.thresholdMax(), n.direction(), n.openedAt(), n.closedAt(), n.worstValue(), n.lastBreachAt());
 
         assertThat(renderer.render(hostile).html()).doesNotContain("<script>").contains("&lt;script&gt;");
+    }
+
+    @Test
+    void templatesUseSpringElWithoutOgnlOnTheClasspath() {
+        // OGNL is excluded (its fixed version does not run with Thymeleaf 3.1); the snapshots below prove the output.
+        assertThatThrownBy(() -> Class.forName("ognl.Ognl")).isInstanceOf(ClassNotFoundException.class);
     }
 
     @ParameterizedTest

@@ -10,13 +10,14 @@ import java.util.Map;
 import org.springframework.stereotype.Component;
 import org.thymeleaf.TemplateEngine;
 import org.thymeleaf.context.Context;
+import org.thymeleaf.spring6.SpringTemplateEngine;
 import org.thymeleaf.templatemode.TemplateMode;
 import org.thymeleaf.templateresolver.ClassLoaderTemplateResolver;
 
 /**
  * Writes alert, reminder and "back to normal" emails (spec threshold-alerting: "Email content"): device name and id,
  * site, metric with unit, current and worst values, threshold, times and a link to the device page. Plain text and
- * HTML from Thymeleaf templates in {@code templates/email}.
+ * HTML from Thymeleaf templates in {@code templates/email}, with Spring EL expressions (no OGNL on the classpath).
  */
 @Component
 public class EmailRenderer {
@@ -111,7 +112,7 @@ public class EmailRenderer {
         resolver.setSuffix(suffix);
         resolver.setTemplateMode(mode);
         resolver.setCharacterEncoding("UTF-8");
-        TemplateEngine engine = new TemplateEngine();
+        TemplateEngine engine = new SpringTemplateEngine();
         engine.setTemplateResolver(resolver);
         return engine;
     }
