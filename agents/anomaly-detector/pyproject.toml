@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "Anomaly detector of the Smart Device Platform (M7): statistics select, Microsoft-Decision-1 decides, gpt-6-luna explains."
 readme = "README.md"
 authors = [
-    { name = "Iheb Khemissi", email = "iheb.khemissi@gmail.com" }
+    { name = "Iheb Khemissi" }
 ]
 requires-python = ">=3.12"
 dependencies = [
