@@ -313,7 +313,7 @@ Details: [docs/security.md](docs/security.md).
 - Owner (or Contributor + User Access Administrator) on the subscription. No local container engine is needed to
   deploy: images are built in Azure Container Registry.
 - Azure CLI (with the `azure-iot` extension), azd, Terraform and OpenSSL.
-- To build and test locally: JDK 25, Podman (or Docker), Node.js 22+, Python 3.12 with [uv](https://docs.astral.sh/uv/).
+- To build and test locally: JDK 25.0.5.1 or later, Podman (or Docker), Node.js 22+, Python 3.12 with [uv](https://docs.astral.sh/uv/).
 
 ### 2. Deploy to Azure
 

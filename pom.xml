@@ -169,8 +169,9 @@
                         <configuration>
                             <rules>
                                 <requireJavaVersion>
-                                    <version>[25,)</version>
-                                    <message>JDK 25 or later is required (see README).</message>
+                                    <version>[25.0.5.1,)</version>
+                                    <!-- 25.0.5.1 fixes CVE-2026-114938; keep in sync with services/Dockerfile. -->
+                                    <message>JDK 25.0.5.1 or later is required (see README).</message>
                                 </requireJavaVersion>
                                 <requireMavenVersion>
                                     <version>[3.9,)</version>
