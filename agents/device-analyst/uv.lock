@@ -758,7 +758,7 @@ eval = [
 
 [package.metadata]
 requires-dist = [
-    { name = "agent-framework-core", specifier = ">=1.23" },
+    { name = "agent-framework-core", specifier = ">=1.23,<1.26.1" },
     { name = "agent-framework-openai", specifier = ">=1.17.0" },
     { name = "aiohttp", specifier = ">=3.14.5" },
     { name = "azure-identity", specifier = ">=1.27.0" },
