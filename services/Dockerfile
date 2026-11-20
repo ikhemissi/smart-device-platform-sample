@@ -26,6 +26,9 @@ RUN test -n "${SERVICE}" || (echo "--build-arg SERVICE=<module> is required" && 
     done
 
 FROM ${RUNTIME_IMAGE}
+# Refuse a stale runtime image: 25.0.5.1 fixes CVE-2026-114938. Keep in sync with requireJavaVersion in pom.xml.
+COPY services/RequireJavaVersion.java /tmp/RequireJavaVersion.java
+RUN ["java", "/tmp/RequireJavaVersion.java", "25.0.5.1"]
 WORKDIR /app
 COPY --from=build /workspace/agent/applicationinsights-agent.jar /app/applicationinsights-agent.jar
 # Single copy of the merged Spring Boot layers: consecutive COPY --from steps can fail on the classic builder used by

@@ -19,6 +19,12 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  # JDK 25.0.5.1 (fix for CVE-2026-114938) is installed from its archive because setup-java's list of Microsoft
+  # builds does not include it yet. Keep in sync with requireJavaVersion in pom.xml.
+  JDK_URL: https://aka.ms/download-jdk/microsoft-jdk-25.0.5.1-linux-x64.tar.gz
+  JDK_SHA256: 5e63672ada97af95999c9552d6607fd39d3bb9c97c993d4da7d6b3298a448108
+
 jobs:
   java:
     name: Java services and libraries
@@ -26,10 +32,15 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Download the Microsoft Build of OpenJDK
+        run: |
+          curl -fsSL -o "$RUNNER_TEMP/jdk.tar.gz" "$JDK_URL"
+          echo "$JDK_SHA256  $RUNNER_TEMP/jdk.tar.gz" | sha256sum -c -
       - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
         with:
-          distribution: microsoft
-          java-version: "25"
+          distribution: jdkfile
+          jdkFile: ${{ runner.temp }}/jdk.tar.gz
+          java-version: "25.0.5"
           cache: maven
       - name: Build, unit and integration tests (Testcontainers on the runner's Docker)
         run: ./mvnw -B -ntp verify
@@ -148,10 +159,15 @@ jobs:
       security-events: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Download the Microsoft Build of OpenJDK
+        run: |
+          curl -fsSL -o "$RUNNER_TEMP/jdk.tar.gz" "$JDK_URL"
+          echo "$JDK_SHA256  $RUNNER_TEMP/jdk.tar.gz" | sha256sum -c -
       - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
         with:
-          distribution: microsoft
-          java-version: "25"
+          distribution: jdkfile
+          jdkFile: ${{ runner.temp }}/jdk.tar.gz
+          java-version: "25.0.5"
           cache: maven
       - uses: aquasecurity/setup-trivy@81e514348e19b6112ce2a7e3ecbafe19c1e1f567 # v0.3.1
         with:
