@@ -170,7 +170,7 @@
                             <rules>
                                 <requireJavaVersion>
                                     <version>[25.0.5.1,)</version>
-                                    <!-- 25.0.5.1 fixes CVE-2026-114938; keep in sync with services/Dockerfile. -->
+                                    <!-- 25.0.5.1 fixes CVE-2026-114938; keep in sync with services/Dockerfile and .github/workflows. -->
                                     <message>JDK 25.0.5.1 or later is required (see README).</message>
                                 </requireJavaVersion>
                                 <requireMavenVersion>
